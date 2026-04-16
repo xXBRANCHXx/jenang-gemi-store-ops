@@ -111,44 +111,6 @@ function jg_sku_db_next_code(array $items, int $start = 1): string
     return str_pad((string) $next, 2, '0', STR_PAD_LEFT);
 }
 
-function jg_sku_db_find_brand_index(array $data, string $brandId): int
-{
-    foreach ($data['brands'] as $index => $brand) {
-        if ((string) ($brand['id'] ?? '') === $brandId) {
-            return $index;
-        }
-    }
-
-    jg_sku_db_fail('Brand not found.', 404);
-}
-
-function jg_sku_db_find_unit(array $data, string $unitId): array
-{
-    foreach ($data['units'] as $unit) {
-        if ((string) ($unit['id'] ?? '') === $unitId) {
-            return $unit;
-        }
-    }
-
-    jg_sku_db_fail('Unit not found.', 404);
-}
-
-function jg_sku_db_find_brand(array $data, string $brandId): array
-{
-    return $data['brands'][jg_sku_db_find_brand_index($data, $brandId)];
-}
-
-function jg_sku_db_find_brand_item(array $items, string $itemId, string $label): array
-{
-    foreach ($items as $item) {
-        if ((string) ($item['id'] ?? '') === $itemId) {
-            return $item;
-        }
-    }
-
-    jg_sku_db_fail($label . ' not found.', 404);
-}
-
 function jg_sku_db_slug(string $value): string
 {
     $value = strtolower(trim($value));
@@ -157,15 +119,16 @@ function jg_sku_db_slug(string $value): string
     return $value !== '' ? $value : 'item';
 }
 
-function jg_sku_db_volume_digits(float $volume): string
+function jg_sku_db_volume_digits(string $value): string
 {
-    if ($volume <= 0 || $volume > 999.9) {
-        jg_sku_db_fail('Volume must be between 0.1 and 999.9.');
+    $volume = trim($value);
+    if (!preg_match('/^\d{1,3}(\.\d)?$/', $volume)) {
+        jg_sku_db_fail('Volume must use up to three whole digits and up to one decimal place.');
     }
 
-    $scaled = (int) round($volume * 10);
+    $scaled = (int) round(((float) $volume) * 10);
     if ($scaled < 1 || $scaled > 9999) {
-        jg_sku_db_fail('Volume must have up to three whole digits and one decimal place.');
+        jg_sku_db_fail('Volume must be between 0.1 and 999.9.');
     }
 
     return str_pad((string) $scaled, 4, '0', STR_PAD_LEFT);
@@ -179,39 +142,39 @@ function jg_sku_db_tag(string $value): string
     }
 
     if (!preg_match('/^[A-Z_]+$/', $tag)) {
-        jg_sku_db_fail('TAG may only use A-Z and underscores.');
+        jg_sku_db_fail('TAG may only use A-Z and underscore characters.');
+    }
+
+    if (str_ends_with($tag, '_')) {
+        jg_sku_db_fail('TAG may not end in an underscore.');
     }
 
     return $tag;
 }
 
-function jg_sku_db_quantity(mixed $value, string $label, bool $allowZero = true): int
+function jg_sku_db_integer(mixed $value, string $label): int
 {
-    if ($value === '' || $value === null) {
-        jg_sku_db_fail($label . ' is required.');
-    }
-
-    if (!is_numeric($value)) {
+    if ($value === '' || $value === null || !is_numeric($value)) {
         jg_sku_db_fail($label . ' must be numeric.');
     }
 
     $number = (int) round((float) $value);
-    if ($number < 0 || (!$allowZero && $number === 0)) {
-        jg_sku_db_fail($label . ' must be ' . ($allowZero ? '0 or greater.' : 'greater than 0.'));
+    if ($number < 0) {
+        jg_sku_db_fail($label . ' cannot be negative.');
     }
 
     return $number;
 }
 
-function jg_sku_db_money(mixed $value): float
+function jg_sku_db_money(mixed $value, string $label = 'COGS'): float
 {
     if ($value === '' || $value === null || !is_numeric($value)) {
-        jg_sku_db_fail('COGS must be numeric.');
+        jg_sku_db_fail($label . ' must be numeric.');
     }
 
     $amount = round((float) $value, 2);
     if ($amount < 0) {
-        jg_sku_db_fail('COGS cannot be negative.');
+        jg_sku_db_fail($label . ' cannot be negative.');
     }
 
     return $amount;
@@ -226,7 +189,6 @@ function jg_sku_db_bump_patch(string $version): string
     $major = (int) $matches[1];
     $middle = (int) $matches[2];
     $patch = (int) $matches[3] + 1;
-
     if ($patch > 99) {
         $patch = 0;
         $middle += 1;
@@ -239,6 +201,53 @@ function jg_sku_db_response(array $data): void
 {
     echo json_encode(['database' => $data], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     exit;
+}
+
+function jg_sku_db_find_brand_index(array $data, string $brandId): int
+{
+    foreach ($data['brands'] as $index => $brand) {
+        if ((string) ($brand['id'] ?? '') === $brandId) {
+            return $index;
+        }
+    }
+
+    jg_sku_db_fail('Brand not found.', 404);
+}
+
+function jg_sku_db_find_brand(array $data, string $brandId): array
+{
+    return $data['brands'][jg_sku_db_find_brand_index($data, $brandId)];
+}
+
+function jg_sku_db_find_unit(array $data, string $unitId): array
+{
+    foreach ($data['units'] as $unit) {
+        if ((string) ($unit['id'] ?? '') === $unitId) {
+            return $unit;
+        }
+    }
+
+    jg_sku_db_fail('Unit not found.', 404);
+}
+
+function jg_sku_db_find_brand_item(array $items, string $itemId, string $label): array
+{
+    foreach ($items as $item) {
+        if ((string) ($item['id'] ?? '') === $itemId) {
+            return $item;
+        }
+    }
+
+    jg_sku_db_fail($label . ' not found.', 404);
+}
+
+function jg_sku_db_unique_name(array $items, string $name, string $error): void
+{
+    foreach ($items as $item) {
+        if (mb_strtolower((string) ($item['name'] ?? '')) === mb_strtolower($name)) {
+            jg_sku_db_fail($error);
+        }
+    }
 }
 
 $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
@@ -257,12 +266,7 @@ $action = (string) ($request['action'] ?? '');
 
 if ($action === 'add_brand') {
     $name = jg_sku_db_normalize_name((string) ($request['name'] ?? ''));
-
-    foreach ($database['brands'] as $brand) {
-        if (mb_strtolower((string) ($brand['name'] ?? '')) === mb_strtolower($name)) {
-            jg_sku_db_fail('Brand already exists.');
-        }
-    }
+    jg_sku_db_unique_name($database['brands'], $name, 'Brand already exists.');
 
     $brandId = 'brand-' . jg_sku_db_slug($name) . '-' . substr(sha1($name . microtime(true)), 0, 6);
     $database['brands'][] = [
@@ -277,7 +281,9 @@ if ($action === 'add_brand') {
             ],
         ],
         'products' => [],
+        'created_at' => gmdate(DATE_ATOM),
     ];
+
     $database['meta']['version'] = jg_sku_db_bump_patch((string) $database['meta']['version']);
     jg_sku_db_write($database);
     jg_sku_db_response($database);
@@ -285,18 +291,15 @@ if ($action === 'add_brand') {
 
 if ($action === 'add_unit') {
     $name = jg_sku_db_normalize_name((string) ($request['name'] ?? ''));
-
-    foreach ($database['units'] as $unit) {
-        if (mb_strtolower((string) ($unit['name'] ?? '')) === mb_strtolower($name)) {
-            jg_sku_db_fail('Unit already exists.');
-        }
-    }
+    jg_sku_db_unique_name($database['units'], $name, 'Unit already exists.');
 
     $database['units'][] = [
         'id' => 'unit-' . jg_sku_db_slug($name) . '-' . substr(sha1($name . microtime(true)), 0, 6),
         'name' => $name,
         'code' => jg_sku_db_next_code($database['units']),
+        'created_at' => gmdate(DATE_ATOM),
     ];
+
     $database['meta']['version'] = jg_sku_db_bump_patch((string) $database['meta']['version']);
     jg_sku_db_write($database);
     jg_sku_db_response($database);
@@ -306,18 +309,15 @@ if ($action === 'add_flavor') {
     $brandId = (string) ($request['brand_id'] ?? '');
     $name = strtoupper(jg_sku_db_normalize_name((string) ($request['name'] ?? '')));
     $brandIndex = jg_sku_db_find_brand_index($database, $brandId);
-
-    foreach ($database['brands'][$brandIndex]['flavors'] as $flavor) {
-        if (mb_strtolower((string) ($flavor['name'] ?? '')) === mb_strtolower($name)) {
-            jg_sku_db_fail('Flavor already exists for this brand.');
-        }
-    }
+    jg_sku_db_unique_name($database['brands'][$brandIndex]['flavors'] ?? [], $name, 'Flavor already exists for this brand.');
 
     $database['brands'][$brandIndex]['flavors'][] = [
         'id' => $brandId . '-flavor-' . jg_sku_db_slug($name) . '-' . substr(sha1($name . microtime(true)), 0, 6),
         'name' => $name,
         'code' => jg_sku_db_next_code($database['brands'][$brandIndex]['flavors']),
+        'created_at' => gmdate(DATE_ATOM),
     ];
+
     $database['meta']['version'] = jg_sku_db_bump_patch((string) $database['meta']['version']);
     jg_sku_db_write($database);
     jg_sku_db_response($database);
@@ -327,42 +327,38 @@ if ($action === 'add_product') {
     $brandId = (string) ($request['brand_id'] ?? '');
     $name = jg_sku_db_normalize_name((string) ($request['name'] ?? ''));
     $brandIndex = jg_sku_db_find_brand_index($database, $brandId);
-
-    foreach ($database['brands'][$brandIndex]['products'] as $product) {
-        if (mb_strtolower((string) ($product['name'] ?? '')) === mb_strtolower($name)) {
-            jg_sku_db_fail('Product already exists for this brand.');
-        }
-    }
+    jg_sku_db_unique_name($database['brands'][$brandIndex]['products'] ?? [], $name, 'Product already exists for this brand.');
 
     $database['brands'][$brandIndex]['products'][] = [
         'id' => $brandId . '-product-' . jg_sku_db_slug($name) . '-' . substr(sha1($name . microtime(true)), 0, 6),
         'name' => $name,
         'code' => jg_sku_db_next_code($database['brands'][$brandIndex]['products']),
+        'created_at' => gmdate(DATE_ATOM),
     ];
+
     $database['meta']['version'] = jg_sku_db_bump_patch((string) $database['meta']['version']);
     jg_sku_db_write($database);
     jg_sku_db_response($database);
 }
 
-if ($action === 'add_sku') {
+if ($action === 'create_sku' || $action === 'add_sku') {
     $brandId = (string) ($request['brand_id'] ?? '');
     $unitId = (string) ($request['unit_id'] ?? '');
-    $volume = round((float) ($request['volume'] ?? 0), 1);
+    $volumeInput = (string) ($request['volume'] ?? '');
     $flavorId = (string) ($request['flavor_id'] ?? '');
     $productId = (string) ($request['product_id'] ?? '');
     $tag = jg_sku_db_tag((string) ($request['tag'] ?? ''));
-    $startingQty = jg_sku_db_quantity($request['starting_qty'] ?? null, 'Starting quantity');
-    $stockTrigger = jg_sku_db_quantity($request['stock_trigger'] ?? null, 'Stock trigger');
+    $startingStock = jg_sku_db_integer($request['starting_stock'] ?? $request['starting_qty'] ?? null, 'Starting stock');
+    $stockTrigger = jg_sku_db_integer($request['stock_trigger'] ?? null, 'Stock trigger');
     $cogs = jg_sku_db_money($request['cogs'] ?? null);
 
     $brand = jg_sku_db_find_brand($database, $brandId);
     $unit = jg_sku_db_find_unit($database, $unitId);
     $flavor = jg_sku_db_find_brand_item($brand['flavors'] ?? [], $flavorId, 'Flavor');
     $product = jg_sku_db_find_brand_item($brand['products'] ?? [], $productId, 'Product');
-
     $sku = (string) ($brand['code'] ?? '')
         . (string) ($unit['code'] ?? '')
-        . jg_sku_db_volume_digits($volume)
+        . jg_sku_db_volume_digits($volumeInput)
         . (string) ($flavor['code'] ?? '')
         . (string) ($product['code'] ?? '');
 
@@ -377,39 +373,48 @@ if ($action === 'add_sku') {
 
     $database['skus'][] = [
         'sku' => $sku,
+        'tag' => $tag,
         'brand_id' => $brandId,
         'brand_name' => (string) ($brand['name'] ?? ''),
         'unit_id' => $unitId,
         'unit_name' => (string) ($unit['name'] ?? ''),
-        'volume' => number_format($volume, 1, '.', ''),
+        'volume' => number_format((float) $volumeInput, 1, '.', ''),
         'flavor_id' => $flavorId,
         'flavor_name' => (string) ($flavor['name'] ?? ''),
         'product_id' => $productId,
         'product_name' => (string) ($product['name'] ?? ''),
-        'tag' => $tag,
-        'quantity' => $startingQty,
+        'starting_stock' => $startingStock,
+        'current_stock' => $startingStock,
         'stock_trigger' => $stockTrigger,
+        'inventory_mode' => 'auto',
         'cogs' => $cogs,
         'cogs_history' => [
             [
                 'old_price' => null,
                 'new_price' => $cogs,
-                'takes_place' => 'immediate',
+                'takes_place' => 'starting stock',
                 'recorded_at' => gmdate(DATE_ATOM),
             ],
         ],
         'created_at' => gmdate(DATE_ATOM),
         'updated_at' => gmdate(DATE_ATOM),
     ];
+
     $database['meta']['version'] = jg_sku_db_bump_patch((string) $database['meta']['version']);
     jg_sku_db_write($database);
     jg_sku_db_response($database);
 }
 
-if ($action === 'update_sku') {
+if ($action === 'change_cogs') {
     $sku = trim((string) ($request['sku'] ?? ''));
     if ($sku === '') {
         jg_sku_db_fail('SKU is required.');
+    }
+
+    $newPrice = jg_sku_db_money($request['new_price'] ?? null, 'New price');
+    $takesPlace = trim((string) ($request['takes_place'] ?? ''));
+    if ($takesPlace === '') {
+        jg_sku_db_fail('Takes place is required.');
     }
 
     $updated = false;
@@ -418,35 +423,14 @@ if ($action === 'update_sku') {
             continue;
         }
 
-        $nextQty = jg_sku_db_quantity($request['quantity'] ?? null, 'Quantity');
-        $nextTrigger = jg_sku_db_quantity($request['stock_trigger'] ?? null, 'Stock trigger');
-        $nextTag = jg_sku_db_tag((string) ($request['tag'] ?? ($row['tag'] ?? '')));
-        $nextCogs = jg_sku_db_money($request['cogs'] ?? null);
-        $takesPlace = trim((string) ($request['takes_place'] ?? 'immediate'));
-
-        foreach ($database['skus'] as $other) {
-            if ((string) ($other['sku'] ?? '') === $sku) {
-                continue;
-            }
-            if ((string) ($other['tag'] ?? '') === $nextTag) {
-                jg_sku_db_fail('That TAG is already in use.');
-            }
-        }
-
-        $oldCogs = round((float) ($row['cogs'] ?? 0), 2);
-        if ($nextCogs !== $oldCogs) {
-            $row['cogs_history'][] = [
-                'old_price' => $oldCogs,
-                'new_price' => $nextCogs,
-                'takes_place' => $takesPlace !== '' ? $takesPlace : 'immediate',
-                'recorded_at' => gmdate(DATE_ATOM),
-            ];
-        }
-
-        $row['quantity'] = $nextQty;
-        $row['stock_trigger'] = $nextTrigger;
-        $row['tag'] = $nextTag;
-        $row['cogs'] = $nextCogs;
+        $oldPrice = round((float) ($row['cogs'] ?? 0), 2);
+        $row['cogs'] = $newPrice;
+        $row['cogs_history'][] = [
+            'old_price' => $oldPrice,
+            'new_price' => $newPrice,
+            'takes_place' => $takesPlace,
+            'recorded_at' => gmdate(DATE_ATOM),
+        ];
         $row['updated_at'] = gmdate(DATE_ATOM);
         $updated = true;
         break;
