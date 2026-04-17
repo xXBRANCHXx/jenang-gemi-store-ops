@@ -600,6 +600,24 @@ button, input {
   color: #ff8e8e;
 }
 
+.admin-sheet-wrap {
+  border: 1px solid var(--admin-border);
+  border-radius: 22px;
+  background: var(--admin-surface-soft);
+}
+
+.admin-sheet-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--admin-surface);
+}
+
+.admin-sheet-table tbody td {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
 @media (max-width: 900px) {
   .admin-affiliate-head,
   .admin-affiliate-actions,

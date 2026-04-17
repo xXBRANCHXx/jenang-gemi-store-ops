@@ -22,6 +22,6 @@ Operational backend for `store.jenanggemi.com`.
 
 ## Notes
 
-- The SKU database currently uses local JSON storage in `data/sku-db.json`.
-- This is intended as a temporary source of truth until the production database is connected.
-- Partner and executive systems should communicate with this repo through APIs and webhooks rather than shared files.
+- Store ops now treats `/sku-db/` as a read-only mirror of the live shared SKU MySQL database.
+- New SKU creation and approvals have moved to the executive dashboard.
+- `/sku-db/new/` now redirects back to `/sku-db/`.

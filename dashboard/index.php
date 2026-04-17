@@ -73,7 +73,7 @@ $adminCssVersion = (string) @filemtime(dirname(__DIR__) . '/admin.css');
                     <p class="admin-table-note">Use the SKU database to add brands, units, flavors, products, tags, stock triggers, and COGS before the production database is connected.</p>
                     <div class="admin-bottom-actions">
                         <a class="admin-primary-btn admin-link-btn" href="../sku-db/">Open SKU Database</a>
-                        <a class="admin-ghost-btn admin-link-btn" href="../sku-db/new/">Add SKU</a>
+                        <a class="admin-ghost-btn admin-link-btn" href="../sku-db/">Open SKU Sheet</a>
                     </div>
                 </article>
 
