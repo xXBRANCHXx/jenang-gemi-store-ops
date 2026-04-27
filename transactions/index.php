@@ -50,11 +50,13 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
                     <p>Duplicate invoice numbers are detected before import. For current testing, duplicate import is available behind an explicit checkbox.</p>
                 </div>
                 <form class="admin-invoice-upload" data-invoice-upload-form enctype="multipart/form-data">
-                    <label>
-                        <span>Invoice PDF</span>
-                        <input type="file" name="invoice_pdf" accept="application/pdf,.pdf" required>
+                    <label class="admin-invoice-dropzone" data-invoice-dropzone>
+                        <input class="admin-file-input" type="file" name="invoice_pdf" accept="application/pdf,.pdf" required>
+                        <span class="admin-invoice-dropzone-kicker">Upload Invoice</span>
+                        <strong>Drop invoice PDF here</strong>
+                        <small>or click this area to choose a PDF from your files.</small>
                     </label>
-                    <button type="submit" class="admin-primary-btn">Upload Invoice</button>
+                    <p class="admin-table-note" data-invoice-file-name hidden></p>
                     <p class="admin-table-note" data-invoice-upload-status hidden></p>
                     <p class="admin-form-error" data-invoice-upload-error hidden></p>
                 </form>

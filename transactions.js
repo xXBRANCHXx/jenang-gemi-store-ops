@@ -4,6 +4,9 @@
 
   const endpoint = root.dataset.transactionsEndpoint || '../api/transactions/';
   const uploadForm = document.querySelector('[data-invoice-upload-form]');
+  const invoiceFileInput = uploadForm?.querySelector('input[type="file"]');
+  const dropzone = document.querySelector('[data-invoice-dropzone]');
+  const fileNameNode = document.querySelector('[data-invoice-file-name]');
   const uploadError = document.querySelector('[data-invoice-upload-error]');
   const uploadStatus = document.querySelector('[data-invoice-upload-status]');
   const previewPanel = document.querySelector('[data-invoice-preview]');
@@ -173,16 +176,17 @@
     }
   };
 
-  uploadForm?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (!(uploadForm instanceof HTMLFormElement)) return;
+  const previewInvoiceFile = async (file) => {
+    if (!(uploadForm instanceof HTMLFormElement) || !(file instanceof File)) return;
     setMessage(uploadError, '');
+    setMessage(fileNameNode, `Selected: ${file.name}`);
     setMessage(uploadStatus, 'Reading invoice PDF...');
     if (importButton instanceof HTMLButtonElement) importButton.disabled = true;
 
     try {
-      const formData = new FormData(uploadForm);
+      const formData = new FormData();
       formData.set('action', 'preview_invoice');
+      formData.set('invoice_pdf', file, file.name);
       const payload = await requestJson({
         method: 'POST',
         body: formData
@@ -194,6 +198,48 @@
       setMessage(uploadStatus, '');
       setMessage(uploadError, error instanceof Error ? error.message : 'Unable to read invoice.');
     }
+  };
+
+  uploadForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!(invoiceFileInput instanceof HTMLInputElement)) return;
+    const file = invoiceFileInput.files?.[0];
+    if (file) await previewInvoiceFile(file);
+  });
+
+  invoiceFileInput?.addEventListener('change', async () => {
+    if (!(invoiceFileInput instanceof HTMLInputElement)) return;
+    const file = invoiceFileInput.files?.[0];
+    if (file) await previewInvoiceFile(file);
+  });
+
+  dropzone?.addEventListener('dragenter', (event) => {
+    event.preventDefault();
+    dropzone.classList.add('is-dragging');
+  });
+
+  dropzone?.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    dropzone.classList.add('is-dragging');
+  });
+
+  dropzone?.addEventListener('dragleave', (event) => {
+    if (!(event.relatedTarget instanceof Node) || !dropzone.contains(event.relatedTarget)) {
+      dropzone.classList.remove('is-dragging');
+    }
+  });
+
+  dropzone?.addEventListener('drop', async (event) => {
+    event.preventDefault();
+    dropzone.classList.remove('is-dragging');
+    const file = event.dataTransfer?.files?.[0];
+    if (!file) return;
+    if (invoiceFileInput instanceof HTMLInputElement) {
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      invoiceFileInput.files = transfer.files;
+    }
+    await previewInvoiceFile(file);
   });
 
   importButton?.addEventListener('click', async () => {
@@ -214,6 +260,7 @@
       state.previewToken = '';
       if (previewPanel instanceof HTMLElement) previewPanel.hidden = true;
       uploadForm?.reset();
+      setMessage(fileNameNode, '');
       renderData(payload);
       const result = payload.result || {};
       setMessage(uploadStatus, `Imported ${result.inserted || 0} transaction row(s). Inventory updated for ${result.inventory_updated || 0} matched SKU row(s).`);

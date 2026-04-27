@@ -212,6 +212,8 @@ function jg_store_ops_transactions_extract_text_fallback(string $path): string
             $streamText = jg_store_ops_transactions_extract_text_from_stream($stream);
             if ($streamText !== '') {
                 $text[] = $streamText;
+            } elseif (stripos($stream, 'CrossIndustryInvoice') !== false || stripos($stream, '<rsm:') !== false) {
+                $text[] = trim($stream);
             }
         }
     }
@@ -234,8 +236,86 @@ function jg_store_ops_transactions_extract_invoice_text(string $path): string
     throw new RuntimeException('Unable to extract readable text from the PDF.');
 }
 
+function jg_store_ops_transactions_xml_value(string $xml, string $pattern): string
+{
+    if (!preg_match($pattern, $xml, $match)) {
+        return '';
+    }
+
+    return trim(html_entity_decode(strip_tags((string) ($match[1] ?? '')), ENT_QUOTES | ENT_XML1, 'UTF-8'));
+}
+
+function jg_store_ops_transactions_parse_invoice_xml(string $text, string $sourceFile = ''): ?array
+{
+    if (stripos($text, 'CrossIndustryInvoice') === false && stripos($text, '<rsm:') === false) {
+        return null;
+    }
+
+    $invoiceNumber = strtoupper(jg_store_ops_transactions_xml_value(
+        $text,
+        '/<rsm:ExchangedDocument\b[^>]*>.*?<ram:ID\b[^>]*>(.*?)<\/ram:ID>/is'
+    ));
+    if ($invoiceNumber === '') {
+        $invoiceNumber = strtoupper(jg_store_ops_transactions_xml_value($text, '/<ram:PaymentReference\b[^>]*>(.*?)<\/ram:PaymentReference>/is'));
+    }
+
+    $poNumber = strtoupper(jg_store_ops_transactions_xml_value(
+        $text,
+        '/<ram:BuyerOrderReferencedDocument\b[^>]*>.*?<ram:IssuerAssignedID\b[^>]*>(.*?)<\/ram:IssuerAssignedID>/is'
+    ));
+
+    $items = [];
+    if (preg_match_all('/<ram:IncludedSupplyChainTradeLineItem\b[^>]*>(.*?)<\/ram:IncludedSupplyChainTradeLineItem>/is', $text, $matches)) {
+        foreach ($matches[1] as $itemXml) {
+            $description = jg_store_ops_transactions_xml_value((string) $itemXml, '/<ram:SpecifiedTradeProduct\b[^>]*>.*?<ram:Name\b[^>]*>(.*?)<\/ram:Name>/is');
+            $quantity = jg_store_ops_transactions_number_to_float(jg_store_ops_transactions_xml_value((string) $itemXml, '/<ram:BilledQuantity\b[^>]*>(.*?)<\/ram:BilledQuantity>/is'));
+            $unitPrice = jg_store_ops_transactions_money_to_float(jg_store_ops_transactions_xml_value((string) $itemXml, '/<ram:NetPriceProductTradePrice\b[^>]*>.*?<ram:ChargeAmount\b[^>]*>(.*?)<\/ram:ChargeAmount>/is'));
+            if ($unitPrice <= 0) {
+                $unitPrice = jg_store_ops_transactions_money_to_float(jg_store_ops_transactions_xml_value((string) $itemXml, '/<ram:GrossPriceProductTradePrice\b[^>]*>.*?<ram:ChargeAmount\b[^>]*>(.*?)<\/ram:ChargeAmount>/is'));
+            }
+            $lineTotal = jg_store_ops_transactions_money_to_float(jg_store_ops_transactions_xml_value((string) $itemXml, '/<ram:LineTotalAmount\b[^>]*>(.*?)<\/ram:LineTotalAmount>/is'));
+            $cogs = $quantity > 0 ? round($lineTotal / $quantity, 2) : $unitPrice;
+
+            if ($description === '' || $quantity <= 0) {
+                continue;
+            }
+
+            $items[] = [
+                'item_tag' => $description,
+                'item_description' => $description,
+                'quantity' => number_format($quantity, 2, '.', ''),
+                'unit_price' => number_format($unitPrice, 2, '.', ''),
+                'line_total' => number_format($lineTotal, 2, '.', ''),
+                'cogs' => number_format($cogs, 2, '.', ''),
+                'sku' => '',
+                'match_status' => 'unmatched',
+            ];
+        }
+    }
+
+    if ($invoiceNumber === '' || $poNumber === '' || $items === []) {
+        return null;
+    }
+
+    return [
+        'invoice_number' => $invoiceNumber,
+        'po_number' => $poNumber,
+        'po_context' => '',
+        'source_order' => '',
+        'source_reference' => $poNumber,
+        'source_file' => basename($sourceFile),
+        'raw_text_hash' => hash('sha256', $text),
+        'items' => $items,
+    ];
+}
+
 function jg_store_ops_transactions_parse_invoice_text(string $text, string $sourceFile = ''): array
 {
+    $xmlInvoice = jg_store_ops_transactions_parse_invoice_xml($text, $sourceFile);
+    if (is_array($xmlInvoice)) {
+        return $xmlInvoice;
+    }
+
     $normalizedText = str_replace(["\r\n", "\r"], "\n", $text);
     $lines = array_values(array_filter(array_map(static fn ($line): string => rtrim((string) $line), explode("\n", $normalizedText)), static fn ($line): bool => trim($line) !== ''));
     $flat = preg_replace('/[ \t]+/', ' ', $normalizedText) ?? $normalizedText;

@@ -628,27 +628,62 @@ button, input {
   background: rgba(255, 255, 255, 0.045);
 }
 
-.admin-invoice-upload label,
 .admin-checkbox-line {
   display: grid;
   gap: 10px;
 }
 
-.admin-invoice-upload label span {
+.admin-invoice-dropzone {
+  position: relative;
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 180px;
+  padding: 24px;
+  border: 1px dashed rgba(157, 255, 0, 0.36);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(157, 255, 0, 0.12), transparent 34%),
+    var(--admin-surface-soft);
+  color: var(--admin-text);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+
+.admin-invoice-dropzone:hover,
+.admin-invoice-dropzone.is-dragging {
+  border-color: rgba(157, 255, 0, 0.72);
+  transform: translateY(-2px);
+  background:
+    radial-gradient(circle at 20% 20%, rgba(157, 255, 0, 0.18), transparent 34%),
+    var(--admin-surface-soft);
+}
+
+.admin-invoice-dropzone strong {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+}
+
+.admin-invoice-dropzone small {
+  color: var(--admin-muted);
+}
+
+.admin-invoice-dropzone-kicker {
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--admin-muted);
+  color: var(--admin-accent-primary);
 }
 
-.admin-invoice-upload input[type='file'] {
-  width: 100%;
-  padding: 13px;
-  border: 1px dashed rgba(157, 255, 0, 0.28);
-  border-radius: 16px;
-  background: var(--admin-surface-soft);
-  color: var(--admin-muted);
+.admin-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .admin-invoice-meta {
