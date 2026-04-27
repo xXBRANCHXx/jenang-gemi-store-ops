@@ -37,6 +37,7 @@ $adminCssVersion = (string) @filemtime(dirname(__DIR__) . '/admin.css');
             <div class="admin-topbar-actions">
                 <a class="admin-ghost-btn admin-link-btn" href="../sku-db/">SKU Database</a>
                 <a class="admin-ghost-btn admin-link-btn" href="../inventory/">Inventory</a>
+                <a class="admin-ghost-btn admin-link-btn" href="../transactions/">Transactions</a>
                 <a class="admin-ghost-btn admin-link-btn" href="../orders/">Orders</a>
                 <a class="admin-ghost-btn admin-link-btn" href="../integrations/">Integrations</a>
                 <a class="admin-primary-btn admin-link-btn" href="../logout/">Lock</a>
@@ -57,8 +58,8 @@ $adminCssVersion = (string) @filemtime(dirname(__DIR__) . '/admin.css');
 
             <section class="admin-metric-grid">
                 <article class="admin-metric-card"><span>SKU Master</span><strong>Live</strong><small>Brands, flavors, products, TAGs, quantity, COGS</small></article>
-                <article class="admin-metric-card"><span>Inventory</span><strong>Planned</strong><small>Stock balances and replenishment logic</small></article>
-                <article class="admin-metric-card"><span>Orders</span><strong>Planned</strong><small>Partner order creation and change history</small></article>
+                <article class="admin-metric-card"><span>Inventory</span><strong>Live</strong><small>PO-based COGS and stock balances</small></article>
+                <article class="admin-metric-card"><span>Transactions</span><strong>Live</strong><small>Invoice-number ledger and PDF import</small></article>
                 <article class="admin-metric-card"><span>Integrations</span><strong>Planned</strong><small>Webhook and API syncs to external systems</small></article>
             </section>
 
@@ -73,7 +74,7 @@ $adminCssVersion = (string) @filemtime(dirname(__DIR__) . '/admin.css');
                     <p class="admin-table-note">Use the SKU database to add brands, units, flavors, products, tags, stock triggers, and COGS before the production database is connected.</p>
                     <div class="admin-bottom-actions">
                         <a class="admin-primary-btn admin-link-btn" href="../sku-db/">Open SKU Database</a>
-                        <a class="admin-ghost-btn admin-link-btn" href="../sku-db/">Open SKU Sheet</a>
+                        <a class="admin-ghost-btn admin-link-btn" href="../transactions/">Open Transactions</a>
                     </div>
                 </article>
 

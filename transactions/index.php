@@ -16,7 +16,7 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
-    <title>Inventory | Jenang Gemi Store Ops</title>
+    <title>Transactions | Jenang Gemi Store Ops</title>
     <meta name="robots" content="noindex,nofollow">
     <link rel="icon" type="image/png" href="https://jenanggemi.com/Media/Jenang%20Gemi%20Website%20Logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -31,13 +31,13 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
         <div class="admin-backdrop admin-backdrop-b"></div>
         <header class="admin-topbar">
             <div class="admin-topbar-brand">
-                <span class="admin-chip">Inventory</span>
-                <h1>Inventory Tracking</h1>
-                <p>Stock and COGS now move through invoice transactions. Invoice rows map item tags to SKUs, then apply COGS by PO number.</p>
+                <span class="admin-chip">Transactions</span>
+                <h1>Invoice Transactions</h1>
+                <p>Track orders by invoice number and apply COGS by PO number. Each product row becomes one transaction record.</p>
             </div>
             <div class="admin-topbar-actions">
                 <a class="admin-ghost-btn admin-link-btn" href="../dashboard/">Dashboard</a>
-                <a class="admin-ghost-btn admin-link-btn" href="../transactions/">Transactions</a>
+                <a class="admin-ghost-btn admin-link-btn" href="../inventory/">Inventory</a>
                 <a class="admin-primary-btn admin-link-btn" href="../sku-db/">SKU Database</a>
             </div>
         </header>
@@ -45,9 +45,9 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
         <main class="admin-layout">
             <section class="admin-hero-panel">
                 <div class="admin-hero-copy">
-                    <span class="admin-chip admin-chip-accent">PO Based COGS</span>
-                    <h2>Upload supplier invoices, preview the SKU map, then update inventory from the transaction rows.</h2>
-                    <p>The system records invoice number, PO number, item tag, quantity, line total, SKU, and COGS per unit in <code>Transaction_Table</code>.</p>
+                    <span class="admin-chip admin-chip-accent">Invoice Number Ledger</span>
+                    <h2>Upload an invoice PDF, confirm the extracted PO and item rows, then import into <code>Transaction_Table</code>.</h2>
+                    <p>Duplicate invoice numbers are detected before import. For current testing, duplicate import is available behind an explicit checkbox.</p>
                 </div>
                 <form class="admin-invoice-upload" data-invoice-upload-form enctype="multipart/form-data">
                     <label>
@@ -71,7 +71,7 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
                 <div class="admin-panel-head">
                     <div>
                         <span class="admin-panel-kicker">Invoice Preview</span>
-                        <h3>Review extracted rows before import</h3>
+                        <h3>Extracted transaction rows</h3>
                     </div>
                     <div class="admin-invoice-meta" data-invoice-preview-meta></div>
                 </div>
@@ -103,28 +103,28 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
             <section class="admin-panel admin-panel-wide">
                 <div class="admin-panel-head">
                     <div>
-                        <span class="admin-panel-kicker">Inventory Sheet</span>
-                        <h3>Live SKU stock and current COGS</h3>
+                        <span class="admin-panel-kicker">Ledger</span>
+                        <h3>Recent transaction rows</h3>
                     </div>
-                    <span class="admin-panel-meta">Latest PO comes from the most recent transaction row for each SKU</span>
+                    <span class="admin-panel-meta">One row per invoice product line</span>
                 </div>
                 <div class="admin-table-wrap admin-sheet-wrap">
                     <table class="admin-table admin-sheet-table">
                         <thead>
                             <tr>
+                                <th>Invoice</th>
+                                <th>PO</th>
                                 <th>SKU</th>
-                                <th>TAG</th>
-                                <th>Product</th>
-                                <th>Flavor</th>
-                                <th>Stock</th>
-                                <th>Trigger</th>
-                                <th>Status</th>
+                                <th>Item Tag</th>
+                                <th>QTY</th>
+                                <th>Line Total</th>
                                 <th>COGS</th>
-                                <th>Latest PO</th>
+                                <th>PDF PO Line</th>
+                                <th>Created</th>
                             </tr>
                         </thead>
-                        <tbody data-inventory-table-body>
-                            <tr><td colspan="9" class="admin-empty">Loading inventory...</td></tr>
+                        <tbody data-transactions-table-body>
+                            <tr><td colspan="9" class="admin-empty">Loading transactions...</td></tr>
                         </tbody>
                     </table>
                 </div>

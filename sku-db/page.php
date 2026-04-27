@@ -42,6 +42,7 @@ $skuDbJsVersion = (string) @filemtime(dirname(__DIR__) . '/sku-db.js');
                     <div class="admin-menu-panel" data-menu-panel hidden>
                         <a class="admin-menu-item admin-link-btn" href="../dashboard/" data-dashboard-view-link="home">Home Dashboard</a>
                         <a class="admin-menu-item admin-link-btn" href="../inventory/">Inventory</a>
+                        <a class="admin-menu-item admin-link-btn" href="../transactions/">Transactions</a>
                         <a class="admin-menu-item admin-link-btn" href="../orders/">Orders</a>
                         <a class="admin-menu-item admin-link-btn" href="../integrations/">Integrations</a>
                         <a class="admin-menu-item admin-link-btn" href="../sku-db/">SKU Database</a>

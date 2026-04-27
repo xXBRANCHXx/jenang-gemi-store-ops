@@ -618,6 +618,92 @@ button, input {
   white-space: nowrap;
 }
 
+.admin-invoice-upload {
+  display: grid;
+  gap: 14px;
+  width: min(420px, 100%);
+  padding: 18px;
+  border: 1px solid var(--admin-border);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.admin-invoice-upload label,
+.admin-checkbox-line {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-invoice-upload label span {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--admin-muted);
+}
+
+.admin-invoice-upload input[type='file'] {
+  width: 100%;
+  padding: 13px;
+  border: 1px dashed rgba(157, 255, 0, 0.28);
+  border-radius: 16px;
+  background: var(--admin-surface-soft);
+  color: var(--admin-muted);
+}
+
+.admin-invoice-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  color: var(--admin-muted);
+  font-size: 12px;
+}
+
+.admin-invoice-meta span,
+.admin-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.admin-status-badge {
+  margin-left: 8px;
+  color: var(--admin-accent-primary);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-status-badge-danger {
+  color: #ff8e8e;
+  border-color: rgba(255, 82, 82, 0.28);
+}
+
+.admin-status-badge-warn {
+  color: var(--admin-accent-secondary);
+  border-color: rgba(255, 212, 0, 0.28);
+}
+
+.admin-checkbox-line {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  color: var(--admin-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-checkbox-line input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--admin-accent-primary);
+}
+
 @media (max-width: 900px) {
   .admin-affiliate-head,
   .admin-affiliate-actions,
