@@ -4,7 +4,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const ordersStorageKey = 'jg-store-demo-orders';
   const activeOrderStorageKey = 'jg-store-active-order-id';
-  const scanSessionStorageKey = 'jg-store-scan-session';
   const orderIdNode = document.querySelector('[data-scan-order-id]');
   const capturePad = document.querySelector('[data-scanner-capture]');
   const scanError = document.querySelector('[data-scan-error]');
@@ -39,31 +38,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const params = new URLSearchParams(window.location.search);
   const orderId = params.get('order') || window.sessionStorage.getItem(activeOrderStorageKey) || '';
-  const session = params.get('session')
-    || window.sessionStorage.getItem(scanSessionStorageKey)
-    || `SCAN-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
   const orders = readOrders();
   const order = orders.find((item) => item.id === orderId) || null;
   const scans = new Map();
   let scanBuffer = '';
   let scanBufferTimer = 0;
-  let bridgeCursor = 0;
-
-  try {
-    window.sessionStorage.setItem(scanSessionStorageKey, session);
-  } catch (_error) {
-    // Query string remains the fallback.
-  }
-
-  if (params.get('session') !== session) {
-    params.set('session', session);
-    if (orderId) params.set('order', orderId);
-    window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
-  }
+  let bridgeCursor = null;
 
   if (orderIdNode) orderIdNode.textContent = order?.id || 'Order missing';
   if (phoneScanLink) {
-    const phoneUrl = `../phone-scan/?session=${encodeURIComponent(session)}`;
+    const phoneUrl = '../phone-scan/';
     phoneScanLink.href = phoneUrl;
     phoneScanLink.textContent = new URL(phoneUrl, window.location.href).href;
   }
@@ -152,11 +136,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const pollPhoneScans = async () => {
     try {
-      const response = await fetch(`../../api/scan-bridge/?session=${encodeURIComponent(session)}&after=${bridgeCursor}`, {
+      const after = bridgeCursor === null ? 0 : bridgeCursor;
+      const response = await fetch(`../../api/scan-bridge/?after=${after}`, {
         credentials: 'same-origin',
         headers: { Accept: 'application/json' }
       });
       const payload = await response.json();
+      if (bridgeCursor === null) {
+        bridgeCursor = Number(payload.cursor || 0);
+        return;
+      }
       bridgeCursor = Number(payload.cursor || bridgeCursor);
       (payload.events || []).forEach((event) => handleScan(event.barcode || ''));
     } catch (_error) {
@@ -172,7 +161,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.setTimeout(() => {
       writeOrders(orders);
       window.sessionStorage.removeItem(activeOrderStorageKey);
-      window.sessionStorage.removeItem(scanSessionStorageKey);
       window.location.href = '../';
     }, 650);
   });

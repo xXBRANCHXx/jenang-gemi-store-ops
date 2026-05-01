@@ -28,30 +28,27 @@ function jg_scan_bridge_read(): array
     }
 
     $decoded = json_decode($raw, true);
-    return is_array($decoded) ? $decoded : [];
+    if (!is_array($decoded)) {
+        return [];
+    }
+
+    if (isset($decoded['events']) && is_array($decoded['events'])) {
+        return $decoded['events'];
+    }
+
+    return array_values($decoded) === $decoded ? $decoded : [];
 }
 
-function jg_scan_bridge_write(array $store): void
+function jg_scan_bridge_write(array $events): void
 {
     $path = jg_scan_bridge_store_path();
-    $encoded = json_encode($store, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    $encoded = json_encode(['events' => array_values($events)], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if (!is_string($encoded) || @file_put_contents($path, $encoded . PHP_EOL, LOCK_EX) === false) {
         jg_scan_bridge_fail('Unable to save scan event.', 500);
     }
 }
 
-function jg_scan_bridge_session(): string
-{
-    $session = strtoupper(trim((string) ($_GET['session'] ?? $_POST['session'] ?? '')));
-    if (!preg_match('/^[A-Z0-9-]{8,48}$/', $session)) {
-        jg_scan_bridge_fail('Invalid scan session.');
-    }
-    return $session;
-}
-
-$session = jg_scan_bridge_session();
-$store = jg_scan_bridge_read();
-$store[$session] = is_array($store[$session] ?? null) ? $store[$session] : [];
+$events = jg_scan_bridge_read();
 
 $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 if ($method === 'POST') {
@@ -63,12 +60,12 @@ if ($method === 'POST') {
         jg_scan_bridge_fail('Invalid barcode.');
     }
 
-    $store[$session][] = [
+    $events[] = [
         'barcode' => $barcode,
         'created_at' => gmdate(DATE_ATOM),
     ];
-    $store[$session] = array_slice($store[$session], -80);
-    jg_scan_bridge_write($store);
+    $events = array_slice($events, -80);
+    jg_scan_bridge_write($events);
     echo json_encode(['ok' => true], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -78,7 +75,6 @@ if ($method !== 'GET') {
 }
 
 $after = max(0, (int) ($_GET['after'] ?? 0));
-$events = array_values($store[$session]);
 $nextEvents = array_slice($events, $after);
 echo json_encode([
     'events' => $nextEvents,

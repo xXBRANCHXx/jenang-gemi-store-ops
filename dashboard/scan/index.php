@@ -35,9 +35,6 @@ $storeScanJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/store-scan.js'
 
         <main class="admin-scan-page-layout">
             <section class="admin-panel admin-scan-page-card">
-                <div class="admin-step-art admin-step-art-scan">
-                    <img src="../../assets/store/scan-step.png" alt="">
-                </div>
                 <div class="admin-scan-head">
                     <div>
                         <span class="admin-panel-kicker">Barcode Check</span>
@@ -50,7 +47,7 @@ $storeScanJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/store-scan.js'
                         <span class="admin-panel-kicker">Phone Scanner</span>
                         <a data-phone-scan-link href="../phone-scan/" target="_blank" rel="noopener">Open phone scanner</a>
                     </div>
-                    <small>Hardware scanners also work from this page. Manual typing is disabled.</small>
+                    <small>Hardware scanner input is captured automatically. Manual typing is disabled.</small>
                 </div>
                 <div class="admin-scanner-capture" tabindex="0" data-scanner-capture>
                     <span></span>

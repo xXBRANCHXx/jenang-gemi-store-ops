@@ -18,7 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const boardClock = document.querySelector('[data-board-clock]');
   const ordersStorageKey = 'jg-store-demo-orders';
   const activeOrderStorageKey = 'jg-store-active-order-id';
-  const scanSessionStorageKey = 'jg-store-scan-session';
 
   const skuCatalog = {
     BUBUR_AREN_15SACHETS: { sku: '010100150203', barcode: 'JG010100150203', productName: 'Bubur Aren 15 Sachets' },
@@ -278,12 +277,10 @@ document.addEventListener('DOMContentLoaded', () => {
     saveOrders();
     try {
       window.sessionStorage.setItem(activeOrderStorageKey, order.id);
-      window.sessionStorage.setItem(scanSessionStorageKey, `SCAN-${Math.random().toString(36).slice(2, 10).toUpperCase()}`);
     } catch (_error) {
       // Query string still carries the order id.
     }
-    const session = window.sessionStorage.getItem(scanSessionStorageKey) || '';
-    window.location.href = `./scan/?order=${encodeURIComponent(order.id)}&session=${encodeURIComponent(session)}`;
+    window.location.href = `./scan/?order=${encodeURIComponent(order.id)}`;
   });
 
   document.querySelectorAll('[data-close-fulfillment-modal]').forEach((button) => {

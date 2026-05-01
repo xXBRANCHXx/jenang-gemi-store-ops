@@ -19,7 +19,7 @@ $phoneScanJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/phone-scan.js'
         <section class="admin-phone-camera-card">
             <div class="admin-phone-camera-head">
                 <span class="admin-panel-kicker">Phone Scanner</span>
-                <strong data-phone-session>Connecting</strong>
+                <strong data-phone-status>Ready</strong>
             </div>
             <div class="admin-phone-camera-frame">
                 <video data-camera-video muted playsinline></video>

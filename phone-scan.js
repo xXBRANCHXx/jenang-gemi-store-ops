@@ -5,17 +5,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const video = document.querySelector('[data-camera-video]');
   const startButton = document.querySelector('[data-start-camera]');
   const demoButton = document.querySelector('[data-demo-scan]');
-  const sessionNode = document.querySelector('[data-phone-session]');
+  const statusNode = document.querySelector('[data-phone-status]');
   const errorNode = document.querySelector('[data-phone-error]');
-  const params = new URLSearchParams(window.location.search);
-  const session = params.get('session') || '';
   const demoCodes = ['JG010100150203', 'JG020200250101', 'JG010100150103', 'JG010100150303'];
   let demoIndex = 0;
   let detector = null;
   let stream = null;
   let scanning = false;
 
-  if (sessionNode) sessionNode.textContent = session || 'Missing session';
+  if (statusNode) statusNode.textContent = 'Ready';
 
   const setError = (message) => {
     if (!errorNode) return;
@@ -24,20 +22,15 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const sendScan = async (barcode) => {
-    if (!session) {
-      setError('Open this page from the scan screen link.');
-      return;
-    }
-
     setError('');
-    await fetch(`../../api/scan-bridge/?session=${encodeURIComponent(session)}`, {
+    await fetch('../../api/scan-bridge/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ barcode })
     });
-    if (sessionNode) sessionNode.textContent = `Sent ${barcode}`;
+    if (statusNode) statusNode.textContent = `Sent ${barcode}`;
     window.setTimeout(() => {
-      if (sessionNode) sessionNode.textContent = session;
+      if (statusNode) statusNode.textContent = 'Ready';
     }, 900);
   };
 
