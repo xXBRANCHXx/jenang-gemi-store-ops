@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const normalizeBarcode = (value) => {
     let barcode = String(value || '').trim().toUpperCase();
     if (/^\d+$/.test(barcode)) barcode = barcode.slice(0, -1);
-    if (/^\d+$/.test(barcode) && !barcode.startsWith('0')) return `0${barcode}`;
+    if (/^\d{11}$/.test(barcode)) return `0${barcode}`;
     return barcode;
   };
 
