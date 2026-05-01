@@ -411,7 +411,8 @@ function jg_store_ops_transactions_fetch_sku_match_index(PDO $pdo): array
             p.name AS product_name,
             f.name AS flavor_name,
             u.name AS unit_name,
-            s.volume
+            s.volume,
+            s.astra
         FROM sku_skus s
         INNER JOIN sku_products p ON p.id = s.product_id
         INNER JOIN sku_flavors f ON f.id = s.flavor_id
@@ -507,7 +508,7 @@ function jg_store_ops_transactions_import_invoice(PDO $pdo, array $invoice, bool
         'INSERT INTO sku_cogs_history (sku, old_price, new_price, takes_place, recorded_at)
          VALUES (:sku, :old_price, :new_price, :takes_place, :recorded_at)'
     );
-    $oldCogs = $pdo->prepare('SELECT cogs FROM sku_skus WHERE sku = :sku LIMIT 1');
+    $skuMeta = $pdo->prepare('SELECT cogs, volume, astra FROM sku_skus WHERE sku = :sku LIMIT 1');
 
     $inserted = 0;
     $inventoryUpdated = 0;
@@ -518,6 +519,23 @@ function jg_store_ops_transactions_import_invoice(PDO $pdo, array $invoice, bool
             $quantity = number_format((float) ($item['quantity'] ?? 0), 2, '.', '');
             $lineTotal = number_format((float) ($item['line_total'] ?? 0), 2, '.', '');
             $cogs = number_format((float) ($item['cogs'] ?? 0), 2, '.', '');
+            $stockQuantity = (float) $quantity;
+            $skuRow = null;
+
+            if ($sku !== '') {
+                $skuMeta->execute([':sku' => $sku]);
+                $fetchedSkuRow = $skuMeta->fetch();
+                if (is_array($fetchedSkuRow)) {
+                    $skuRow = $fetchedSkuRow;
+                    $volume = (float) ($skuRow['volume'] ?? 0);
+                    $astra = (float) ($skuRow['astra'] ?? $volume);
+                    $multiplier = $volume > 0 && $astra > 0 ? max(1.0, $volume / $astra) : 1.0;
+                    $stockQuantity = (float) $quantity * $multiplier;
+                    if ($stockQuantity > 0 && (float) $lineTotal > 0) {
+                        $cogs = number_format(round((float) $lineTotal / $stockQuantity, 2), 2, '.', '');
+                    }
+                }
+            }
 
             $insert->execute([
                 ':import_group_id' => $importGroupId,
@@ -544,24 +562,22 @@ function jg_store_ops_transactions_import_invoice(PDO $pdo, array $invoice, bool
                 continue;
             }
 
-            $oldCogs->execute([':sku' => $sku]);
-            $oldPrice = $oldCogs->fetchColumn();
-            if ($oldPrice === false) {
+            if (!is_array($skuRow)) {
                 continue;
             }
 
-            $stockQuantity = (int) round((float) $quantity);
+            $stockQuantityToAdd = (int) round($stockQuantity);
             $updateSku->execute([
-                ':quantity' => $stockQuantity,
+                ':quantity' => $stockQuantityToAdd,
                 ':cogs' => $cogs,
                 ':updated_at' => $now,
                 ':sku' => $sku,
             ]);
             $history->execute([
                 ':sku' => $sku,
-                ':old_price' => number_format((float) $oldPrice, 2, '.', ''),
+                ':old_price' => number_format((float) ($skuRow['cogs'] ?? 0), 2, '.', ''),
                 ':new_price' => $cogs,
-                ':takes_place' => sprintf('PO %s | Invoice %s | Qty %s', (string) $invoice['po_number'], (string) $invoice['invoice_number'], $quantity),
+                ':takes_place' => sprintf('PO %s | Invoice %s | Qty %s | ASTRA stock %s', (string) $invoice['po_number'], (string) $invoice['invoice_number'], $quantity, number_format($stockQuantity, 2, '.', '')),
                 ':recorded_at' => $now,
             ]);
             $inventoryUpdated++;
@@ -632,6 +648,7 @@ function jg_store_ops_transactions_fetch_inventory(PDO $pdo): array
             f.name AS flavor_name,
             u.name AS unit_name,
             s.volume,
+            s.astra,
             s.current_stock,
             s.stock_trigger,
             s.cogs,
@@ -663,6 +680,7 @@ function jg_store_ops_transactions_fetch_inventory(PDO $pdo): array
             'flavor_name' => (string) ($row['flavor_name'] ?? ''),
             'unit_name' => (string) ($row['unit_name'] ?? ''),
             'volume' => number_format((float) ($row['volume'] ?? 0), 1, '.', ''),
+            'astra' => number_format((float) ($row['astra'] ?? $row['volume'] ?? 0), 2, '.', ''),
             'current_stock' => (int) ($row['current_stock'] ?? 0),
             'stock_trigger' => (int) ($row['stock_trigger'] ?? 0),
             'cogs' => number_format((float) ($row['cogs'] ?? 0), 2, '.', ''),

@@ -53,8 +53,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const scanCountFor = (sku) => Number(scans.get(sku) || 0);
-  const totalRequired = () => order ? order.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
-  const totalScanned = () => order ? order.items.reduce((sum, item) => sum + scanCountFor(item.sku), 0) : 0;
+  const scanSkuFor = (item) => String(item.scanSku || item.sku || '');
+  const scanQuantityFor = (item) => Number(item.scanQuantity || item.quantity || 0);
+  const totalRequired = () => order ? order.items.reduce((sum, item) => sum + scanQuantityFor(item), 0) : 0;
+  const totalScanned = () => order ? order.items.reduce((sum, item) => sum + scanCountFor(scanSkuFor(item)), 0) : 0;
 
   const normalizeScanCode = (value) => String(value || '').trim().toUpperCase();
 
@@ -80,15 +82,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (scanList) {
       scanList.innerHTML = order.items.map((item) => {
-        const count = scanCountFor(item.sku);
-        const complete = count >= item.quantity;
+        const scanSku = scanSkuFor(item);
+        const required = scanQuantityFor(item);
+        const count = scanCountFor(scanSku);
+        const complete = count >= required;
         return `
           <article class="admin-scan-item ${complete ? 'is-complete' : ''}">
             <div>
-              <strong>${escapeHtml(item.productName)}</strong>
-              <span>${escapeHtml(item.sku)} / ${escapeHtml(item.barcode)}</span>
+              <strong>${escapeHtml(item.scanProductName || item.productName)}</strong>
+              <span>${escapeHtml(scanSku)} / ${escapeHtml(item.scanBarcode || item.barcode)}</span>
             </div>
-            <em>${count}/${escapeHtml(item.quantity)}</em>
+            <em>${count}/${escapeHtml(required)}</em>
           </article>
         `;
       }).join('');
@@ -99,8 +103,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!order || !value) return;
     const scannedCode = normalizeScanCode(value);
     const match = order.items.find((item) => {
-      const itemSku = normalizeScanCode(item.sku);
-      const itemBarcode = normalizeScanCode(item.barcode);
+      const itemSku = normalizeScanCode(scanSkuFor(item));
+      const itemBarcode = normalizeScanCode(item.scanBarcode || item.barcode);
       return scannedCode === itemSku || scannedCode === itemBarcode;
     });
 
@@ -109,13 +113,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const current = scanCountFor(match.sku);
-    if (current >= match.quantity) {
-      setError(`${match.productName} is already fully scanned.`);
+    const matchSku = scanSkuFor(match);
+    const current = scanCountFor(matchSku);
+    if (current >= scanQuantityFor(match)) {
+      setError(`${match.scanProductName || match.productName} is already fully scanned.`);
       return;
     }
 
-    scans.set(match.sku, current + 1);
+    scans.set(matchSku, current + 1);
     setError('');
     render();
   };

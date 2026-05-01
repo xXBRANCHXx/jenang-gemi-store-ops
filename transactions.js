@@ -71,7 +71,7 @@
   const renderInventory = (rows = []) => {
     if (!inventoryBody) return;
     if (!rows.length) {
-      inventoryBody.innerHTML = '<tr><td colspan="9" class="admin-empty">No live SKUs found.</td></tr>';
+      inventoryBody.innerHTML = '<tr><td colspan="10" class="admin-empty">No live SKUs found.</td></tr>';
       return;
     }
 
@@ -83,6 +83,7 @@
           <td>${escapeHtml(row.tag)}</td>
           <td>${escapeHtml(row.product_name)}</td>
           <td>${escapeHtml(row.flavor_name)}</td>
+          <td>${escapeHtml(row.astra || row.volume || '')}</td>
           <td>${escapeHtml(row.current_stock)}</td>
           <td>${escapeHtml(row.stock_trigger)}</td>
           <td>${isLow ? '<span class="admin-status-badge admin-status-badge-danger">Low</span>' : '<span class="admin-status-badge">OK</span>'}</td>

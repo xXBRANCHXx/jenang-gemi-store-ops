@@ -48,6 +48,28 @@ function jg_store_ops_sku_db(): PDO
             PDO::ATTR_EMULATE_PREPARES => false,
         ]
     );
+    jg_store_ops_sku_ensure_astra_schema($pdo);
 
     return $pdo;
+}
+
+function jg_store_ops_sku_ensure_astra_schema(PDO $pdo): void
+{
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*)
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = :table_name
+           AND COLUMN_NAME = :column_name'
+    );
+    $stmt->execute([
+        ':table_name' => 'sku_skus',
+        ':column_name' => 'astra',
+    ]);
+
+    if ((int) $stmt->fetchColumn() === 0) {
+        $pdo->exec('ALTER TABLE sku_skus ADD COLUMN astra DECIMAL(6,2) NOT NULL DEFAULT 0.00 AFTER volume');
+    }
+
+    $pdo->exec('UPDATE sku_skus SET astra = volume WHERE astra <= 0');
 }

@@ -118,6 +118,7 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
                                 <th>TAG</th>
                                 <th>Product</th>
                                 <th>Flavor</th>
+                                <th>ASTRA</th>
                                 <th>Stock</th>
                                 <th>Trigger</th>
                                 <th>Status</th>
@@ -126,7 +127,7 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
                             </tr>
                         </thead>
                         <tbody data-inventory-table-body>
-                            <tr><td colspan="9" class="admin-empty">Loading inventory...</td></tr>
+                            <tr><td colspan="10" class="admin-empty">Loading inventory...</td></tr>
                         </tbody>
                     </table>
                 </div>

@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ordersStorageKey = 'jg-store-demo-orders';
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const catalogFingerprintStorageKey = 'jg-store-demo-orders-sku-fingerprint';
-  const orderSchemaVersion = 'numeric-sku-barcodes-v1';
+  const orderSchemaVersion = 'astra-scan-units-v1';
   const skuDbEndpoint = '../api/sku-db/';
 
   let skuCatalog = [];
@@ -51,7 +51,22 @@ document.addEventListener('DOMContentLoaded', () => {
     ['TTK-77820393', 'TikTok', 144, false, [[2, 2]]]
   ];
 
-  const liveCatalogFingerprint = () => `${orderSchemaVersion}:${skuCatalog.map((item) => item.sku).join('|')}`;
+  const liveCatalogFingerprint = () => `${orderSchemaVersion}:${skuCatalog.map((item) => `${item.sku}:${item.astra}`).join('|')}`;
+
+  const astraMultiplier = (item) => {
+    const volume = Number(item.volume || 0);
+    const astra = Number(item.astra || item.volume || 0);
+    if (!Number.isFinite(volume) || !Number.isFinite(astra) || volume <= 0 || astra <= 0) return 1;
+    return Math.max(1, Math.round(volume / astra));
+  };
+
+  const catalogSignature = (item, volume) => [
+    item.brandId,
+    item.unitId,
+    Number(volume || 0).toFixed(2),
+    item.flavorId,
+    item.productId
+  ].join('|');
 
   const productNameFromSkuRow = (row) => {
     const parts = [row.brand_name, row.product_name, row.flavor_name, row.volume && Number(row.volume) ? row.volume : '', row.unit_name]
@@ -62,12 +77,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const normalizeSkuRow = (row) => {
     const sku = String(row.sku || '').trim();
+    const volume = Number(row.volume || 0);
+    const astra = Number(row.astra || row.volume || 0);
     return {
       tag: String(row.tag || sku).trim(),
       sku,
       barcode: sku,
+      brandId: String(row.brand_id || ''),
+      unitId: String(row.unit_id || ''),
+      volume,
+      astra: astra > 0 ? astra : volume,
+      flavorId: String(row.flavor_id || ''),
+      productId: String(row.product_id || ''),
       productName: productNameFromSkuRow(row) || sku
     };
+  };
+
+  const applyAstraScanTargets = () => {
+    const baseSkuBySignature = new Map();
+    skuCatalog.forEach((item) => {
+      baseSkuBySignature.set(catalogSignature(item, item.volume), item);
+    });
+
+    skuCatalog = skuCatalog.map((item) => {
+      const multiplier = astraMultiplier(item);
+      const baseItem = multiplier > 1 ? baseSkuBySignature.get(catalogSignature(item, item.astra)) : item;
+      const scanItem = baseItem || item;
+      return {
+        ...item,
+        scanSku: scanItem.sku,
+        scanBarcode: scanItem.barcode,
+        scanProductName: scanItem.productName,
+        scanMultiplier: multiplier
+      };
+    });
   };
 
   const loadSkuCatalog = async () => {
@@ -82,6 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
     skuCatalog = (payload.database?.skus || [])
       .map(normalizeSkuRow)
       .filter((item) => item.sku);
+    applyAstraScanTargets();
   };
 
   const catalogItemAt = (index) => skuCatalog[index % skuCatalog.length];
@@ -109,7 +153,14 @@ document.addEventListener('DOMContentLoaded', () => {
       instant,
       deadlineAt: now + minutes * 60000,
       started: false,
-      items: items.map(([skuIndex, quantity]) => ({ quantity, ...catalogItemAt(skuIndex) }))
+      items: items.map(([skuIndex, quantity]) => {
+        const item = catalogItemAt(skuIndex);
+        return {
+          quantity,
+          scanQuantity: quantity * Number(item.scanMultiplier || 1),
+          ...item
+        };
+      })
     }));
   };
 
@@ -300,7 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <article class="admin-pick-item">
           <div>
             <strong>${escapeHtml(item.productName)}</strong>
-            <span>Matched from approved SKU database</span>
+            <span>${Number(item.scanQuantity || item.quantity)} scan${Number(item.scanQuantity || item.quantity) === 1 ? '' : 's'} of ${escapeHtml(item.scanProductName || item.productName)}</span>
           </div>
           <em>x${escapeHtml(item.quantity)}</em>
         </article>

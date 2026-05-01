@@ -128,13 +128,14 @@ $skuDbJsVersion = (string) @filemtime(dirname(__DIR__) . '/sku-db.js');
                                     <th>Flavor</th>
                                     <th>Unit</th>
                                     <th>Volume</th>
+                                    <th>ASTRA</th>
                                     <th>Stock</th>
                                     <th>Trigger</th>
                                     <th>COGS</th>
                                 </tr>
                             </thead>
                             <tbody data-sku-table-body>
-                                <tr><td colspan="10" class="admin-empty">Loading live SKU sheet…</td></tr>
+                                <tr><td colspan="11" class="admin-empty">Loading live SKU sheet…</td></tr>
                             </tbody>
                         </table>
                     </div>
