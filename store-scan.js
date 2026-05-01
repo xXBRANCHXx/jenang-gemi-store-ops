@@ -56,6 +56,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const totalRequired = () => order ? order.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
   const totalScanned = () => order ? order.items.reduce((sum, item) => sum + scanCountFor(item.sku), 0) : 0;
 
+  const normalizedScanCandidates = (value) => {
+    const normalized = String(value ?? '').trim().toUpperCase();
+    const candidates = [normalized];
+
+    if (/^\d{11}$/.test(normalized)) {
+      candidates.push(`0${normalized}`);
+    }
+
+    if (/^JG\d{11}$/.test(normalized)) {
+      candidates.push(`JG0${normalized.slice(2)}`);
+    }
+
+    return [...new Set(candidates.filter(Boolean))];
+  };
+
   const setError = (message) => {
     if (!scanError) return;
     scanError.textContent = message;
@@ -95,8 +110,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const handleScan = (value) => {
     if (!order || !value) return;
-    const normalized = value.trim().toUpperCase();
-    const match = order.items.find((item) => item.sku === normalized || item.barcode === normalized);
+    const candidates = normalizedScanCandidates(value);
+    const match = order.items.find((item) => candidates.includes(item.sku) || candidates.includes(item.barcode));
 
     if (!match) {
       setError('Barcode not found in this order.');
