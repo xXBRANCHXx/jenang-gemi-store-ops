@@ -145,17 +145,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const playSirenPulse = () => {
     if (!audioContext || audioContext.state === 'closed') return;
-    const oscillator = audioContext.createOscillator();
-    const gain = audioContext.createGain();
-    oscillator.type = 'sawtooth';
-    oscillator.frequency.setValueAtTime(760, audioContext.currentTime);
-    oscillator.frequency.linearRampToValueAtTime(1280, audioContext.currentTime + 0.22);
-    gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.08, audioContext.currentTime + 0.04);
-    gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.42);
-    oscillator.connect(gain).connect(audioContext.destination);
-    oscillator.start();
-    oscillator.stop(audioContext.currentTime + 0.44);
+    const start = audioContext.currentTime;
+    const compressor = audioContext.createDynamicsCompressor();
+    const master = audioContext.createGain();
+    compressor.threshold.setValueAtTime(-24, start);
+    compressor.knee.setValueAtTime(18, start);
+    compressor.ratio.setValueAtTime(8, start);
+    compressor.attack.setValueAtTime(0.003, start);
+    compressor.release.setValueAtTime(0.18, start);
+    master.gain.setValueAtTime(0.0001, start);
+    master.gain.exponentialRampToValueAtTime(0.56, start + 0.035);
+    master.gain.setValueAtTime(0.56, start + 0.5);
+    master.gain.exponentialRampToValueAtTime(0.0001, start + 0.68);
+    compressor.connect(master).connect(audioContext.destination);
+
+    [
+      { type: 'square', low: 640, high: 1460, gain: 0.82 },
+      { type: 'sawtooth', low: 430, high: 1040, gain: 0.48 }
+    ].forEach((voice) => {
+      const oscillator = audioContext.createOscillator();
+      const voiceGain = audioContext.createGain();
+      oscillator.type = voice.type;
+      oscillator.frequency.setValueAtTime(voice.low, start);
+      oscillator.frequency.linearRampToValueAtTime(voice.high, start + 0.18);
+      oscillator.frequency.setValueAtTime(voice.high, start + 0.27);
+      oscillator.frequency.linearRampToValueAtTime(voice.low, start + 0.48);
+      voiceGain.gain.setValueAtTime(voice.gain, start);
+      oscillator.connect(voiceGain).connect(compressor);
+      oscillator.start(start);
+      oscillator.stop(start + 0.72);
+    });
+
+    const noiseBuffer = audioContext.createBuffer(1, Math.floor(audioContext.sampleRate * 0.12), audioContext.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let index = 0; index < data.length; index += 1) {
+      data[index] = (Math.random() * 2 - 1) * (1 - index / data.length);
+    }
+    const noise = audioContext.createBufferSource();
+    const noiseGain = audioContext.createGain();
+    noise.buffer = noiseBuffer;
+    noiseGain.gain.setValueAtTime(0.22, start);
+    noiseGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.12);
+    noise.connect(noiseGain).connect(compressor);
+    noise.start(start);
   };
 
   const refreshSiren = () => {
@@ -168,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!sirenTimer) {
       playSirenPulse();
-      sirenTimer = window.setInterval(playSirenPulse, 1700);
+      sirenTimer = window.setInterval(playSirenPulse, 980);
     }
   };
 
