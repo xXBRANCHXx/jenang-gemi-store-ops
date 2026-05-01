@@ -21,14 +21,22 @@ document.addEventListener('DOMContentLoaded', () => {
     errorNode.hidden = message === '';
   };
 
+  const normalizeBarcode = (value) => {
+    const barcode = String(value || '').trim().toUpperCase();
+    if (/^\d{11}$/.test(barcode)) return `0${barcode}`;
+    if (/^JG\d{11}$/.test(barcode)) return `JG0${barcode.slice(2)}`;
+    return barcode;
+  };
+
   const sendScan = async (barcode) => {
     setError('');
+    const normalizedBarcode = normalizeBarcode(barcode);
     await fetch('../../api/scan-bridge/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ barcode })
+      body: JSON.stringify({ barcode: normalizedBarcode })
     });
-    if (statusNode) statusNode.textContent = `Sent ${barcode}`;
+    if (statusNode) statusNode.textContent = `Sent ${normalizedBarcode}`;
     window.setTimeout(() => {
       if (statusNode) statusNode.textContent = 'Ready';
     }, 900);

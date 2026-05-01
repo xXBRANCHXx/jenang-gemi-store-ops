@@ -61,8 +61,15 @@ document.addEventListener('DOMContentLoaded', () => {
     return /^\d{11}$/.test(sku) ? `0${sku}` : sku;
   };
 
+  const normalizeBarcodeCode = (value) => {
+    const barcode = String(value || '').trim().toUpperCase();
+    if (/^\d{11}$/.test(barcode)) return `0${barcode}`;
+    if (/^JG\d{11}$/.test(barcode)) return `JG0${barcode.slice(2)}`;
+    return barcode;
+  };
+
   const normalizedScanCandidates = (value) => {
-    const normalized = String(value ?? '').trim().toUpperCase();
+    const normalized = normalizeBarcodeCode(value);
     const candidates = [normalized];
 
     if (/^\d{11}$/.test(normalized)) {
@@ -118,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const candidates = normalizedScanCandidates(value);
     const match = order.items.find((item) => {
       const itemSku = normalizeSkuCode(item.sku);
-      const itemBarcode = String(item.barcode || '').trim().toUpperCase();
+      const itemBarcode = normalizeBarcodeCode(item.barcode);
       return candidates.includes(itemSku) || candidates.includes(itemBarcode);
     });
 
