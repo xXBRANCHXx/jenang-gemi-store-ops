@@ -31,11 +31,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const sendScan = async (barcode) => {
     setError('');
     const normalizedBarcode = normalizeBarcode(barcode);
-    await fetch('../../api/scan-bridge/', {
+    const response = await fetch('../../api/scan-bridge/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ barcode: normalizedBarcode })
     });
+    if (!response.ok) {
+      throw new Error('Unable to send scan.');
+    }
     if (statusNode) statusNode.textContent = `Sent ${normalizedBarcode}`;
     window.setTimeout(() => {
       if (statusNode) statusNode.textContent = 'Ready';

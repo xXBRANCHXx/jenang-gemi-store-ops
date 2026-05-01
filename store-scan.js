@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const scanProgress = document.querySelector('[data-scan-progress]');
   const printButton = document.querySelector('[data-print-label]');
   const phoneScanLink = document.querySelector('[data-phone-scan-link]');
+  const captureTitle = capturePad?.querySelector('strong');
+  const captureHint = capturePad?.querySelector('small');
 
   const escapeHtml = (value) => String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -44,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let scanBuffer = '';
   let scanBufferTimer = 0;
   let bridgeCursor = null;
+  const bridgeStartedAt = Date.now();
 
   if (orderIdNode) orderIdNode.textContent = order?.id || 'Order missing';
   if (phoneScanLink) {
@@ -64,6 +67,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!scanError) return;
     scanError.textContent = message;
     scanError.hidden = message === '';
+  };
+
+  const setScanStatus = (title, detail = '') => {
+    if (captureTitle) captureTitle.textContent = title;
+    if (captureHint) captureHint.textContent = detail;
   };
 
   const render = () => {
@@ -100,8 +108,9 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const handleScan = (value) => {
-    if (!order || !value) return;
+    if (!order || !value) return false;
     const scannedCode = normalizeScanCode(value);
+    setScanStatus(`Received ${scannedCode}`, 'Checking this scan against the active order.');
     const match = order.items.find((item) => {
       const itemSku = normalizeScanCode(scanSkuFor(item));
       const itemBarcode = normalizeScanCode(item.scanBarcode || item.barcode);
@@ -110,19 +119,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!match) {
       setError('Barcode not found in this order.');
-      return;
+      setScanStatus('Scan not found', `${scannedCode} is not required for this order.`);
+      return false;
     }
 
     const matchSku = scanSkuFor(match);
     const current = scanCountFor(matchSku);
     if (current >= scanQuantityFor(match)) {
       setError(`${match.scanProductName || match.productName} is already fully scanned.`);
-      return;
+      setScanStatus('Already complete', `${match.scanProductName || match.productName} does not need more scans.`);
+      return false;
     }
 
     scans.set(matchSku, current + 1);
     setError('');
     render();
+    setScanStatus('Scan accepted', `${match.scanProductName || match.productName} ${current + 1}/${scanQuantityFor(match)}`);
+    return true;
   };
 
   const submitScanBuffer = () => {
@@ -156,14 +169,19 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { Accept: 'application/json' }
       });
       const payload = await response.json();
+      const events = Array.isArray(payload.events) ? payload.events : [];
       if (bridgeCursor === null) {
         bridgeCursor = Number(payload.cursor || 0);
+        events
+          .filter((event) => Date.parse(event.created_at || '') >= bridgeStartedAt - 2000)
+          .forEach((event) => handleScan(event.barcode || ''));
         return;
       }
       bridgeCursor = Number(payload.cursor || bridgeCursor);
-      (payload.events || []).forEach((event) => handleScan(event.barcode || ''));
+      events.forEach((event) => handleScan(event.barcode || ''));
     } catch (_error) {
       // Phone bridge is demo-only; hardware scanner still works.
+      setScanStatus('Phone scanner disconnected', 'Hardware scanner input still works on this page.');
     }
   };
 
