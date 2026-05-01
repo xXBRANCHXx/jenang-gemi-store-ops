@@ -1137,7 +1137,7 @@ button, input {
   width: min(1180px, calc(100vw - 28px));
   min-height: min(760px, calc(100svh - 28px));
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
 }
 
 .admin-fulfillment-card .admin-quiz-stage,
@@ -1170,6 +1170,158 @@ button, input {
 .admin-scan-input-page {
   min-height: 72px;
   font-size: 1.35rem;
+}
+
+.admin-step-art {
+  position: relative;
+  min-height: 210px;
+  overflow: hidden;
+  border-radius: 22px;
+  border: 1px solid var(--admin-border);
+  background: #101721;
+}
+
+.admin-step-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 210px;
+  object-fit: cover;
+}
+
+.admin-step-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(11, 15, 20, 0.72), transparent 58%);
+  pointer-events: none;
+}
+
+.admin-scanner-capture {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  min-height: 180px;
+  padding: 26px;
+  border: 1px dashed rgba(157, 255, 0, 0.42);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(157, 255, 0, 0.14), transparent 36%),
+    var(--admin-surface-soft);
+  text-align: center;
+  outline: none;
+}
+
+.admin-scanner-capture:focus {
+  border-color: rgba(157, 255, 0, 0.82);
+  box-shadow: 0 0 0 1px rgba(157, 255, 0, 0.18);
+}
+
+.admin-scanner-capture span {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background:
+    linear-gradient(90deg, transparent 42%, var(--admin-accent-primary) 42% 58%, transparent 58%),
+    linear-gradient(var(--admin-accent-primary), var(--admin-accent-primary));
+  background-size: 100% 4px, 4px 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.admin-scanner-capture strong {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(1.6rem, 4vw, 3rem);
+}
+
+.admin-scanner-capture small,
+.admin-phone-scan-card small {
+  color: var(--admin-muted);
+}
+
+.admin-phone-scan-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(34, 211, 238, 0.22);
+  border-radius: 20px;
+  background: rgba(34, 211, 238, 0.08);
+}
+
+.admin-phone-scan-card div {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-phone-scan-card a {
+  color: var(--admin-accent-quaternary);
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.admin-phone-scanner-page {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+}
+
+.admin-phone-camera-card {
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  gap: 14px;
+  width: min(720px, 100%);
+  min-height: calc(100svh - 24px);
+  padding: 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: 28px;
+  background: var(--admin-surface);
+  box-shadow: var(--admin-shadow);
+}
+
+.admin-phone-camera-head,
+.admin-phone-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-phone-camera-head strong {
+  font-family: 'Space Grotesk', sans-serif;
+  overflow-wrap: anywhere;
+}
+
+.admin-phone-camera-frame {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 24px;
+  background:
+    linear-gradient(rgba(6, 10, 16, 0.18), rgba(6, 10, 16, 0.18)),
+    url('./assets/store/scan-step.png') center / cover;
+}
+
+.admin-phone-camera-frame video {
+  width: 100%;
+  height: 100%;
+  min-height: 54svh;
+  object-fit: cover;
+}
+
+.admin-phone-reticle {
+  position: absolute;
+  inset: 20%;
+  border: 3px solid rgba(157, 255, 0, 0.84);
+  border-radius: 26px;
+  box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.24);
+}
+
+.admin-phone-actions button {
+  flex: 1;
+  min-height: 58px;
 }
 
 @media (max-width: 900px) {
@@ -1223,6 +1375,13 @@ button, input {
 
   .admin-order-board-wrap {
     max-height: 68svh;
+  }
+
+  .admin-phone-scan-card,
+  .admin-phone-camera-head,
+  .admin-phone-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .admin-board-columns,

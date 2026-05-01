@@ -4,12 +4,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const ordersStorageKey = 'jg-store-demo-orders';
   const activeOrderStorageKey = 'jg-store-active-order-id';
+  const scanSessionStorageKey = 'jg-store-scan-session';
   const orderIdNode = document.querySelector('[data-scan-order-id]');
-  const scanInput = document.querySelector('[data-scan-input]');
+  const capturePad = document.querySelector('[data-scanner-capture]');
   const scanError = document.querySelector('[data-scan-error]');
   const scanList = document.querySelector('[data-scan-list]');
   const scanProgress = document.querySelector('[data-scan-progress]');
   const printButton = document.querySelector('[data-print-label]');
+  const phoneScanLink = document.querySelector('[data-phone-scan-link]');
 
   const escapeHtml = (value) => String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -37,11 +39,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const params = new URLSearchParams(window.location.search);
   const orderId = params.get('order') || window.sessionStorage.getItem(activeOrderStorageKey) || '';
+  const session = params.get('session')
+    || window.sessionStorage.getItem(scanSessionStorageKey)
+    || `SCAN-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
   const orders = readOrders();
   const order = orders.find((item) => item.id === orderId) || null;
   const scans = new Map();
+  let scanBuffer = '';
+  let scanBufferTimer = 0;
+  let bridgeCursor = 0;
+
+  try {
+    window.sessionStorage.setItem(scanSessionStorageKey, session);
+  } catch (_error) {
+    // Query string remains the fallback.
+  }
+
+  if (params.get('session') !== session) {
+    params.set('session', session);
+    if (orderId) params.set('order', orderId);
+    window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
+  }
 
   if (orderIdNode) orderIdNode.textContent = order?.id || 'Order missing';
+  if (phoneScanLink) {
+    const phoneUrl = `../phone-scan/?session=${encodeURIComponent(session)}`;
+    phoneScanLink.href = phoneUrl;
+    phoneScanLink.textContent = new URL(phoneUrl, window.location.href).href;
+  }
 
   const scanCountFor = (sku) => Number(scans.get(sku) || 0);
   const totalRequired = () => order ? order.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
@@ -105,12 +130,39 @@ document.addEventListener('DOMContentLoaded', () => {
     render();
   };
 
-  scanInput?.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter') return;
+  document.addEventListener('keydown', (event) => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const value = scanBuffer;
+      scanBuffer = '';
+      handleScan(value);
+      return;
+    }
+
+    if (event.key.length !== 1) return;
     event.preventDefault();
-    handleScan(scanInput.value);
-    scanInput.value = '';
+    scanBuffer += event.key;
+    window.clearTimeout(scanBufferTimer);
+    scanBufferTimer = window.setTimeout(() => {
+      scanBuffer = '';
+    }, 180);
   });
+
+  const pollPhoneScans = async () => {
+    try {
+      const response = await fetch(`../../api/scan-bridge/?session=${encodeURIComponent(session)}&after=${bridgeCursor}`, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await response.json();
+      bridgeCursor = Number(payload.cursor || bridgeCursor);
+      (payload.events || []).forEach((event) => handleScan(event.barcode || ''));
+    } catch (_error) {
+      // Phone bridge is demo-only; hardware scanner still works.
+    }
+  };
 
   printButton?.addEventListener('click', () => {
     if (!order || printButton.disabled) return;
@@ -120,10 +172,13 @@ document.addEventListener('DOMContentLoaded', () => {
     window.setTimeout(() => {
       writeOrders(orders);
       window.sessionStorage.removeItem(activeOrderStorageKey);
+      window.sessionStorage.removeItem(scanSessionStorageKey);
       window.location.href = '../';
     }, 650);
   });
 
   render();
-  window.setTimeout(() => scanInput?.focus(), 120);
+  window.setTimeout(() => capturePad?.focus(), 120);
+  pollPhoneScans();
+  window.setInterval(pollPhoneScans, 700);
 });

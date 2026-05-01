@@ -69,6 +69,9 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
         <div class="admin-modal-shell admin-fulfillment-modal" data-fulfillment-modal hidden>
             <div class="admin-modal-backdrop" data-close-fulfillment-modal></div>
             <div class="admin-modal-card admin-fulfillment-card" data-fulfillment-card>
+                <div class="admin-step-art admin-step-art-pick">
+                    <img src="../assets/store/pick-step.png" alt="">
+                </div>
                 <div class="admin-modal-head">
                     <div>
                         <span class="admin-panel-kicker" data-modal-step-label>Pick List</span>
