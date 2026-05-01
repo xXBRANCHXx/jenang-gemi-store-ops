@@ -18,14 +18,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const boardClock = document.querySelector('[data-board-clock]');
   const ordersStorageKey = 'jg-store-demo-orders';
   const activeOrderStorageKey = 'jg-store-active-order-id';
+  const catalogFingerprintStorageKey = 'jg-store-demo-orders-sku-fingerprint';
+  const skuDbEndpoint = '../api/sku-db/';
 
-  const skuCatalog = {
-    BUBUR_AREN_15SACHETS: { sku: '010100150203', barcode: 'JG010100150203', productName: 'Bubur Aren 15 Sachets' },
-    BUBUR_ORIGINAL_15SACHETS: { sku: '010100150103', barcode: 'JG010100150103', productName: 'Bubur Original 15 Sachets' },
-    BUBUR_PANDAN_15SACHETS: { sku: '010100150303', barcode: 'JG010100150303', productName: 'Bubur Pandan 15 Sachets' },
-    JAMU_KUNYIT_250ML: { sku: '020200250101', barcode: 'JG020200250101', productName: 'Jamu Kunyit 250 ml' },
-    JAMU_BERAS_KENCUR_250ML: { sku: '020200250201', barcode: 'JG020200250201', productName: 'Jamu Beras Kencur 250 ml' },
-    BUNDLE_BUBUR_MIX: { sku: '010100450901', barcode: 'JG010100450901', productName: 'Bubur Mix Bundle' }
+  let skuCatalog = [];
+  let state = {
+    orders: [],
+    activeOrderId: '',
+    scans: new Map()
   };
 
   const marketplaceSignals = {
@@ -36,35 +36,70 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const now = Date.now();
   const seedOrders = [
-    ['SPX-250501-8801', 'Shopee', 7, true, [['BUBUR_AREN_15SACHETS', 2], ['JAMU_KUNYIT_250ML', 1]]],
-    ['SPX-250501-8802', 'Shopee', 13, false, [['BUBUR_ORIGINAL_15SACHETS', 1]]],
-    ['TTK-77820391', 'TikTok', 18, false, [['BUBUR_PANDAN_15SACHETS', 3]]],
-    ['TKP-11993021', 'Tokopedia', 25, false, [['BUNDLE_BUBUR_MIX', 1], ['JAMU_BERAS_KENCUR_250ML', 2]]],
-    ['SPX-250501-8803', 'Shopee', 34, true, [['BUBUR_AREN_15SACHETS', 1]]],
-    ['SPX-250501-8804', 'Shopee', 48, false, [['BUBUR_ORIGINAL_15SACHETS', 2], ['BUBUR_PANDAN_15SACHETS', 1]]],
-    ['TTK-77820392', 'TikTok', 61, false, [['JAMU_KUNYIT_250ML', 4]]],
-    ['SPX-250501-8805', 'Shopee', 72, false, [['BUNDLE_BUBUR_MIX', 2]]],
-    ['TKP-11993022', 'Tokopedia', 88, true, [['BUBUR_PANDAN_15SACHETS', 1], ['JAMU_BERAS_KENCUR_250ML', 1]]],
-    ['SPX-250501-8806', 'Shopee', 105, false, [['BUBUR_AREN_15SACHETS', 3]]],
-    ['SPX-250501-8807', 'Shopee', 126, false, [['BUBUR_ORIGINAL_15SACHETS', 1], ['JAMU_KUNYIT_250ML', 1]]],
-    ['TTK-77820393', 'TikTok', 144, false, [['BUBUR_PANDAN_15SACHETS', 2]]]
+    ['SPX-250501-8801', 'Shopee', 7, true, [[0, 2], [3, 1]]],
+    ['SPX-250501-8802', 'Shopee', 13, false, [[1, 1]]],
+    ['TTK-77820391', 'TikTok', 18, false, [[2, 3]]],
+    ['TKP-11993021', 'Tokopedia', 25, false, [[5, 1], [4, 2]]],
+    ['SPX-250501-8803', 'Shopee', 34, true, [[0, 1]]],
+    ['SPX-250501-8804', 'Shopee', 48, false, [[1, 2], [2, 1]]],
+    ['TTK-77820392', 'TikTok', 61, false, [[3, 4]]],
+    ['SPX-250501-8805', 'Shopee', 72, false, [[5, 2]]],
+    ['TKP-11993022', 'Tokopedia', 88, true, [[2, 1], [4, 1]]],
+    ['SPX-250501-8806', 'Shopee', 105, false, [[0, 3]]],
+    ['SPX-250501-8807', 'Shopee', 126, false, [[1, 1], [3, 1]]],
+    ['TTK-77820393', 'TikTok', 144, false, [[2, 2]]]
   ];
 
-  const generatedOrders = Array.from({ length: 44 }, (_, index) => {
-    const templates = Object.keys(skuCatalog);
+  const liveCatalogFingerprint = () => skuCatalog.map((item) => item.sku).join('|');
+
+  const productNameFromSkuRow = (row) => {
+    const parts = [row.brand_name, row.product_name, row.flavor_name, row.volume && Number(row.volume) ? row.volume : '', row.unit_name]
+      .map((part) => String(part || '').trim())
+      .filter(Boolean);
+    return parts.join(' ');
+  };
+
+  const normalizeSkuRow = (row) => {
+    const sku = String(row.sku || '').trim();
+    return {
+      tag: String(row.tag || sku).trim(),
+      sku,
+      barcode: `JG${sku}`,
+      productName: productNameFromSkuRow(row) || sku
+    };
+  };
+
+  const loadSkuCatalog = async () => {
+    const response = await fetch(skuDbEndpoint, {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' }
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || 'Unable to load live SKU database.');
+    }
+    skuCatalog = (payload.database?.skus || [])
+      .map(normalizeSkuRow)
+      .filter((item) => item.sku);
+  };
+
+  const catalogItemAt = (index) => skuCatalog[index % skuCatalog.length];
+
+  const generatedOrders = () => Array.from({ length: 44 }, (_, index) => {
     const platform = index % 9 === 0 ? 'Tokopedia' : (index % 5 === 0 ? 'TikTok' : 'Shopee');
-    const tagA = templates[index % templates.length];
-    const tagB = templates[(index + 2) % templates.length];
     return [
       `${platform === 'Shopee' ? 'SPX' : platform === 'TikTok' ? 'TTK' : 'TKP'}-DEMO-${String(index + 1).padStart(3, '0')}`,
       platform,
       155 + index * 11,
       index % 13 === 0,
-      [[tagA, (index % 3) + 1], ...(index % 4 === 0 ? [[tagB, 1]] : [])]
+      [[index, (index % 3) + 1], ...(index % 4 === 0 ? [[index + 2, 1]] : [])]
     ];
   });
 
-  const createDemoOrders = () => [...seedOrders, ...generatedOrders].map(([id, platform, minutes, instant, items], index) => ({
+  const createDemoOrders = () => {
+    if (!skuCatalog.length) return [];
+
+    return [...seedOrders, ...generatedOrders()].map(([id, platform, minutes, instant, items], index) => ({
       id,
       platform,
       account: index % 3 === 0 ? 'Main' : (index % 3 === 1 ? 'Jamu' : 'Promo'),
@@ -73,13 +108,15 @@ document.addEventListener('DOMContentLoaded', () => {
       instant,
       deadlineAt: now + minutes * 60000,
       started: false,
-      items: items.map(([tag, quantity]) => ({ tag, quantity, ...skuCatalog[tag] }))
+      items: items.map(([skuIndex, quantity]) => ({ quantity, ...catalogItemAt(skuIndex) }))
     }));
+  };
 
   const loadOrders = () => {
     try {
       const stored = JSON.parse(window.localStorage.getItem(ordersStorageKey) || 'null');
-      if (Array.isArray(stored) && stored.length) return stored;
+      const storedFingerprint = window.localStorage.getItem(catalogFingerprintStorageKey) || '';
+      if (Array.isArray(stored) && stored.length && storedFingerprint === liveCatalogFingerprint()) return stored;
     } catch (_error) {
       // Keep the demo usable if localStorage is unavailable or corrupted.
     }
@@ -89,17 +126,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const saveOrders = () => {
     try {
       window.localStorage.setItem(ordersStorageKey, JSON.stringify(state.orders));
+      window.localStorage.setItem(catalogFingerprintStorageKey, liveCatalogFingerprint());
     } catch (_error) {
       // Non-persistent demo mode is acceptable.
     }
   };
-
-  const state = {
-    orders: loadOrders(),
-    activeOrderId: '',
-    scans: new Map()
-  };
-  saveOrders();
 
   const escapeHtml = (value) => String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -322,10 +353,24 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('pointerdown', unlockAudio, { once: true });
   document.addEventListener('keydown', unlockAudio, { once: true });
 
-  renderBoard();
-  formatClock();
-  window.setInterval(() => {
-    formatClock();
+  const initialize = async () => {
+    try {
+      await loadSkuCatalog();
+      state.orders = loadOrders();
+      saveOrders();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to load live SKU database.';
+      if (board) board.innerHTML = `<div class="admin-board-empty">${escapeHtml(message)}</div>`;
+      return;
+    }
+
     renderBoard();
-  }, 15000);
+    formatClock();
+    window.setInterval(() => {
+      formatClock();
+      renderBoard();
+    }, 15000);
+  };
+
+  initialize();
 });
