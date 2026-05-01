@@ -52,6 +52,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const liveCatalogFingerprint = () => skuCatalog.map((item) => item.sku).join('|');
 
+  const normalizeSkuCode = (value) => {
+    const sku = String(value || '').trim();
+    return /^\d{11}$/.test(sku) ? `0${sku}` : sku;
+  };
+
   const productNameFromSkuRow = (row) => {
     const parts = [row.brand_name, row.product_name, row.flavor_name, row.volume && Number(row.volume) ? row.volume : '', row.unit_name]
       .map((part) => String(part || '').trim())
@@ -60,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const normalizeSkuRow = (row) => {
-    const sku = String(row.sku || '').trim();
+    const sku = normalizeSkuCode(row.sku);
     return {
       tag: String(row.tag || sku).trim(),
       sku,
