@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ordersStorageKey = 'jg-store-demo-orders';
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const catalogFingerprintStorageKey = 'jg-store-demo-orders-sku-fingerprint';
+  const orderSchemaVersion = 'numeric-sku-barcodes-v1';
   const skuDbEndpoint = '../api/sku-db/';
 
   let skuCatalog = [];
@@ -50,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ['TTK-77820393', 'TikTok', 144, false, [[2, 2]]]
   ];
 
-  const liveCatalogFingerprint = () => skuCatalog.map((item) => item.sku).join('|');
+  const liveCatalogFingerprint = () => `${orderSchemaVersion}:${skuCatalog.map((item) => item.sku).join('|')}`;
 
   const productNameFromSkuRow = (row) => {
     const parts = [row.brand_name, row.product_name, row.flavor_name, row.volume && Number(row.volume) ? row.volume : '', row.unit_name]
