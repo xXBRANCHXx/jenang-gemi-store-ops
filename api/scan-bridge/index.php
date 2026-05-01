@@ -48,27 +48,6 @@ function jg_scan_bridge_write(array $events): void
     }
 }
 
-function jg_scan_bridge_normalize_barcode(string $barcode): string
-{
-    if (preg_match('/^\d{11}$/', $barcode) === 1) {
-        return '0' . $barcode;
-    }
-
-    if (preg_match('/^0\d{12}$/', $barcode) === 1) {
-        return substr($barcode, 1);
-    }
-
-    if (preg_match('/^JG\d{11}$/', $barcode) === 1) {
-        return 'JG0' . substr($barcode, 2);
-    }
-
-    if (preg_match('/^JG0\d{12}$/', $barcode) === 1) {
-        return 'JG' . substr($barcode, 3);
-    }
-
-    return $barcode;
-}
-
 $events = jg_scan_bridge_read();
 
 $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
@@ -76,7 +55,7 @@ if ($method === 'POST') {
     $raw = file_get_contents('php://input');
     $payload = is_string($raw) && trim($raw) !== '' ? json_decode($raw, true) : $_POST;
     $payload = is_array($payload) ? $payload : [];
-    $barcode = jg_scan_bridge_normalize_barcode(strtoupper(trim((string) ($payload['barcode'] ?? ''))));
+    $barcode = strtoupper(trim((string) ($payload['barcode'] ?? '')));
     if (!preg_match('/^[A-Z0-9._-]{4,80}$/', $barcode)) {
         jg_scan_bridge_fail('Invalid barcode.');
     }

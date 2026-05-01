@@ -56,57 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const totalRequired = () => order ? order.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
   const totalScanned = () => order ? order.items.reduce((sum, item) => sum + scanCountFor(item.sku), 0) : 0;
 
-  const normalizeSkuCode = (value) => {
-    const sku = String(value || '').trim().toUpperCase();
-    return /^\d{11}$/.test(sku) ? `0${sku}` : sku;
-  };
-
-  const normalizeBarcodeCode = (value) => {
-    const barcode = String(value || '').trim().toUpperCase();
-    if (/^\d{11}$/.test(barcode)) return `0${barcode}`;
-    if (/^0\d{12}$/.test(barcode)) return barcode.slice(1);
-    if (/^JG\d{11}$/.test(barcode)) return `JG0${barcode.slice(2)}`;
-    if (/^JG0\d{12}$/.test(barcode)) return `JG${barcode.slice(3)}`;
-    return barcode;
-  };
-
-  const addScanCandidate = (candidates, value) => {
-    const normalized = normalizeBarcodeCode(value);
-    if (!normalized) return;
-    candidates.push(normalized);
-
-    if (/^\d+$/.test(normalized)) {
-      candidates.push(`JG${normalized}`);
-    }
-
-    if (/^JG\d+$/.test(normalized)) {
-      candidates.push(normalized.slice(2));
-    }
-  };
-
-  const normalizedScanCandidates = (value) => {
-    const raw = String(value ?? '').trim().toUpperCase();
-    const candidates = [];
-    addScanCandidate(candidates, raw);
-
-    if (/^\d{11}$/.test(raw)) {
-      addScanCandidate(candidates, `0${raw}`);
-    }
-
-    if (/^0\d{12}$/.test(raw)) {
-      addScanCandidate(candidates, raw.slice(1));
-    }
-
-    if (/^JG\d{11}$/.test(raw)) {
-      addScanCandidate(candidates, `JG0${raw.slice(2)}`);
-    }
-
-    if (/^JG0\d{12}$/.test(raw)) {
-      addScanCandidate(candidates, `JG${raw.slice(3)}`);
-    }
-
-    return [...new Set(candidates.filter(Boolean))];
-  };
+  const normalizeScanCode = (value) => String(value || '').trim().toUpperCase();
 
   const setError = (message) => {
     if (!scanError) return;
@@ -147,11 +97,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const handleScan = (value) => {
     if (!order || !value) return;
-    const candidates = normalizedScanCandidates(value);
+    const scannedCode = normalizeScanCode(value);
     const match = order.items.find((item) => {
-      const itemSku = normalizeSkuCode(item.sku);
-      const itemBarcode = normalizeBarcodeCode(item.barcode);
-      return candidates.includes(itemSku) || candidates.includes(itemBarcode);
+      const itemSku = normalizeScanCode(item.sku);
+      const itemBarcode = normalizeScanCode(item.barcode);
+      return scannedCode === itemSku || scannedCode === itemBarcode;
     });
 
     if (!match) {

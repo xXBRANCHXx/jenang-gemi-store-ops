@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const demoButton = document.querySelector('[data-demo-scan]');
   const statusNode = document.querySelector('[data-phone-status]');
   const errorNode = document.querySelector('[data-phone-error]');
-  const demoCodes = ['JG010100150203', 'JG020200250101', 'JG010100150103', 'JG010100150303'];
+  const demoCodes = ['010100150203', '020200250101', '010100150103', '010100150303'];
   let demoIndex = 0;
   let detector = null;
   let stream = null;
@@ -24,9 +24,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const normalizeBarcode = (value) => {
     const barcode = String(value || '').trim().toUpperCase();
     if (/^\d{11}$/.test(barcode)) return `0${barcode}`;
-    if (/^0\d{12}$/.test(barcode)) return barcode.slice(1);
-    if (/^JG\d{11}$/.test(barcode)) return `JG0${barcode.slice(2)}`;
-    if (/^JG0\d{12}$/.test(barcode)) return `JG${barcode.slice(3)}`;
     return barcode;
   };
 
