@@ -7,14 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const modalTitle = document.querySelector('[data-modal-title]');
   const modalStepLabel = document.querySelector('[data-modal-step-label]');
   const pickStage = document.querySelector('[data-pick-stage]');
-  const scanStage = document.querySelector('[data-scan-stage]');
   const orderSummary = document.querySelector('[data-order-summary]');
   const pickList = document.querySelector('[data-pick-list]');
-  const scanInput = document.querySelector('[data-scan-input]');
-  const scanError = document.querySelector('[data-scan-error]');
-  const scanList = document.querySelector('[data-scan-list]');
-  const scanProgress = document.querySelector('[data-scan-progress]');
-  const printButton = document.querySelector('[data-print-label]');
   const listedCount = document.querySelector('[data-listed-count]');
   const criticalCount = document.querySelector('[data-critical-count]');
   const startedCount = document.querySelector('[data-started-count]');
@@ -22,6 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const boardDensity = document.querySelector('[data-board-density]');
   const boardOverflow = document.querySelector('[data-board-overflow]');
   const boardClock = document.querySelector('[data-board-clock]');
+  const ordersStorageKey = 'jg-store-demo-orders';
+  const activeOrderStorageKey = 'jg-store-active-order-id';
 
   const skuCatalog = {
     BUBUR_AREN_15SACHETS: { sku: '010100150203', barcode: 'JG010100150203', productName: 'Bubur Aren 15 Sachets' },
@@ -68,8 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
   });
 
-  const state = {
-    orders: [...seedOrders, ...generatedOrders].map(([id, platform, minutes, instant, items], index) => ({
+  const createDemoOrders = () => [...seedOrders, ...generatedOrders].map(([id, platform, minutes, instant, items], index) => ({
       id,
       platform,
       account: index % 3 === 0 ? 'Main' : (index % 3 === 1 ? 'Jamu' : 'Promo'),
@@ -79,10 +74,32 @@ document.addEventListener('DOMContentLoaded', () => {
       deadlineAt: now + minutes * 60000,
       started: false,
       items: items.map(([tag, quantity]) => ({ tag, quantity, ...skuCatalog[tag] }))
-    })),
+    }));
+
+  const loadOrders = () => {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(ordersStorageKey) || 'null');
+      if (Array.isArray(stored) && stored.length) return stored;
+    } catch (_error) {
+      // Keep the demo usable if localStorage is unavailable or corrupted.
+    }
+    return createDemoOrders();
+  };
+
+  const saveOrders = () => {
+    try {
+      window.localStorage.setItem(ordersStorageKey, JSON.stringify(state.orders));
+    } catch (_error) {
+      // Non-persistent demo mode is acceptable.
+    }
+  };
+
+  const state = {
+    orders: loadOrders(),
     activeOrderId: '',
     scans: new Map()
   };
+  saveOrders();
 
   const escapeHtml = (value) => String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -227,52 +244,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const scanCountFor = (sku) => Number(state.scans.get(sku) || 0);
-
-  const totalRequired = (order) => order.items.reduce((sum, item) => sum + item.quantity, 0);
-
-  const totalScanned = (order) => order.items.reduce((sum, item) => sum + scanCountFor(item.sku), 0);
-
-  const renderScanStage = (order) => {
-    const scanned = totalScanned(order);
-    const required = totalRequired(order);
-    if (modalTitle) modalTitle.textContent = order.id;
-    if (modalStepLabel) modalStepLabel.textContent = 'Barcode Check';
-    if (scanProgress) scanProgress.textContent = `${scanned}/${required}`;
-    if (printButton) {
-      printButton.disabled = scanned < required;
-      printButton.textContent = `Print ${order.platform} Label`;
-    }
-    if (scanList) {
-      scanList.innerHTML = order.items.map((item) => {
-        const count = scanCountFor(item.sku);
-        const complete = count >= item.quantity;
-        return `
-          <article class="admin-scan-item ${complete ? 'is-complete' : ''}">
-            <div>
-              <strong>${escapeHtml(item.productName)}</strong>
-              <span>${escapeHtml(item.sku)} / ${escapeHtml(item.barcode)}</span>
-            </div>
-            <em>${count}/${escapeHtml(item.quantity)}</em>
-          </article>
-        `;
-      }).join('');
-    }
-  };
-
-  const showStage = (stage) => {
-    if (pickStage) pickStage.hidden = stage !== 'pick';
-    if (scanStage) scanStage.hidden = stage !== 'scan';
-  };
-
   const openFulfillment = (orderId) => {
     const order = state.orders.find((item) => item.id === orderId);
     if (!order) return;
     order.started = true;
     state.activeOrderId = order.id;
     state.scans = new Map();
+    saveOrders();
     renderPickStage(order);
-    showStage('pick');
+    if (pickStage) pickStage.hidden = false;
     if (modal) modal.hidden = false;
     renderBoard();
   };
@@ -281,41 +261,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modal) modal.hidden = true;
     state.activeOrderId = '';
     state.scans = new Map();
-    if (scanError) {
-      scanError.hidden = true;
-      scanError.textContent = '';
-    }
-  };
-
-  const handleScan = (value) => {
-    const order = activeOrder();
-    if (!order || !value) return;
-    const normalized = value.trim().toUpperCase();
-    const match = order.items.find((item) => item.sku === normalized || item.barcode === normalized);
-
-    if (!match) {
-      if (scanError) {
-        scanError.textContent = 'Barcode not found in this order.';
-        scanError.hidden = false;
-      }
-      return;
-    }
-
-    const current = scanCountFor(match.sku);
-    if (current >= match.quantity) {
-      if (scanError) {
-        scanError.textContent = `${match.productName} is already fully scanned.`;
-        scanError.hidden = false;
-      }
-      return;
-    }
-
-    state.scans.set(match.sku, current + 1);
-    if (scanError) {
-      scanError.hidden = true;
-      scanError.textContent = '';
-    }
-    renderScanStage(order);
   };
 
   board?.addEventListener('click', (event) => {
@@ -329,35 +274,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelector('[data-next-scan]')?.addEventListener('click', () => {
     const order = activeOrder();
     if (!order) return;
-    showStage('scan');
-    renderScanStage(order);
-    window.setTimeout(() => scanInput?.focus(), 80);
-  });
-
-  document.querySelector('[data-back-pick]')?.addEventListener('click', () => {
-    const order = activeOrder();
-    if (!order) return;
-    renderPickStage(order);
-    showStage('pick');
-  });
-
-  scanInput?.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter') return;
-    event.preventDefault();
-    handleScan(scanInput.value);
-    scanInput.value = '';
-  });
-
-  printButton?.addEventListener('click', () => {
-    const order = activeOrder();
-    if (!order || printButton.disabled) return;
-    printButton.disabled = true;
-    printButton.textContent = 'Printing label...';
-    window.setTimeout(() => {
-      order.status = 'IS_BEING_FULFILLED';
-      closeFulfillment();
-      renderBoard();
-    }, 650);
+    saveOrders();
+    try {
+      window.sessionStorage.setItem(activeOrderStorageKey, order.id);
+    } catch (_error) {
+      // Query string still carries the order id.
+    }
+    window.location.href = `./scan/?order=${encodeURIComponent(order.id)}`;
   });
 
   document.querySelectorAll('[data-close-fulfillment-modal]').forEach((button) => {

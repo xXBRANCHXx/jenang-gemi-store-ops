@@ -29,12 +29,25 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
     <div class="admin-app admin-store-home" data-store-home>
         <div class="admin-backdrop admin-backdrop-a"></div>
         <div class="admin-backdrop admin-backdrop-b"></div>
-        <header class="admin-topbar">
-            <div class="admin-topbar-brand">
-                <span class="admin-chip">Fulfillment Home</span>
-                <h1>Incoming Listed Orders</h1>
-                <p>Orders stay in IS_LISTED until the shipping label is printed, then move into IS_BEING_FULFILLED.</p>
-            </div>
+        <header class="admin-topbar admin-store-topbar">
+            <section class="admin-store-command">
+                <article class="admin-store-stat">
+                    <span>Listed</span>
+                    <strong data-listed-count>0</strong>
+                </article>
+                <article class="admin-store-stat">
+                    <span>&lt;10m</span>
+                    <strong data-critical-count>0</strong>
+                </article>
+                <article class="admin-store-stat">
+                    <span>Started</span>
+                    <strong data-started-count>0</strong>
+                </article>
+                <article class="admin-store-stat">
+                    <span>Fulfilling</span>
+                    <strong data-fulfilling-count>0</strong>
+                </article>
+            </section>
             <div class="admin-topbar-actions">
                 <div class="admin-view-indicator" data-board-clock>Live Queue</div>
                 <a class="admin-ghost-btn admin-link-btn" href="../inventory/">Inventory</a>
@@ -46,78 +59,10 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
         </header>
 
         <main class="admin-layout">
-            <section class="admin-store-command">
-                <article class="admin-store-stat">
-                    <span>IS_LISTED</span>
-                    <strong data-listed-count>0</strong>
-                    <small>Ready to start</small>
-                </article>
-                <article class="admin-store-stat">
-                    <span>Under 10 min</span>
-                    <strong data-critical-count>0</strong>
-                    <small>Flashes and siren-ready</small>
-                </article>
-                <article class="admin-store-stat">
-                    <span>Started</span>
-                    <strong data-started-count>0</strong>
-                    <small>Not status-updated yet</small>
-                </article>
-                <article class="admin-store-stat">
-                    <span>Fulfillment</span>
-                    <strong data-fulfilling-count>0</strong>
-                    <small>Label already printed</small>
-                </article>
-            </section>
-
             <section class="admin-panel admin-panel-wide admin-fulfillment-panel">
-                <div class="admin-panel-head">
-                    <div>
-                        <span class="admin-panel-kicker">Most Urgent First</span>
-                        <h3>Serpentine listed-order board</h3>
-                    </div>
-                    <div class="admin-board-meta">
-                        <span data-board-density>5 columns x 10 rows</span>
-                        <span data-board-overflow hidden>Temporary overflow rows active</span>
-                    </div>
-                </div>
-                <div class="admin-board-columns" aria-hidden="true">
-                    <span>Lane 1</span>
-                    <span>Lane 2</span>
-                    <span>Lane 3</span>
-                    <span>Lane 4</span>
-                    <span>Lane 5</span>
-                </div>
                 <div class="admin-order-board-wrap">
                     <div class="admin-order-board" data-order-board></div>
                 </div>
-            </section>
-
-            <section class="admin-main-grid">
-                <article class="admin-panel admin-queue-notes">
-                    <div class="admin-panel-head">
-                        <div>
-                            <span class="admin-panel-kicker">Demo Contract</span>
-                            <h3>Status movement</h3>
-                        </div>
-                    </div>
-                    <div class="admin-note-stack">
-                        <div class="admin-note-card"><strong>Marketplace signal</strong><span>Shopee READY_TO_SHIP and TikTok/Tokopedia AWAITING_SHIPMENT enter as IS_LISTED.</span></div>
-                        <div class="admin-note-card"><strong>Start does not update status</strong><span>Starting opens the picking and barcode flow while the order remains listed.</span></div>
-                        <div class="admin-note-card"><strong>Print label updates status</strong><span>After label print, the demo moves the order to IS_BEING_FULFILLED and removes it from the board.</span></div>
-                    </div>
-                </article>
-                <article class="admin-panel admin-queue-notes">
-                    <div class="admin-panel-head">
-                        <div>
-                            <span class="admin-panel-kicker">SKU Match</span>
-                            <h3>Tag to product list</h3>
-                        </div>
-                    </div>
-                    <p class="admin-table-note">This demo maps marketplace item tags to SKU records in local JSON, then displays only the database Product Name and quantity during pick confirmation.</p>
-                    <div class="admin-bottom-actions">
-                        <a class="admin-primary-btn admin-link-btn" href="../sku-db/">Open SKU Database</a>
-                    </div>
-                </article>
             </section>
         </main>
 
@@ -136,22 +81,6 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
                     <div class="admin-pick-list" data-pick-list></div>
                     <div class="admin-modal-actions">
                         <button type="button" class="admin-primary-btn admin-next-btn" data-next-scan>Lanjut</button>
-                    </div>
-                </div>
-                <div class="admin-quiz-stage" data-scan-stage hidden>
-                    <div class="admin-scan-head">
-                        <div>
-                            <span class="admin-panel-kicker">Barcode Check</span>
-                            <h3>Scan every product before printing</h3>
-                        </div>
-                        <span class="admin-status-badge" data-scan-progress>0/0</span>
-                    </div>
-                    <input class="admin-scan-input" type="text" data-scan-input autocomplete="off" placeholder="Scan barcode or SKU">
-                    <p class="admin-form-error" data-scan-error hidden></p>
-                    <div class="admin-scan-list" data-scan-list></div>
-                    <div class="admin-modal-actions">
-                        <button type="button" class="admin-ghost-btn" data-back-pick>Back</button>
-                        <button type="button" class="admin-primary-btn admin-print-btn" data-print-label disabled>Print Shopee Label</button>
                     </div>
                 </div>
             </div>

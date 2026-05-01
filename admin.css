@@ -1067,9 +1067,114 @@ button, input {
   box-shadow: none;
 }
 
+.admin-store-home {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 10px;
+  min-height: 100svh;
+  padding: 12px;
+}
+
+.admin-store-topbar {
+  align-items: center;
+  margin-bottom: 0;
+}
+
+.admin-store-topbar .admin-topbar-actions {
+  justify-content: flex-end;
+}
+
+.admin-store-command {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-store-stat {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  min-height: 0;
+  padding: 7px;
+  border-radius: 50%;
+  text-align: center;
+}
+
+.admin-store-stat span {
+  font-size: 8px;
+  line-height: 1;
+  letter-spacing: 0.05em;
+}
+
+.admin-store-stat strong {
+  margin: 1px 0 0;
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.admin-store-stat small,
+.admin-board-meta,
+.admin-board-columns {
+  display: none;
+}
+
+.admin-store-home .admin-layout {
+  min-height: 0;
+}
+
+.admin-fulfillment-panel {
+  min-height: 0;
+  padding: 10px;
+  border-radius: 18px;
+}
+
+.admin-order-board-wrap {
+  max-height: calc(100svh - 116px);
+}
+
+.admin-fulfillment-card,
+.admin-scan-page-card {
+  width: min(1180px, calc(100vw - 28px));
+  min-height: min(760px, calc(100svh - 28px));
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.admin-fulfillment-card .admin-quiz-stage,
+.admin-scan-page-card {
+  align-content: start;
+}
+
+.admin-pick-list,
+.admin-scan-list {
+  align-content: start;
+}
+
+.admin-store-scan-page {
+  min-height: 100svh;
+  padding: 12px;
+}
+
+.admin-scan-page-layout {
+  display: grid;
+  min-height: calc(100svh - 86px);
+}
+
+.admin-scan-page-card {
+  justify-self: stretch;
+  align-self: stretch;
+  width: 100%;
+  min-height: 0;
+}
+
+.admin-scan-input-page {
+  min-height: 72px;
+  font-size: 1.35rem;
+}
+
 @media (max-width: 900px) {
   .admin-store-command {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    flex-wrap: wrap;
   }
 
   .admin-board-columns,
@@ -1092,9 +1197,21 @@ button, input {
 }
 
 @media (max-width: 640px) {
-  .admin-store-command,
   .admin-main-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-store-home {
+    padding: 8px;
+  }
+
+  .admin-store-stat {
+    width: 58px;
+    height: 58px;
+  }
+
+  .admin-store-stat strong {
+    font-size: 1.1rem;
   }
 
   .admin-topbar,
