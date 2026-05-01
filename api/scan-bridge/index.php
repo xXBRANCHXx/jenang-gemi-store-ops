@@ -54,8 +54,16 @@ function jg_scan_bridge_normalize_barcode(string $barcode): string
         return '0' . $barcode;
     }
 
+    if (preg_match('/^0\d{12}$/', $barcode) === 1) {
+        return substr($barcode, 1);
+    }
+
     if (preg_match('/^JG\d{11}$/', $barcode) === 1) {
         return 'JG0' . substr($barcode, 2);
+    }
+
+    if (preg_match('/^JG0\d{12}$/', $barcode) === 1) {
+        return 'JG' . substr($barcode, 3);
     }
 
     return $barcode;

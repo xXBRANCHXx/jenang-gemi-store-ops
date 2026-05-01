@@ -64,20 +64,45 @@ document.addEventListener('DOMContentLoaded', () => {
   const normalizeBarcodeCode = (value) => {
     const barcode = String(value || '').trim().toUpperCase();
     if (/^\d{11}$/.test(barcode)) return `0${barcode}`;
+    if (/^0\d{12}$/.test(barcode)) return barcode.slice(1);
     if (/^JG\d{11}$/.test(barcode)) return `JG0${barcode.slice(2)}`;
+    if (/^JG0\d{12}$/.test(barcode)) return `JG${barcode.slice(3)}`;
     return barcode;
   };
 
-  const normalizedScanCandidates = (value) => {
+  const addScanCandidate = (candidates, value) => {
     const normalized = normalizeBarcodeCode(value);
-    const candidates = [normalized];
+    if (!normalized) return;
+    candidates.push(normalized);
 
-    if (/^\d{11}$/.test(normalized)) {
-      candidates.push(`0${normalized}`);
+    if (/^\d+$/.test(normalized)) {
+      candidates.push(`JG${normalized}`);
     }
 
-    if (/^JG\d{11}$/.test(normalized)) {
-      candidates.push(`JG0${normalized.slice(2)}`);
+    if (/^JG\d+$/.test(normalized)) {
+      candidates.push(normalized.slice(2));
+    }
+  };
+
+  const normalizedScanCandidates = (value) => {
+    const raw = String(value ?? '').trim().toUpperCase();
+    const candidates = [];
+    addScanCandidate(candidates, raw);
+
+    if (/^\d{11}$/.test(raw)) {
+      addScanCandidate(candidates, `0${raw}`);
+    }
+
+    if (/^0\d{12}$/.test(raw)) {
+      addScanCandidate(candidates, raw.slice(1));
+    }
+
+    if (/^JG\d{11}$/.test(raw)) {
+      addScanCandidate(candidates, `JG0${raw.slice(2)}`);
+    }
+
+    if (/^JG0\d{12}$/.test(raw)) {
+      addScanCandidate(candidates, `JG${raw.slice(3)}`);
     }
 
     return [...new Set(candidates.filter(Boolean))];
@@ -145,14 +170,19 @@ document.addEventListener('DOMContentLoaded', () => {
     render();
   };
 
+  const submitScanBuffer = () => {
+    const value = scanBuffer;
+    scanBuffer = '';
+    window.clearTimeout(scanBufferTimer);
+    handleScan(value);
+  };
+
   document.addEventListener('keydown', (event) => {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
 
-    if (event.key === 'Enter') {
+    if (event.key === 'Enter' || event.key === 'Tab') {
       event.preventDefault();
-      const value = scanBuffer;
-      scanBuffer = '';
-      handleScan(value);
+      submitScanBuffer();
       return;
     }
 
@@ -160,9 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
     event.preventDefault();
     scanBuffer += event.key;
     window.clearTimeout(scanBufferTimer);
-    scanBufferTimer = window.setTimeout(() => {
-      scanBuffer = '';
-    }, 180);
+    scanBufferTimer = window.setTimeout(submitScanBuffer, 260);
   });
 
   const pollPhoneScans = async () => {
