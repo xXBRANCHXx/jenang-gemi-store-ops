@@ -63,6 +63,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const normalizeScanCode = (value) => String(value || '').trim().toUpperCase();
 
+  const expectedScanCodes = () => {
+    if (!order) return '';
+    return [...new Set(order.items.map((item) => scanSkuFor(item)).filter(Boolean))].join(', ');
+  };
+
   const setError = (message) => {
     if (!scanError) return;
     scanError.textContent = message;
@@ -94,11 +99,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const required = scanQuantityFor(item);
         const count = scanCountFor(scanSku);
         const complete = count >= required;
+        const orderSku = String(item.sku || '');
+        const codeLabel = orderSku && orderSku !== scanSku
+          ? `Order ${orderSku} -> scan ${scanSku}`
+          : `${scanSku} / ${item.scanBarcode || item.barcode}`;
         return `
           <article class="admin-scan-item ${complete ? 'is-complete' : ''}">
             <div>
               <strong>${escapeHtml(item.scanProductName || item.productName)}</strong>
-              <span>${escapeHtml(scanSku)} / ${escapeHtml(item.scanBarcode || item.barcode)}</span>
+              <span>${escapeHtml(codeLabel)}</span>
             </div>
             <em>${count}/${escapeHtml(required)}</em>
           </article>
@@ -118,8 +127,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     if (!match) {
+      const soldSkuMatch = order.items.find((item) => {
+        const orderSku = normalizeScanCode(item.sku);
+        const orderBarcode = normalizeScanCode(item.barcode);
+        const scanSku = normalizeScanCode(scanSkuFor(item));
+        return (scannedCode === orderSku || scannedCode === orderBarcode) && scannedCode !== scanSku;
+      });
+
+      if (soldSkuMatch) {
+        const requiredSku = scanSkuFor(soldSkuMatch);
+        const requiredCount = scanQuantityFor(soldSkuMatch);
+        const message = `ASTRA requires ${requiredCount} scan${requiredCount === 1 ? '' : 's'} of ${requiredSku} for this order SKU.`;
+        setError(message);
+        setScanStatus('Scan is the order SKU', message);
+        return false;
+      }
+
       setError('Barcode not found in this order.');
-      setScanStatus('Scan not found', `${scannedCode} is not required for this order.`);
+      setScanStatus('Scan not found', `${scannedCode} is not required. Expected: ${expectedScanCodes() || 'No active SKU'}.`);
       return false;
     }
 
