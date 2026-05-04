@@ -21,6 +21,7 @@ $phoneScanJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/phone-scan.js'
                 <span class="admin-panel-kicker">Phone Scanner</span>
                 <strong data-phone-status>Ready</strong>
             </div>
+            <p class="admin-phone-orientation-note">Turn your phone sideways if it is not already sideways.</p>
             <div class="admin-phone-camera-frame">
                 <video data-camera-video muted playsinline></video>
                 <div class="admin-phone-reticle"></div>
@@ -31,6 +32,17 @@ $phoneScanJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/phone-scan.js'
                 <button type="button" class="admin-ghost-btn" data-demo-scan>Demo Scan</button>
             </div>
         </section>
+        <div class="admin-phone-confirm-shell" data-phone-confirm hidden>
+            <div class="admin-phone-confirm-card">
+                <span class="admin-panel-kicker">Confirm Scan</span>
+                <strong data-confirm-product>Product</strong>
+                <small data-confirm-sku>SKU</small>
+                <div class="admin-phone-actions">
+                    <button type="button" class="admin-primary-btn" data-confirm-send>Continue</button>
+                    <button type="button" class="admin-ghost-btn" data-confirm-cancel>Cancel</button>
+                </div>
+            </div>
+        </div>
     </main>
     <script src="../../phone-scan.js?v=<?php echo urlencode($phoneScanJsVersion ?: '1'); ?>" defer></script>
 </body>

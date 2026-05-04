@@ -1241,18 +1241,18 @@ button, input {
   min-height: 100svh;
   display: grid;
   place-items: center;
-  padding: 12px;
+  padding: 10px;
 }
 
 .admin-phone-camera-card {
   display: grid;
-  grid-template-rows: auto 1fr auto auto;
-  gap: 14px;
-  width: min(720px, 100%);
-  min-height: calc(100svh - 24px);
-  padding: 14px;
+  grid-template-rows: auto auto 1fr auto auto;
+  gap: 10px;
+  width: min(980px, 100%);
+  min-height: calc(100svh - 20px);
+  padding: 12px;
   border: 1px solid var(--admin-border);
-  border-radius: 28px;
+  border-radius: 18px;
   background: var(--admin-surface);
   box-shadow: var(--admin-shadow);
 }
@@ -1270,11 +1270,20 @@ button, input {
   overflow-wrap: anywhere;
 }
 
+.admin-phone-orientation-note {
+  margin: 0;
+  color: #ef4444;
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-align: center;
+}
+
 .admin-phone-camera-frame {
   position: relative;
   min-height: 0;
   overflow: hidden;
-  border-radius: 24px;
+  border-radius: 16px;
+  aspect-ratio: 16 / 9;
   background:
     radial-gradient(circle at 50% 48%, rgba(157, 255, 0, 0.16), transparent 34%),
     #071018;
@@ -1283,21 +1292,81 @@ button, input {
 .admin-phone-camera-frame video {
   width: 100%;
   height: 100%;
-  min-height: 54svh;
+  min-height: 0;
   object-fit: cover;
 }
 
 .admin-phone-reticle {
   position: absolute;
-  inset: 20%;
+  inset: 30% 11%;
   border: 3px solid rgba(157, 255, 0, 0.84);
-  border-radius: 26px;
+  border-radius: 14px;
   box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.24);
 }
 
 .admin-phone-actions button {
   flex: 1;
   min-height: 58px;
+}
+
+.admin-phone-confirm-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(11, 18, 32, 0.72);
+  backdrop-filter: blur(12px);
+}
+
+.admin-phone-confirm-shell[hidden] {
+  display: none;
+}
+
+.admin-phone-confirm-card {
+  display: grid;
+  gap: 16px;
+  width: min(520px, 100%);
+  padding: 22px;
+  border: 1px solid var(--admin-border);
+  border-radius: 18px;
+  background: var(--admin-surface);
+  box-shadow: var(--admin-shadow);
+}
+
+.admin-phone-confirm-card strong {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(1.6rem, 4vw, 2.7rem);
+  line-height: 1.02;
+  overflow-wrap: anywhere;
+}
+
+.admin-phone-confirm-card small {
+  color: var(--admin-muted);
+  font-size: 1rem;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+@media (orientation: portrait) {
+  .admin-phone-camera-frame {
+    aspect-ratio: 4 / 3;
+  }
+
+  .admin-phone-reticle {
+    inset: 32% 8%;
+  }
+}
+
+@media (orientation: landscape) {
+  .admin-phone-orientation-note {
+    color: var(--admin-muted);
+  }
+
+  .admin-phone-camera-card {
+    min-height: auto;
+  }
 }
 
 @media (max-width: 900px) {

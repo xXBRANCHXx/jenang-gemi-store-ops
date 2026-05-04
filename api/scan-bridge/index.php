@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once dirname(__DIR__, 2) . '/sku-db-bootstrap.php';
+
 header('Content-Type: application/json; charset=utf-8');
 
 function jg_scan_bridge_fail(string $message, int $status = 422): void
@@ -48,6 +50,51 @@ function jg_scan_bridge_write(array $events): void
     }
 }
 
+function jg_scan_bridge_sku_product(string $sku): array
+{
+    try {
+        $pdo = jg_store_ops_sku_db();
+        $stmt = $pdo->prepare(
+            'SELECT
+                s.sku,
+                b.name AS brand_name,
+                p.name AS product_name,
+                f.name AS flavor_name,
+                s.volume,
+                u.name AS unit_name
+             FROM sku_skus s
+             INNER JOIN sku_brands b ON b.id = s.brand_id
+             INNER JOIN sku_products p ON p.id = s.product_id
+             INNER JOIN sku_flavors f ON f.id = s.flavor_id
+             INNER JOIN sku_units u ON u.id = s.unit_id
+             WHERE s.sku = :sku
+             LIMIT 1'
+        );
+        $stmt->execute([':sku' => $sku]);
+        $row = $stmt->fetch();
+    } catch (Throwable $throwable) {
+        $row = false;
+    }
+
+    if (!is_array($row)) {
+        return ['sku' => $sku, 'product_name' => $sku];
+    }
+
+    $parts = [
+        (string) ($row['brand_name'] ?? ''),
+        (string) ($row['product_name'] ?? ''),
+        (string) ($row['flavor_name'] ?? ''),
+        number_format((float) ($row['volume'] ?? 0), 1, '.', ''),
+        (string) ($row['unit_name'] ?? ''),
+    ];
+    $parts = array_values(array_filter(array_map('trim', $parts), static fn (string $part): bool => $part !== '' && $part !== '0.0'));
+
+    return [
+        'sku' => $sku,
+        'product_name' => implode(' ', $parts) ?: $sku,
+    ];
+}
+
 $events = jg_scan_bridge_read();
 
 $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
@@ -72,6 +119,16 @@ if ($method === 'POST') {
 
 if ($method !== 'GET') {
     jg_scan_bridge_fail('Method not allowed.', 405);
+}
+
+$lookupSku = strtoupper(trim((string) ($_GET['sku'] ?? '')));
+if ($lookupSku !== '') {
+    if (!preg_match('/^[A-Z0-9._-]{4,80}$/', $lookupSku)) {
+        jg_scan_bridge_fail('Invalid SKU.');
+    }
+
+    echo json_encode(jg_scan_bridge_sku_product($lookupSku), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit;
 }
 
 $after = max(0, (int) ($_GET['after'] ?? 0));
