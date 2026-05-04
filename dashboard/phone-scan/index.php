@@ -23,6 +23,10 @@ $phoneScanJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/phone-scan.js'
 </head>
 <body class="admin-body is-dashboard is-phone-scanner">
     <main class="admin-phone-scanner-page" data-phone-scanner>
+        <div class="admin-phone-top-controls" data-phone-standby-controls hidden>
+            <button type="button" class="admin-ghost-btn" data-phone-settings>Settings</button>
+            <span class="admin-phone-profile-badge" data-phone-profile-badge>Profile</span>
+        </div>
         <section class="admin-phone-camera-card">
             <div class="admin-phone-camera-head">
                 <span class="admin-panel-kicker">Phone Scanner</span>

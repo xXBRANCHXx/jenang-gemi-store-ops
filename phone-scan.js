@@ -10,6 +10,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const confirmSku = document.querySelector('[data-confirm-sku]');
   const confirmSend = document.querySelector('[data-confirm-send]');
   const confirmCancel = document.querySelector('[data-confirm-cancel]');
+  const standbyControls = document.querySelector('[data-phone-standby-controls]');
+  const settingsButton = document.querySelector('[data-phone-settings]');
+  const profileBadge = document.querySelector('[data-phone-profile-badge]');
   const profileStorageKey = 'jg-store-profile';
   const scanBridgeEndpoint = '../../api/scan-bridge/';
   let detector = null;
@@ -25,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentProfile = null;
   let activeSession = { active: false, order_id: '' };
   let standbyShell = null;
+  let profileGate = null;
   let profiles = [];
 
   if (statusNode) statusNode.textContent = 'Ready';
@@ -68,6 +72,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!profiles.includes(profile)) throw new Error('Choose a company profile from Settings.');
     currentProfile = { username: profile };
     window.localStorage.setItem(profileStorageKey, JSON.stringify(currentProfile));
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('profile', profile);
+      window.history.replaceState(null, '', url);
+    } catch (_error) {
+      // Local storage still carries the selected profile.
+    }
     return currentProfile;
   };
 
@@ -88,20 +99,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const renderProfileGate = () => {
-    if (currentProfile) return;
+  const updateProfileBadge = () => {
+    if (profileBadge) profileBadge.textContent = currentProfile?.username || 'No profile';
+  };
+
+  const updateStandbyControls = () => {
+    if (!standbyControls) return;
+    standbyControls.hidden = Boolean(activeSession.active) || !currentProfile;
+    updateProfileBadge();
+  };
+
+  const renderProfileGate = (mode = 'login') => {
+    if (mode === 'login' && currentProfile) return;
+    if (profileGate) profileGate.remove();
+    const isSettings = mode === 'settings';
     const gate = document.createElement('div');
+    profileGate = gate;
     gate.className = 'admin-store-login-shell';
     gate.innerHTML = `
       <form class="admin-store-login-card" data-phone-profile-form>
-        <span class="admin-panel-kicker">Phone Scanner Login</span>
-        <strong>Choose company profile</strong>
+        <span class="admin-panel-kicker">${isSettings ? 'Scanner Settings' : 'Phone Scanner Login'}</span>
+        <strong>${isSettings ? 'Change company profile' : 'Choose company profile'}</strong>
         <select class="admin-profile-input" name="profile" required>
           <option value="">Select company profile</option>
-          ${profiles.map((profile) => `<option value="${escapeHtml(profile)}">${escapeHtml(profile)}</option>`).join('')}
+          ${profiles.map((profile) => `<option value="${escapeHtml(profile)}" ${profile === currentProfile?.username ? 'selected' : ''}>${escapeHtml(profile)}</option>`).join('')}
         </select>
         <p class="admin-form-error" data-profile-error hidden></p>
-        <button type="submit" class="admin-primary-btn">Continue</button>
+        <div class="admin-phone-actions">
+          <button type="submit" class="admin-primary-btn">${isSettings ? 'Save' : 'Continue'}</button>
+          ${isSettings ? '<button type="button" class="admin-ghost-btn" data-phone-profile-cancel>Cancel</button>' : ''}
+        </div>
       </form>
     `;
     document.body.appendChild(gate);
@@ -118,6 +145,9 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         setCurrentProfile(select?.value || '');
         gate.remove();
+        profileGate = null;
+        updateProfileBadge();
+        updateStandbyControls();
         updateStandby();
         pollSession();
       } catch (saveError) {
@@ -126,6 +156,10 @@ document.addEventListener('DOMContentLoaded', () => {
           error.hidden = false;
         }
       }
+    });
+    gate.querySelector('[data-phone-profile-cancel]')?.addEventListener('click', () => {
+      gate.remove();
+      profileGate = null;
     });
   };
 
@@ -300,6 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const updateStandby = () => {
     const shell = ensureStandbyShell();
     const profile = currentProfile?.username || 'no profile';
+    updateStandbyControls();
     if (activeSession.active) {
       shell.hidden = cameraReady;
       const waitingText = cameraFailed ? 'Camera unavailable. Allow camera access and reload.' : 'Camera will turn on automatically.';
@@ -314,6 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
     shell.hidden = false;
     setStandbyText('Waiting for scan step', `${profile} has no active order in /scan/.`);
     if (statusNode) statusNode.textContent = `Standby: ${profile}`;
+    updateStandbyControls();
   };
 
   const activateScanningIfReady = () => {
@@ -439,6 +475,11 @@ document.addEventListener('DOMContentLoaded', () => {
     closeConfirmation();
     if (statusNode) statusNode.textContent = 'Ready';
     resumeScanning(300);
+  });
+
+  settingsButton?.addEventListener('click', () => {
+    if (activeSession.active) return;
+    renderProfileGate('settings');
   });
 
   document.addEventListener('visibilitychange', () => {

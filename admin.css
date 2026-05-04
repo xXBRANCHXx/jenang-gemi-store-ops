@@ -1467,28 +1467,27 @@ button, input {
 }
 
 .admin-phone-scanner-page {
+  position: relative;
   width: 100vw;
   height: 100dvh;
   min-height: 100dvh;
-  display: grid;
-  place-items: center;
+  display: block;
   overflow: hidden;
-  padding: 8px;
+  padding: 0;
+  background: #071018;
   overscroll-behavior: none;
   touch-action: manipulation;
 }
 
 .admin-phone-camera-card {
-  display: grid;
-  grid-template-rows: auto auto 1fr auto auto;
-  gap: 10px;
-  width: min(980px, 100%);
-  height: calc(100dvh - 16px);
-  padding: 12px;
-  border: 1px solid var(--admin-border);
-  border-radius: 18px;
-  background: var(--admin-surface);
-  box-shadow: var(--admin-shadow);
+  position: relative;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: #071018;
+  box-shadow: none;
 }
 
 .admin-phone-camera-head,
@@ -1499,26 +1498,48 @@ button, input {
   gap: 12px;
 }
 
+.admin-phone-camera-head {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  left: 12px;
+  z-index: 6;
+  max-width: min(360px, calc(100vw - 24px));
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 11px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  background: rgba(7, 16, 24, 0.62);
+  backdrop-filter: blur(10px);
+}
+
 .admin-phone-camera-head strong {
   font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(1.05rem, 3.4vw, 1.45rem);
+  line-height: 1.05;
   overflow-wrap: anywhere;
 }
 
 .admin-phone-orientation-note {
+  position: absolute;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  left: 12px;
+  z-index: 6;
   margin: 0;
   color: #ef4444;
   font-size: 0.82rem;
   font-weight: 900;
   text-align: center;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.64);
 }
 
 .admin-phone-camera-frame {
-  position: relative;
-  min-height: 0;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
-  border-radius: 16px;
-  aspect-ratio: 16 / 9;
+  border-radius: 0;
   background:
     radial-gradient(circle at 50% 48%, rgba(157, 255, 0, 0.16), transparent 34%),
     #071018;
@@ -1533,15 +1554,65 @@ button, input {
 
 .admin-phone-reticle {
   position: absolute;
-  inset: 30% 11%;
+  inset: 32% 12%;
   border: 3px solid rgba(157, 255, 0, 0.84);
   border-radius: 14px;
   box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.24);
 }
 
+.admin-phone-camera-card > .admin-form-error {
+  position: absolute;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 46px);
+  left: 12px;
+  z-index: 7;
+  margin: 0;
+}
+
 .admin-phone-actions button {
   flex: 1;
   min-height: 58px;
+}
+
+.admin-phone-top-controls {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  right: 12px;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-phone-top-controls[hidden] {
+  display: none;
+}
+
+.admin-phone-top-controls .admin-ghost-btn {
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.86);
+  backdrop-filter: blur(10px);
+}
+
+.admin-phone-profile-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: min(42vw, 220px);
+  min-height: 38px;
+  padding: 0 12px;
+  overflow: hidden;
+  border: 1px solid rgba(157, 255, 0, 0.38);
+  border-radius: 999px;
+  background: rgba(25, 64, 31, 0.86);
+  color: #b9ff66;
+  font-size: 0.82rem;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
 }
 
 .admin-phone-standby-shell {
@@ -1562,11 +1633,11 @@ button, input {
 
 .admin-phone-standby-card {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   width: min(460px, 100%);
-  padding: 20px;
+  padding: 18px;
   border: 1px solid var(--admin-border);
-  border-radius: 18px;
+  border-radius: 16px;
   background: rgba(15, 23, 42, 0.92);
   text-align: center;
   box-shadow: var(--admin-shadow);
@@ -1575,11 +1646,12 @@ button, input {
 .admin-phone-standby-card strong {
   font-family: 'Space Grotesk', sans-serif;
   font-size: clamp(1.4rem, 4vw, 2.2rem);
-  line-height: 1.02;
+  line-height: 1.05;
 }
 
 .admin-phone-standby-card small {
   color: var(--admin-muted);
+  line-height: 1.35;
   font-weight: 800;
 }
 
@@ -1600,9 +1672,9 @@ button, input {
 
 .admin-phone-confirm-card {
   display: grid;
-  gap: 16px;
+  gap: 14px;
   width: min(520px, 100%);
-  padding: 22px;
+  padding: 20px;
   border: 1px solid var(--admin-border);
   border-radius: 18px;
   background: var(--admin-surface);
@@ -1624,10 +1696,6 @@ button, input {
 }
 
 @media (orientation: portrait) {
-  .admin-phone-camera-frame {
-    aspect-ratio: 4 / 3;
-  }
-
   .admin-phone-reticle {
     inset: 32% 8%;
   }
@@ -1636,23 +1704,6 @@ button, input {
 @media (orientation: landscape) {
   .admin-phone-orientation-note {
     color: var(--admin-muted);
-  }
-
-  .admin-phone-camera-card {
-    grid-template-columns: 210px 1fr;
-    grid-template-rows: auto auto 1fr auto;
-  }
-
-  .admin-phone-camera-head,
-  .admin-phone-orientation-note,
-  .admin-phone-actions,
-  .admin-phone-camera-card > .admin-form-error {
-    grid-column: 1;
-  }
-
-  .admin-phone-camera-frame {
-    grid-column: 2;
-    grid-row: 1 / -1;
   }
 }
 
