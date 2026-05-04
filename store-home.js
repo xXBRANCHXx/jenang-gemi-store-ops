@@ -353,15 +353,18 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
     }
     if (pickList) {
-      pickList.innerHTML = order.items.map((item) => `
-        <article class="admin-pick-item">
-          <div>
-            <strong>${escapeHtml(item.productName)}</strong>
-            <span>${Number(item.scanQuantity || item.quantity)} scan${Number(item.scanQuantity || item.quantity) === 1 ? '' : 's'} of ${escapeHtml(item.scanProductName || item.productName)}</span>
-          </div>
-          <em>x${escapeHtml(item.quantity)}</em>
-        </article>
-      `).join('');
+      pickList.innerHTML = order.items.map((item) => {
+        const scanQuantity = Number(item.scanQuantity || item.quantity);
+        return `
+          <article class="admin-pick-item">
+            <div>
+              <strong>${escapeHtml(item.scanProductName || item.productName)}</strong>
+              <span>${escapeHtml(item.productName)}</span>
+            </div>
+            <em>x${escapeHtml(scanQuantity)}</em>
+          </article>
+        `;
+      }).join('');
     }
   };
 
