@@ -17,37 +17,121 @@ function jg_scan_bridge_store_path(): string
     return dirname(__DIR__, 2) . '/data/scan-bridge.json';
 }
 
-function jg_scan_bridge_read(): array
+function jg_scan_bridge_read_store(): array
 {
     $path = jg_scan_bridge_store_path();
     if (!is_file($path)) {
-        return [];
+        return ['events' => [], 'profiles' => [], 'sessions' => []];
     }
 
     $raw = @file_get_contents($path);
     if (!is_string($raw) || trim($raw) === '') {
-        return [];
+        return ['events' => [], 'profiles' => [], 'sessions' => []];
     }
 
     $decoded = json_decode($raw, true);
     if (!is_array($decoded)) {
-        return [];
+        return ['events' => [], 'profiles' => [], 'sessions' => []];
     }
 
     if (isset($decoded['events']) && is_array($decoded['events'])) {
-        return $decoded['events'];
+        return [
+            'events' => $decoded['events'],
+            'profiles' => isset($decoded['profiles']) && is_array($decoded['profiles']) ? $decoded['profiles'] : [],
+            'sessions' => isset($decoded['sessions']) && is_array($decoded['sessions']) ? $decoded['sessions'] : [],
+        ];
     }
 
-    return array_values($decoded) === $decoded ? $decoded : [];
+    return [
+        'events' => array_values($decoded) === $decoded ? $decoded : [],
+        'profiles' => [],
+        'sessions' => [],
+    ];
+}
+
+function jg_scan_bridge_read(): array
+{
+    return jg_scan_bridge_read_store()['events'];
+}
+
+function jg_scan_bridge_write_store(array $store): void
+{
+    $path = jg_scan_bridge_store_path();
+    $encoded = json_encode([
+        'events' => array_values($store['events'] ?? []),
+        'profiles' => array_values($store['profiles'] ?? []),
+        'sessions' => $store['sessions'] ?? [],
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if (!is_string($encoded) || @file_put_contents($path, $encoded . PHP_EOL, LOCK_EX) === false) {
+        jg_scan_bridge_fail('Unable to save scan event.', 500);
+    }
 }
 
 function jg_scan_bridge_write(array $events): void
 {
-    $path = jg_scan_bridge_store_path();
-    $encoded = json_encode(['events' => array_values($events)], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    if (!is_string($encoded) || @file_put_contents($path, $encoded . PHP_EOL, LOCK_EX) === false) {
-        jg_scan_bridge_fail('Unable to save scan event.', 500);
+    $store = jg_scan_bridge_read_store();
+    $store['events'] = $events;
+    jg_scan_bridge_write_store($store);
+}
+
+function jg_scan_bridge_profile(string $value): string
+{
+    $profile = strtolower(trim($value));
+    $profile = preg_replace('/[^a-z0-9._-]+/', '-', $profile) ?? '';
+    $profile = trim($profile, '.-_');
+    if ($profile === '' || strlen($profile) > 40) {
+        jg_scan_bridge_fail('Invalid profile.');
     }
+
+    return $profile;
+}
+
+function jg_scan_bridge_order_id(string $value): string
+{
+    $orderId = strtoupper(trim($value));
+    if ($orderId === '') {
+        return '';
+    }
+    if (!preg_match('/^[A-Z0-9._-]{3,80}$/', $orderId)) {
+        jg_scan_bridge_fail('Invalid order.');
+    }
+
+    return $orderId;
+}
+
+function jg_scan_bridge_save_profile(array &$store, string $profile): void
+{
+    $profiles = [];
+    foreach (($store['profiles'] ?? []) as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $username = (string) ($row['username'] ?? '');
+        if ($username !== '') {
+            $profiles[$username] = $row;
+        }
+    }
+
+    if (!isset($profiles[$profile])) {
+        $profiles[$profile] = [
+            'username' => $profile,
+            'created_at' => gmdate(DATE_ATOM),
+        ];
+    }
+
+    $profiles[$profile]['updated_at'] = gmdate(DATE_ATOM);
+    ksort($profiles);
+    $store['profiles'] = array_values($profiles);
+}
+
+function jg_scan_bridge_active_session(array $session): bool
+{
+    $updatedAt = DateTimeImmutable::createFromFormat(DATE_ATOM, (string) ($session['updated_at'] ?? ''));
+    if (!$updatedAt instanceof DateTimeImmutable) {
+        return false;
+    }
+
+    return time() - $updatedAt->getTimestamp() <= 15;
 }
 
 function jg_scan_bridge_next_id(array $events): int
@@ -123,31 +207,90 @@ function jg_scan_bridge_sku_product(string $sku): array
     ];
 }
 
-$events = jg_scan_bridge_read();
+$store = jg_scan_bridge_read_store();
+$events = $store['events'];
 
 $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 if ($method === 'POST') {
     $raw = file_get_contents('php://input');
     $payload = is_string($raw) && trim($raw) !== '' ? json_decode($raw, true) : $_POST;
     $payload = is_array($payload) ? $payload : [];
+    $action = strtolower(trim((string) ($payload['action'] ?? 'scan')));
+
+    if ($action === 'profile') {
+        $profile = jg_scan_bridge_profile((string) ($payload['profile'] ?? ''));
+        jg_scan_bridge_save_profile($store, $profile);
+        jg_scan_bridge_write_store($store);
+        echo json_encode(['ok' => true, 'profile' => $profile], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    if ($action === 'session') {
+        $profile = jg_scan_bridge_profile((string) ($payload['profile'] ?? ''));
+        jg_scan_bridge_save_profile($store, $profile);
+        $active = (bool) ($payload['active'] ?? false);
+        if ($active) {
+            $orderId = jg_scan_bridge_order_id((string) ($payload['order_id'] ?? ''));
+            if ($orderId === '') {
+                jg_scan_bridge_fail('Invalid order.');
+            }
+            $store['sessions'][$profile] = [
+                'profile' => $profile,
+                'order_id' => $orderId,
+                'active' => true,
+                'updated_at' => gmdate(DATE_ATOM),
+            ];
+        } else {
+            unset($store['sessions'][$profile]);
+        }
+        jg_scan_bridge_write_store($store);
+        echo json_encode(['ok' => true], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
     $barcode = strtoupper(trim((string) ($payload['barcode'] ?? '')));
     if (!preg_match('/^[A-Z0-9._-]{4,80}$/', $barcode)) {
         jg_scan_bridge_fail('Invalid barcode.');
     }
+    $profile = jg_scan_bridge_profile((string) ($payload['profile'] ?? ''));
+    $orderId = jg_scan_bridge_order_id((string) ($payload['order_id'] ?? ''));
 
     $events[] = [
         'id' => jg_scan_bridge_next_id($events),
         'barcode' => $barcode,
+        'profile' => $profile,
+        'order_id' => $orderId,
         'created_at' => gmdate(DATE_ATOM),
     ];
     $events = array_slice($events, -80);
-    jg_scan_bridge_write($events);
+    $store['events'] = $events;
+    jg_scan_bridge_write_store($store);
     echo json_encode(['ok' => true], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
 if ($method !== 'GET') {
     jg_scan_bridge_fail('Method not allowed.', 405);
+}
+
+if (isset($_GET['profiles'])) {
+    echo json_encode([
+        'profiles' => array_values($store['profiles'] ?? []),
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+$statusProfile = trim((string) ($_GET['status_profile'] ?? ''));
+if ($statusProfile !== '') {
+    $profile = jg_scan_bridge_profile($statusProfile);
+    $session = is_array($store['sessions'][$profile] ?? null) ? $store['sessions'][$profile] : [];
+    $active = $session !== [] && jg_scan_bridge_active_session($session);
+    echo json_encode([
+        'active' => $active,
+        'profile' => $profile,
+        'order_id' => $active ? (string) ($session['order_id'] ?? '') : '',
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit;
 }
 
 $lookupSku = strtoupper(trim((string) ($_GET['sku'] ?? '')));
@@ -161,9 +304,16 @@ if ($lookupSku !== '') {
 }
 
 $after = max(0, (int) ($_GET['after'] ?? 0));
+$profileFilter = trim((string) ($_GET['profile'] ?? ''));
+$orderFilter = trim((string) ($_GET['order_id'] ?? ''));
+$profileFilter = $profileFilter !== '' ? jg_scan_bridge_profile($profileFilter) : '';
+$orderFilter = $orderFilter !== '' ? jg_scan_bridge_order_id($orderFilter) : '';
 $nextEvents = array_values(array_filter(
     $events,
-    static fn (array $event): bool => (int) ($event['id'] ?? 0) > $after
+    static fn (array $event): bool =>
+        (int) ($event['id'] ?? 0) > $after
+        && ($profileFilter === '' || (string) ($event['profile'] ?? '') === $profileFilter)
+        && ($orderFilter === '' || (string) ($event['order_id'] ?? '') === $orderFilter)
 ));
 echo json_encode([
     'events' => $nextEvents,

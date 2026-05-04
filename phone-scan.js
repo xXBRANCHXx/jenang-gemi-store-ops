@@ -12,15 +12,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const confirmSku = document.querySelector('[data-confirm-sku]');
   const confirmSend = document.querySelector('[data-confirm-send]');
   const confirmCancel = document.querySelector('[data-confirm-cancel]');
+  const profileStorageKey = 'jg-store-profile';
+  const scanBridgeEndpoint = '../../api/scan-bridge/';
   const demoCodes = ['010100150203', '020200250101', '010100150103', '010100150303'];
   let demoIndex = 0;
   let detector = null;
   let stream = null;
   let scanning = false;
+  let cameraReady = false;
   let pendingScan = null;
   let audioContext = null;
   let wakeLock = null;
   let hapticWarningShown = false;
+  let currentProfile = null;
+  let activeSession = { active: false, order_id: '' };
+  let standbyShell = null;
 
   if (statusNode) statusNode.textContent = 'Ready';
 
@@ -28,6 +34,74 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!errorNode) return;
     errorNode.textContent = message;
     errorNode.hidden = message === '';
+  };
+
+  const normalizeProfile = (value) => String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^[._-]+|[._-]+$/g, '')
+    .slice(0, 40);
+
+  const readProfile = () => {
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = normalizeProfile(params.get('profile') || '');
+    if (fromUrl) return { username: fromUrl };
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(profileStorageKey) || 'null');
+      const username = normalizeProfile(stored?.username || stored);
+      return username ? { username } : null;
+    } catch (_error) {
+      return null;
+    }
+  };
+
+  const saveProfile = async (username) => {
+    const profile = normalizeProfile(username);
+    if (!profile) throw new Error('Enter a username.');
+    const response = await fetch(scanBridgeEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ action: 'profile', profile })
+    });
+    if (!response.ok) throw new Error('Unable to save profile.');
+    currentProfile = { username: profile };
+    window.localStorage.setItem(profileStorageKey, JSON.stringify(currentProfile));
+    return currentProfile;
+  };
+
+  const renderProfileGate = () => {
+    if (currentProfile) return;
+    const gate = document.createElement('div');
+    gate.className = 'admin-store-login-shell';
+    gate.innerHTML = `
+      <form class="admin-store-login-card" data-phone-profile-form>
+        <span class="admin-panel-kicker">Phone Scanner Login</span>
+        <strong>Choose your profile</strong>
+        <input class="admin-profile-input" name="profile" autocomplete="username" placeholder="username" required>
+        <p class="admin-form-error" data-profile-error hidden></p>
+        <button type="submit" class="admin-primary-btn">Continue</button>
+      </form>
+    `;
+    document.body.appendChild(gate);
+    const form = gate.querySelector('[data-phone-profile-form]');
+    const input = form?.querySelector('input[name="profile"]');
+    const error = gate.querySelector('[data-profile-error]');
+    input?.focus();
+    form?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      try {
+        await saveProfile(input?.value || '');
+        gate.remove();
+        updateStandby();
+        pollSession();
+      } catch (saveError) {
+        if (error) {
+          error.textContent = saveError instanceof Error ? saveError.message : 'Unable to login.';
+          error.hidden = false;
+        }
+      }
+    });
   };
 
   const normalizeBarcode = (value) => {
@@ -125,8 +199,74 @@ document.addEventListener('DOMContentLoaded', () => {
       .catch(() => {});
   };
 
+  const ensureStandbyShell = () => {
+    if (standbyShell) return standbyShell;
+    standbyShell = document.createElement('div');
+    standbyShell.className = 'admin-phone-standby-shell';
+    standbyShell.innerHTML = `
+      <div class="admin-phone-standby-card">
+        <span class="admin-panel-kicker">Standby</span>
+        <strong data-standby-title>Waiting for scan step</strong>
+        <small data-standby-detail>Login with the same profile that started the order.</small>
+      </div>
+    `;
+    root.appendChild(standbyShell);
+    return standbyShell;
+  };
+
+  const setStandbyText = (title, detail) => {
+    const shell = ensureStandbyShell();
+    const titleNode = shell.querySelector('[data-standby-title]');
+    const detailNode = shell.querySelector('[data-standby-detail]');
+    if (titleNode) titleNode.textContent = title;
+    if (detailNode) detailNode.textContent = detail;
+  };
+
+  const updateStandby = () => {
+    const shell = ensureStandbyShell();
+    const profile = currentProfile?.username || 'no profile';
+    if (activeSession.active) {
+      shell.hidden = cameraReady;
+      setStandbyText(`Order ${activeSession.order_id}`, cameraReady ? 'Scanner active.' : 'Tap Start Camera to enable scanning.');
+      if (statusNode) statusNode.textContent = cameraReady ? `Scanning as ${profile}` : `Order ready for ${profile}`;
+      return;
+    }
+
+    scanning = false;
+    shell.hidden = false;
+    setStandbyText('Waiting for scan step', `${profile} has no active order in /scan/.`);
+    if (statusNode) statusNode.textContent = `Standby: ${profile}`;
+  };
+
+  const activateScanningIfReady = () => {
+    updateStandby();
+    if (!activeSession.active || !cameraReady || scanning || !detector) return;
+    scanning = true;
+    detectLoop();
+  };
+
+  const pollSession = async () => {
+    if (!currentProfile?.username) return;
+    try {
+      const response = await fetch(`${scanBridgeEndpoint}?status_profile=${encodeURIComponent(currentProfile.username)}&t=${Date.now()}`, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await response.json();
+      activeSession = {
+        active: Boolean(payload.active),
+        order_id: String(payload.order_id || '')
+      };
+      activateScanningIfReady();
+    } catch (_error) {
+      activeSession = { active: false, order_id: '' };
+      updateStandby();
+    }
+  };
+
   const resumeScanning = (delay = 700) => {
-    if (!detector) return;
+    if (!detector || !activeSession.active) return;
     window.setTimeout(() => {
       scanning = true;
       detectLoop();
@@ -134,6 +274,11 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const showConfirmation = async (rawBarcode) => {
+    if (!activeSession.active) {
+      scanning = false;
+      updateStandby();
+      return;
+    }
     const normalizedBarcode = normalizeBarcode(rawBarcode);
     const productName = await lookupProductName(normalizedBarcode);
     pendingScan = { barcode: normalizedBarcode, productName };
@@ -152,11 +297,18 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const sendScan = async (barcode) => {
+    if (!currentProfile?.username || !activeSession.active || !activeSession.order_id) {
+      throw new Error('No active order for this profile.');
+    }
     setError('');
-    const response = await fetch('../../api/scan-bridge/', {
+    const response = await fetch(scanBridgeEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ barcode })
+      body: JSON.stringify({
+        barcode,
+        profile: currentProfile.username,
+        order_id: activeSession.order_id
+      })
     });
     if (!response.ok) {
       throw new Error('Unable to send scan.');
@@ -201,8 +353,8 @@ document.addEventListener('DOMContentLoaded', () => {
         video.srcObject = stream;
         await video.play();
       }
-      scanning = true;
-      detectLoop();
+      cameraReady = true;
+      activateScanningIfReady();
       startButton.textContent = 'Camera Active';
       startButton.disabled = true;
     } catch (_error) {
@@ -244,4 +396,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') keepScannerAwake();
   });
+
+  currentProfile = readProfile();
+  renderProfileGate();
+  updateStandby();
+  pollSession();
+  window.setInterval(pollSession, 2000);
 });

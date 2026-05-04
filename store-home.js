@@ -18,13 +18,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const boardClock = document.querySelector('[data-board-clock]');
   const ordersStorageKey = 'jg-store-demo-orders';
   const activeOrderStorageKey = 'jg-store-active-order-id';
+  const activeProfileStorageKey = 'jg-store-active-profile';
+  const profileStorageKey = 'jg-store-profile';
   const catalogFingerprintStorageKey = 'jg-store-demo-orders-sku-fingerprint';
   const orderSchemaVersion = 'astra-32h-test-orders-v1';
   const skuDbEndpoint = '../api/sku-db/';
+  const scanBridgeEndpoint = '../api/scan-bridge/';
   const demoDeadlineMinutes = 32 * 60;
 
   let skuCatalog = [];
   let demoCatalog = [];
+  let currentProfile = null;
   let state = {
     orders: [],
     activeOrderId: '',
@@ -35,6 +39,90 @@ document.addEventListener('DOMContentLoaded', () => {
     Shopee: 'READY_TO_SHIP',
     TikTok: 'AWAITING_SHIPMENT',
     Tokopedia: 'AWAITING_SHIPMENT'
+  };
+
+  const normalizeProfile = (value) => String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^[._-]+|[._-]+$/g, '')
+    .slice(0, 40);
+
+  const readProfile = () => {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(profileStorageKey) || 'null');
+      const username = normalizeProfile(stored?.username || stored);
+      return username ? { username } : null;
+    } catch (_error) {
+      return null;
+    }
+  };
+
+  const saveProfile = async (username) => {
+    const profile = normalizeProfile(username);
+    if (!profile) throw new Error('Enter a username.');
+    const response = await fetch(scanBridgeEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ action: 'profile', profile })
+    });
+    if (!response.ok) throw new Error('Unable to save profile.');
+    currentProfile = { username: profile };
+    window.localStorage.setItem(profileStorageKey, JSON.stringify(currentProfile));
+    return currentProfile;
+  };
+
+  const renderProfileGate = () => {
+    if (currentProfile) return;
+    const gate = document.createElement('div');
+    gate.className = 'admin-store-login-shell';
+    gate.innerHTML = `
+      <form class="admin-store-login-card" data-store-profile-form>
+        <span class="admin-panel-kicker">Store Login</span>
+        <strong>Choose your profile</strong>
+        <input class="admin-profile-input" name="profile" autocomplete="username" placeholder="username" required>
+        <p class="admin-form-error" data-profile-error hidden></p>
+        <button type="submit" class="admin-primary-btn">Continue</button>
+      </form>
+    `;
+    document.body.appendChild(gate);
+    const form = gate.querySelector('[data-store-profile-form]');
+    const input = form?.querySelector('input[name="profile"]');
+    const error = gate.querySelector('[data-profile-error]');
+    input?.focus();
+    form?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      try {
+        await saveProfile(input?.value || '');
+        gate.remove();
+        renderProfileChip();
+        renderBoard();
+      } catch (saveError) {
+        if (error) {
+          error.textContent = saveError instanceof Error ? saveError.message : 'Unable to login.';
+          error.hidden = false;
+        }
+      }
+    });
+  };
+
+  const renderProfileChip = () => {
+    const actions = document.querySelector('.admin-topbar-actions');
+    if (!actions || !currentProfile) return;
+    let chip = actions.querySelector('[data-store-profile-chip]');
+    if (!chip) {
+      chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'admin-profile-chip';
+      chip.dataset.storeProfileChip = 'true';
+      actions.prepend(chip);
+      chip.addEventListener('click', () => {
+        window.localStorage.removeItem(profileStorageKey);
+        currentProfile = null;
+        renderProfileGate();
+      });
+    }
+    chip.textContent = currentProfile.username;
   };
 
   const now = Date.now();
@@ -230,6 +318,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const activeOrder = () => state.orders.find((order) => order.id === state.activeOrderId) || null;
 
+  const orderOwner = (order) => normalizeProfile(order.assignedProfile || '');
+
+  const canUseOrder = (order) => {
+    const owner = orderOwner(order);
+    return !owner || owner === currentProfile?.username;
+  };
+
   const minutesRemaining = (order) => Math.ceil((order.deadlineAt - Date.now()) / 60000);
 
   const formatDeadline = (order) => {
@@ -348,6 +443,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const minutes = minutesRemaining(order);
       const isCritical = minutes <= 10;
       const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
+      const owner = orderOwner(order);
+      const locked = owner && owner !== currentProfile?.username;
+      const buttonLabel = locked ? owner : (owner ? 'Resume' : (index === 0 ? 'Start Next' : 'Start'));
       return `
         <article class="admin-order-card ${isCritical ? 'is-critical' : ''} ${order.started ? 'is-started' : ''}">
           <div class="admin-order-card-top">
@@ -360,7 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>${escapeHtml(order.marketplaceStatus)}</span>
             <span>${itemCount} item${itemCount === 1 ? '' : 's'}</span>
           </div>
-          <button type="button" class="admin-start-order-btn" data-start-order="${escapeHtml(order.id)}">${index === 0 ? 'Start Next' : 'Start'}</button>
+          <button type="button" class="admin-start-order-btn" data-start-order="${escapeHtml(order.id)}" ${locked ? 'disabled' : ''}>${escapeHtml(buttonLabel)}</button>
         </article>
       `;
     }).join('');
@@ -399,9 +497,14 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const openFulfillment = (orderId) => {
+    if (!currentProfile) {
+      renderProfileGate();
+      return;
+    }
     const order = state.orders.find((item) => item.id === orderId);
-    if (!order) return;
+    if (!order || !canUseOrder(order)) return;
     order.started = true;
+    order.assignedProfile = currentProfile.username;
     state.activeOrderId = order.id;
     state.scans = new Map();
     saveOrders();
@@ -427,14 +530,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.querySelector('[data-next-scan]')?.addEventListener('click', () => {
     const order = activeOrder();
-    if (!order) return;
+    if (!order || !currentProfile) return;
     saveOrders();
     try {
       window.sessionStorage.setItem(activeOrderStorageKey, order.id);
+      window.sessionStorage.setItem(activeProfileStorageKey, currentProfile.username);
     } catch (_error) {
       // Query string still carries the order id.
     }
-    window.location.href = `./scan/?order=${encodeURIComponent(order.id)}`;
+    window.location.href = `./scan/?order=${encodeURIComponent(order.id)}&profile=${encodeURIComponent(currentProfile.username)}`;
   });
 
   document.querySelectorAll('[data-close-fulfillment-modal]').forEach((button) => {
@@ -445,6 +549,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('keydown', unlockAudio, { once: true });
 
   const initialize = async () => {
+    currentProfile = readProfile();
+    renderProfileChip();
+    renderProfileGate();
     try {
       await loadSkuCatalog();
       state.orders = loadOrders();
