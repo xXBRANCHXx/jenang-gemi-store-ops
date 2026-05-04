@@ -19,6 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let scanning = false;
   let pendingScan = null;
   let audioContext = null;
+  let wakeLock = null;
+  let hapticWarningShown = false;
 
   if (statusNode) statusNode.textContent = 'Ready';
 
@@ -50,8 +52,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  const vibrate = (pattern, warn = false) => {
+    if (!('vibrate' in navigator)) {
+      if (warn && !hapticWarningShown) {
+        hapticWarningShown = true;
+        setError('This browser is not exposing Android haptics to the page.');
+      }
+      return false;
+    }
+
+    const accepted = navigator.vibrate(pattern);
+    if (!accepted && warn && !hapticWarningShown) {
+      hapticWarningShown = true;
+      setError('Android blocked vibration for this browser page.');
+    }
+    return accepted;
+  };
+
   const vibrateScan = () => {
-    if ('vibrate' in navigator) navigator.vibrate([160, 60, 160, 60, 240]);
+    vibrate([320, 90, 320, 90, 420]);
   };
 
   const startAudioFeedback = () => {
@@ -92,6 +111,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (screen.orientation?.lock) {
       screen.orientation.lock('landscape').catch(() => {});
     }
+  };
+
+  const keepScannerAwake = () => {
+    if (!navigator.wakeLock?.request || wakeLock) return;
+    navigator.wakeLock.request('screen')
+      .then((lock) => {
+        wakeLock = lock;
+        wakeLock.addEventListener('release', () => {
+          wakeLock = null;
+        });
+      })
+      .catch(() => {});
   };
 
   const resumeScanning = (delay = 700) => {
@@ -155,6 +186,8 @@ document.addEventListener('DOMContentLoaded', () => {
   startButton?.addEventListener('click', async () => {
     startAudioFeedback();
     openFullscreenScanner();
+    keepScannerAwake();
+    vibrate([90, 40, 90], true);
 
     if (!('BarcodeDetector' in window)) {
       setError('This phone browser does not support camera barcode detection. Use Demo Scan.');
@@ -180,6 +213,8 @@ document.addEventListener('DOMContentLoaded', () => {
   demoButton?.addEventListener('click', () => {
     startAudioFeedback();
     openFullscreenScanner();
+    keepScannerAwake();
+    vibrate([90, 40, 90], true);
     const barcode = demoCodes[demoIndex % demoCodes.length];
     demoIndex += 1;
     scanning = false;
@@ -190,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!pendingScan) return;
     const { barcode } = pendingScan;
     try {
-      if ('vibrate' in navigator) navigator.vibrate(70);
+      vibrate([140, 50, 180], true);
       await sendScan(barcode);
       closeConfirmation();
       resumeScanning();
@@ -200,8 +235,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   confirmCancel?.addEventListener('click', () => {
+    vibrate(40);
     closeConfirmation();
     if (statusNode) statusNode.textContent = 'Ready';
     resumeScanning(300);
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') keepScannerAwake();
   });
 });
