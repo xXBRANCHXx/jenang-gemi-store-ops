@@ -67,18 +67,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const saveProfile = async (username) => {
+  const setCurrentProfile = (username) => {
     const profile = normalizeProfile(username);
-    if (!profile) throw new Error('Enter a username.');
-    const response = await fetch(scanBridgeEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ action: 'profile', profile })
-    });
-    if (!response.ok) throw new Error('Unable to save profile.');
+    if (!profile) throw new Error('Choose a company profile.');
+    if (!profiles.includes(profile)) throw new Error('Choose a company profile from Settings.');
     currentProfile = { username: profile };
     writeProfile(currentProfile);
     return currentProfile;
+  };
+
+  const loadProfiles = async () => {
+    try {
+      const response = await fetch(`${scanBridgeEndpoint}?profiles=1`, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await response.json();
+      profiles = (Array.isArray(payload.profiles) ? payload.profiles : [])
+        .map((profile) => normalizeProfile(profile.username || profile))
+        .filter(Boolean)
+        .sort();
+    } catch (_error) {
+      profiles = [];
+    }
   };
 
   const params = new URLSearchParams(window.location.search);
@@ -93,6 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let sessionTimer = 0;
   let phonePollTimer = 0;
   let printRedirecting = false;
+  let profiles = [];
   const bridgeStartedAt = Date.now();
 
   if (orderIdNode) orderIdNode.textContent = order?.id || 'Order missing';
@@ -161,28 +174,35 @@ document.addEventListener('DOMContentLoaded', () => {
     gate.innerHTML = `
       <form class="admin-store-login-card" data-store-profile-form>
         <span class="admin-panel-kicker">Store Login</span>
-        <strong>Choose your profile</strong>
-        <input class="admin-profile-input" name="profile" autocomplete="username" placeholder="username" required>
+        <strong>Choose company profile</strong>
+        <select class="admin-profile-input" name="profile" required>
+          <option value="">Select company profile</option>
+          ${profiles.map((profile) => `<option value="${escapeHtml(profile)}">${escapeHtml(profile)}</option>`).join('')}
+        </select>
         <p class="admin-form-error" data-profile-error hidden></p>
         <button type="submit" class="admin-primary-btn">Continue</button>
       </form>
     `;
     document.body.appendChild(gate);
     const form = gate.querySelector('[data-store-profile-form]');
-    const input = form?.querySelector('input[name="profile"]');
+    const select = form?.querySelector('select[name="profile"]');
     const error = gate.querySelector('[data-profile-error]');
-    input?.focus();
+    if (error && !profiles.length) {
+      error.textContent = 'Add company profiles in Store Settings first.';
+      error.hidden = false;
+    }
+    select?.focus();
     form?.addEventListener('submit', async (event) => {
       event.preventDefault();
       try {
-        await saveProfile(input?.value || '');
+        setCurrentProfile(select?.value || '');
         gate.remove();
         initializeScanSession();
         startPhonePolling();
         render();
       } catch (saveError) {
         if (error) {
-          error.textContent = saveError instanceof Error ? saveError.message : 'Unable to login.';
+          error.textContent = saveError instanceof Error ? saveError.message : 'Unable to choose profile.';
           error.hidden = false;
         }
       }
@@ -396,14 +416,23 @@ document.addEventListener('DOMContentLoaded', () => {
     phonePollTimer = window.setInterval(pollPhoneScans, 700);
   };
 
-  render();
-  if (!currentProfile) {
-    showProfileGate();
-  } else {
-    writeProfile(currentProfile);
-    initializeScanSession();
-    startPhonePolling();
-  }
+  const initialize = async () => {
+    await loadProfiles();
+    currentProfile = readProfile();
+    if (currentProfile && !profiles.includes(currentProfile.username)) {
+      currentProfile = null;
+    }
+    render();
+    if (!currentProfile) {
+      showProfileGate();
+    } else {
+      writeProfile(currentProfile);
+      initializeScanSession();
+      startPhonePolling();
+    }
+  };
+
+  initialize();
 
   window.addEventListener('pagehide', () => {
     postSession(false).catch(() => {});

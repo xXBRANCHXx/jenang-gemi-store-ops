@@ -24,6 +24,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const assignTitle = document.querySelector('[data-profile-assign-title]');
   const assignSelect = document.querySelector('[data-profile-select]');
   const assignError = document.querySelector('[data-profile-assign-error]');
+  const settingsModal = document.querySelector('[data-store-settings-modal]');
+  const settingsForm = document.querySelector('[data-store-settings-form]');
+  const settingsError = document.querySelector('[data-store-settings-error]');
+  const profileList = document.querySelector('[data-profile-list]');
   const ordersStorageKey = 'jg-store-demo-orders';
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const activeProfileStorageKey = 'jg-store-active-profile';
@@ -326,9 +330,41 @@ document.addEventListener('DOMContentLoaded', () => {
       ? profiles
       : [...profiles, selected].sort();
     assignSelect.innerHTML = [
-      '<option value="">Select profile</option>',
+      '<option value="">Select company profile</option>',
       ...options.map((profile) => `<option value="${escapeHtml(profile)}" ${profile === selected ? 'selected' : ''}>${escapeHtml(profile)}</option>`)
     ].join('');
+  };
+
+  const renderProfileList = () => {
+    if (!profileList) return;
+    profileList.innerHTML = profiles.length
+      ? profiles.map((profile) => `<span>${escapeHtml(profile)}</span>`).join('')
+      : '<small>No company profiles yet.</small>';
+  };
+
+  const openSettingsModal = () => {
+    if (!settingsModal) return;
+    if (settingsError) {
+      settingsError.textContent = '';
+      settingsError.hidden = true;
+    }
+    renderProfileList();
+    settingsModal.hidden = false;
+    const input = settingsModal.querySelector('input[name="profile_new"]');
+    if (input instanceof HTMLInputElement) {
+      input.value = '';
+      window.setTimeout(() => input.focus(), 40);
+    }
+  };
+
+  const closeSettingsModal = () => {
+    if (settingsModal) settingsModal.hidden = true;
+  };
+
+  const showSettingsError = (message) => {
+    if (!settingsError) return;
+    settingsError.textContent = message;
+    settingsError.hidden = false;
   };
 
   const showAssignError = (message) => {
@@ -348,16 +384,10 @@ document.addEventListener('DOMContentLoaded', () => {
       assignError.textContent = '';
       assignError.hidden = true;
     }
-    const input = assignModal.querySelector('input[name="profile_new"]');
-    if (input instanceof HTMLInputElement) input.value = '';
     assignModal.hidden = false;
     window.setTimeout(() => {
-      if (owner && assignSelect instanceof HTMLSelectElement) {
+      if (assignSelect instanceof HTMLSelectElement) {
         assignSelect.focus();
-      } else if (assignSelect instanceof HTMLSelectElement && profiles.length) {
-        assignSelect.focus();
-      } else if (input instanceof HTMLInputElement) {
-        input.focus();
       }
     }, 40);
   };
@@ -369,7 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const selectedProfileFromForm = (form) => {
     const formData = new FormData(form);
-    return normalizeProfile(formData.get('profile_new')) || normalizeProfile(formData.get('profile_select'));
+    return normalizeProfile(formData.get('profile_select'));
   };
 
   const minutesRemaining = (order) => Math.ceil((order.deadlineAt - Date.now()) / 60000);
@@ -551,10 +581,13 @@ document.addEventListener('DOMContentLoaded', () => {
       showAssignError(`This order is assigned to ${owner}.`);
       return;
     }
-    const assignedProfile = await saveProfile(selectedProfile);
+    if (!selectedProfile || (!profiles.includes(selectedProfile) && selectedProfile !== owner)) {
+      showAssignError('Choose a company profile. Add new profiles in Settings.');
+      return;
+    }
     order.started = true;
-    order.assignedProfile = assignedProfile;
-    activeProfile = assignedProfile;
+    order.assignedProfile = selectedProfile;
+    activeProfile = selectedProfile;
     state.activeOrderId = order.id;
     state.scans = new Map();
     saveOrders();
@@ -604,7 +637,7 @@ document.addEventListener('DOMContentLoaded', () => {
     event.preventDefault();
     const profile = selectedProfileFromForm(assignForm);
     if (!profile) {
-      showAssignError('Choose a profile or enter a new username.');
+      showAssignError('Choose a company profile. Add new profiles in Settings.');
       return;
     }
     try {
@@ -617,6 +650,31 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.querySelector('[data-open-reprint]')?.addEventListener('click', openReprintModal);
+
+  document.querySelector('[data-open-store-settings]')?.addEventListener('click', openSettingsModal);
+
+  document.querySelectorAll('[data-close-store-settings]').forEach((button) => {
+    button.addEventListener('click', closeSettingsModal);
+  });
+
+  settingsForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const formData = new FormData(settingsForm);
+    const profile = normalizeProfile(formData.get('profile_new'));
+    if (!profile) {
+      showSettingsError('Enter a company profile name.');
+      return;
+    }
+    try {
+      await saveProfile(profile);
+      renderProfileSelect(profile);
+      renderProfileList();
+      const input = settingsForm.querySelector('input[name="profile_new"]');
+      if (input instanceof HTMLInputElement) input.value = '';
+    } catch (error) {
+      showSettingsError(error instanceof Error ? error.message : 'Unable to add profile.');
+    }
+  });
 
   document.querySelectorAll('[data-close-reprint-modal]').forEach((button) => {
     button.addEventListener('click', closeReprintModal);

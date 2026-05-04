@@ -1417,13 +1417,44 @@ button, input {
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.06);
   color: var(--admin-text);
+  color-scheme: dark;
   font: inherit;
   font-weight: 800;
+}
+
+.admin-profile-input option {
+  background: #101827;
+  color: #f8fafc;
 }
 
 .admin-profile-input:focus {
   border-color: rgba(157, 255, 0, 0.56);
   outline: none;
+}
+
+.admin-profile-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 38px;
+}
+
+.admin-profile-list span,
+.admin-profile-list small {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.82);
+  color: #f8fafc;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.admin-profile-list small {
+  color: var(--admin-muted);
 }
 
 .admin-body.is-phone-scanner {

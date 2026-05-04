@@ -55,6 +55,7 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
                 <a class="admin-ghost-btn admin-link-btn" href="../orders/">Orders</a>
                 <a class="admin-ghost-btn admin-link-btn" href="../integrations/">Integrations</a>
                 <button type="button" class="admin-ghost-btn admin-link-btn" data-open-reprint>Reprint</button>
+                <button type="button" class="admin-ghost-btn admin-link-btn" data-open-store-settings>Settings</button>
                 <a class="admin-primary-btn admin-link-btn" href="../logout/">Lock</a>
             </div>
         </header>
@@ -98,16 +99,34 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
                     <button type="button" class="admin-ghost-btn" data-close-profile-assign>Close</button>
                 </div>
                 <label class="admin-reprint-field">
-                    <span>Employee profile</span>
+                    <span>Company profile</span>
                     <select class="admin-profile-input" name="profile_select" data-profile-select></select>
-                </label>
-                <label class="admin-reprint-field">
-                    <span>New profile</span>
-                    <input class="admin-profile-input" name="profile_new" autocomplete="username" placeholder="username">
                 </label>
                 <p class="admin-form-error" data-profile-assign-error hidden></p>
                 <div class="admin-modal-actions">
                     <button type="submit" class="admin-primary-btn">Process Order</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="admin-modal-shell admin-store-settings-modal" data-store-settings-modal hidden>
+            <div class="admin-modal-backdrop" data-close-store-settings></div>
+            <form class="admin-modal-card admin-store-settings-card" data-store-settings-form>
+                <div class="admin-modal-head">
+                    <div>
+                        <span class="admin-panel-kicker">Store Settings</span>
+                        <h3>Company Profiles</h3>
+                    </div>
+                    <button type="button" class="admin-ghost-btn" data-close-store-settings>Close</button>
+                </div>
+                <label class="admin-reprint-field">
+                    <span>Add profile</span>
+                    <input class="admin-profile-input" name="profile_new" autocomplete="username" placeholder="company-profile" required>
+                </label>
+                <p class="admin-form-error" data-store-settings-error hidden></p>
+                <div class="admin-profile-list" data-profile-list></div>
+                <div class="admin-modal-actions">
+                    <button type="submit" class="admin-primary-btn">Add Profile</button>
                 </div>
             </form>
         </div>
