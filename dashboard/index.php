@@ -87,6 +87,31 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
             </div>
         </div>
 
+        <div class="admin-modal-shell admin-profile-assign-modal" data-profile-assign-modal hidden>
+            <div class="admin-modal-backdrop" data-close-profile-assign></div>
+            <form class="admin-modal-card admin-profile-assign-card" data-profile-assign-form>
+                <div class="admin-modal-head">
+                    <div>
+                        <span class="admin-panel-kicker">Assign Scanner</span>
+                        <h3 data-profile-assign-title>Order</h3>
+                    </div>
+                    <button type="button" class="admin-ghost-btn" data-close-profile-assign>Close</button>
+                </div>
+                <label class="admin-reprint-field">
+                    <span>Employee profile</span>
+                    <select class="admin-profile-input" name="profile_select" data-profile-select></select>
+                </label>
+                <label class="admin-reprint-field">
+                    <span>New profile</span>
+                    <input class="admin-profile-input" name="profile_new" autocomplete="username" placeholder="username">
+                </label>
+                <p class="admin-form-error" data-profile-assign-error hidden></p>
+                <div class="admin-modal-actions">
+                    <button type="submit" class="admin-primary-btn">Process Order</button>
+                </div>
+            </form>
+        </div>
+
         <div class="admin-modal-shell admin-reprint-modal" data-reprint-modal hidden>
             <div class="admin-modal-backdrop" data-close-reprint-modal></div>
             <form class="admin-modal-card admin-reprint-card" data-reprint-form>

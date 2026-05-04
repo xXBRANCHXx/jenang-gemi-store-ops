@@ -8,13 +8,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const profileStorageKey = 'jg-store-profile';
   const scanBridgeEndpoint = '../../api/scan-bridge/';
   const orderIdNode = document.querySelector('[data-scan-order-id]');
-  const capturePad = document.querySelector('[data-scanner-capture]');
   const scanError = document.querySelector('[data-scan-error]');
   const scanList = document.querySelector('[data-scan-list]');
   const scanProgress = document.querySelector('[data-scan-progress]');
-  const phoneScanLink = document.querySelector('[data-phone-scan-link]');
-  const captureTitle = capturePad?.querySelector('strong');
-  const captureHint = capturePad?.querySelector('small');
 
   const escapeHtml = (value) => String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -159,15 +155,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return !owner || owner === currentProfile?.username;
   };
 
-  const updatePhoneScanLink = () => {
-    if (!phoneScanLink) return;
-    const phoneUrl = currentProfile?.username
-      ? `../phone-scan/?profile=${encodeURIComponent(currentProfile.username)}`
-      : '../phone-scan/';
-    phoneScanLink.href = phoneUrl;
-    phoneScanLink.textContent = new URL(phoneUrl, window.location.href).href;
-  };
-
   const showProfileGate = () => {
     const gate = document.createElement('div');
     gate.className = 'admin-store-login-shell';
@@ -190,7 +177,6 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         await saveProfile(input?.value || '');
         gate.remove();
-        updatePhoneScanLink();
         initializeScanSession();
         startPhonePolling();
         render();
@@ -257,10 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
     scanError.hidden = message === '';
   };
 
-  const setScanStatus = (title, detail = '') => {
-    if (captureTitle) captureTitle.textContent = title;
-    if (captureHint) captureHint.textContent = detail;
-  };
+  const setScanStatus = () => {};
 
   const render = () => {
     if (!currentProfile) {
@@ -409,13 +392,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const startPhonePolling = () => {
     if (phonePollTimer || !currentProfile || !order || !hasOrderAccess()) return;
-    window.setTimeout(() => capturePad?.focus(), 120);
     pollPhoneScans();
     phonePollTimer = window.setInterval(pollPhoneScans, 700);
   };
 
   render();
-  updatePhoneScanLink();
   if (!currentProfile) {
     showProfileGate();
   } else {

@@ -17,6 +17,8 @@ $phoneScanJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/phone-scan.js'
     <meta name="apple-mobile-web-app-title" content="JG Scanner">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=Space+Grotesk:wght@700&display=swap">
     <link rel="manifest" href="./phone-scanner.webmanifest">
+    <link rel="icon" type="image/svg+xml" href="./icon.svg">
+    <link rel="apple-touch-icon" href="https://jenanggemi.com/Media/Jenang%20Gemi%20Website%20Logo.png">
     <link rel="stylesheet" href="../../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
 <body class="admin-body is-dashboard is-phone-scanner">
