@@ -37,12 +37,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const lookupProductName = async (sku) => {
     try {
-      const response = await fetch(`../../api/scan-bridge/?sku=${encodeURIComponent(sku)}`, {
+      const response = await fetch(`../../api/scan-bridge/?sku=${encodeURIComponent(sku)}&t=${Date.now()}`, {
+        cache: 'no-store',
         credentials: 'same-origin',
         headers: { Accept: 'application/json' }
       });
+      if (!response.ok) return sku;
       const payload = await response.json();
-      return String(payload.product_name || sku);
+      return String(payload.display_name || payload.product_name || sku);
     } catch (_error) {
       return sku;
     }

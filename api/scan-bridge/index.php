@@ -97,12 +97,18 @@ function jg_scan_bridge_sku_product(string $sku): array
     }
 
     if (!is_array($row)) {
-        return ['sku' => $sku, 'product_name' => $sku];
+        return [
+            'sku' => $sku,
+            'product_name' => $sku,
+            'display_name' => $sku,
+            'found' => false,
+        ];
     }
 
+    $productName = trim((string) ($row['product_name'] ?? ''));
     $parts = [
         (string) ($row['brand_name'] ?? ''),
-        (string) ($row['product_name'] ?? ''),
+        $productName,
         (string) ($row['flavor_name'] ?? ''),
         number_format((float) ($row['volume'] ?? 0), 1, '.', ''),
         (string) ($row['unit_name'] ?? ''),
@@ -111,7 +117,9 @@ function jg_scan_bridge_sku_product(string $sku): array
 
     return [
         'sku' => $sku,
-        'product_name' => implode(' ', $parts) ?: $sku,
+        'product_name' => $productName ?: $sku,
+        'display_name' => implode(' ', $parts) ?: ($productName ?: $sku),
+        'found' => true,
     ];
 }
 
