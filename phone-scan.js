@@ -3,8 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!root) return;
 
   const video = document.querySelector('[data-camera-video]');
-  const startButton = document.querySelector('[data-start-camera]');
-  const demoButton = document.querySelector('[data-demo-scan]');
   const statusNode = document.querySelector('[data-phone-status]');
   const errorNode = document.querySelector('[data-phone-error]');
   const confirmShell = document.querySelector('[data-phone-confirm]');
@@ -14,12 +12,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const confirmCancel = document.querySelector('[data-confirm-cancel]');
   const profileStorageKey = 'jg-store-profile';
   const scanBridgeEndpoint = '../../api/scan-bridge/';
-  const demoCodes = ['010100150203', '020200250101', '010100150103', '010100150303'];
-  let demoIndex = 0;
   let detector = null;
   let stream = null;
   let scanning = false;
   let cameraReady = false;
+  let cameraStarting = false;
+  let cameraFailed = false;
   let pendingScan = null;
   let audioContext = null;
   let wakeLock = null;
@@ -199,6 +197,54 @@ document.addEventListener('DOMContentLoaded', () => {
       .catch(() => {});
   };
 
+  const startCamera = async () => {
+    if (cameraReady || cameraStarting || cameraFailed) return;
+    cameraStarting = true;
+    setError('');
+    startAudioFeedback();
+    openFullscreenScanner();
+    keepScannerAwake();
+
+    if (!('BarcodeDetector' in window)) {
+      cameraFailed = true;
+      setError('This phone browser does not support camera barcode detection.');
+      cameraStarting = false;
+      updateStandby();
+      return;
+    }
+
+    try {
+      detector = new window.BarcodeDetector({ formats: ['code_128', 'ean_13', 'ean_8', 'qr_code'] });
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      if (video instanceof HTMLVideoElement) {
+        video.srcObject = stream;
+        await video.play();
+      }
+      cameraReady = true;
+      vibrate([90, 40, 90], true);
+    } catch (_error) {
+      cameraFailed = true;
+      setError('Camera permission failed. Allow camera access and reload the scanner.');
+    } finally {
+      cameraStarting = false;
+      activateScanningIfReady();
+    }
+  };
+
+  const stopCamera = () => {
+    scanning = false;
+    cameraReady = false;
+    detector = null;
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+      stream = null;
+    }
+    if (video instanceof HTMLVideoElement) {
+      video.pause();
+      video.srcObject = null;
+    }
+  };
+
   const ensureStandbyShell = () => {
     if (standbyShell) return standbyShell;
     standbyShell = document.createElement('div');
@@ -227,12 +273,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const profile = currentProfile?.username || 'no profile';
     if (activeSession.active) {
       shell.hidden = cameraReady;
-      setStandbyText(`Order ${activeSession.order_id}`, cameraReady ? 'Scanner active.' : 'Tap Start Camera to enable scanning.');
+      const waitingText = cameraFailed ? 'Camera unavailable. Allow camera access and reload.' : 'Camera will turn on automatically.';
+      setStandbyText(`Order ${activeSession.order_id}`, cameraReady ? 'Scanner active.' : waitingText);
       if (statusNode) statusNode.textContent = cameraReady ? `Scanning as ${profile}` : `Order ready for ${profile}`;
       return;
     }
 
     scanning = false;
+    stopCamera();
+    closeConfirmation();
     shell.hidden = false;
     setStandbyText('Waiting for scan step', `${profile} has no active order in /scan/.`);
     if (statusNode) statusNode.textContent = `Standby: ${profile}`;
@@ -240,7 +289,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const activateScanningIfReady = () => {
     updateStandby();
-    if (!activeSession.active || !cameraReady || scanning || !detector) return;
+    if (!activeSession.active) return;
+    if (!cameraReady) {
+      startCamera().catch(() => {});
+      return;
+    }
+    if (scanning || !detector) return;
     scanning = true;
     detectLoop();
   };
@@ -334,44 +388,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.requestAnimationFrame(detectLoop);
   };
-
-  startButton?.addEventListener('click', async () => {
-    startAudioFeedback();
-    openFullscreenScanner();
-    keepScannerAwake();
-    vibrate([90, 40, 90], true);
-
-    if (!('BarcodeDetector' in window)) {
-      setError('This phone browser does not support camera barcode detection. Use Demo Scan.');
-      return;
-    }
-
-    try {
-      detector = new window.BarcodeDetector({ formats: ['code_128', 'ean_13', 'ean_8', 'qr_code'] });
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-      if (video instanceof HTMLVideoElement) {
-        video.srcObject = stream;
-        await video.play();
-      }
-      cameraReady = true;
-      activateScanningIfReady();
-      startButton.textContent = 'Camera Active';
-      startButton.disabled = true;
-    } catch (_error) {
-      setError('Camera permission failed. Use Demo Scan for the boss demo.');
-    }
-  });
-
-  demoButton?.addEventListener('click', () => {
-    startAudioFeedback();
-    openFullscreenScanner();
-    keepScannerAwake();
-    vibrate([90, 40, 90], true);
-    const barcode = demoCodes[demoIndex % demoCodes.length];
-    demoIndex += 1;
-    scanning = false;
-    showConfirmation(barcode).catch(() => setError('Unable to prepare demo scan.'));
-  });
 
   confirmSend?.addEventListener('click', async () => {
     if (!pendingScan) return;

@@ -32,10 +32,6 @@ $phoneScanJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/phone-scan.js'
                 <div class="admin-phone-reticle"></div>
             </div>
             <p class="admin-form-error" data-phone-error hidden></p>
-            <div class="admin-phone-actions">
-                <button type="button" class="admin-primary-btn" data-start-camera>Start Camera</button>
-                <button type="button" class="admin-ghost-btn" data-demo-scan>Demo Scan</button>
-            </div>
         </section>
         <div class="admin-phone-confirm-shell" data-phone-confirm hidden>
             <div class="admin-phone-confirm-card">
