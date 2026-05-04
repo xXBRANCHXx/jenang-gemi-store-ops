@@ -170,6 +170,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }));
   };
 
+  const consolidateScanItems = (items) => {
+    const grouped = new Map();
+    (items || []).forEach((item) => {
+      const scanSku = String(item.scanSku || item.sku || '');
+      const scanBarcode = String(item.scanBarcode || item.barcode || scanSku);
+      const key = scanSku || scanBarcode || String(item.productName || item.scanProductName || '');
+      const quantity = Number(item.quantity || 0);
+      const scanQuantity = Number(item.scanQuantity || quantity);
+      if (!key) return;
+
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.quantity += quantity;
+        existing.scanQuantity += scanQuantity;
+        return;
+      }
+
+      grouped.set(key, {
+        ...item,
+        quantity,
+        scanQuantity
+      });
+    });
+
+    return Array.from(grouped.values());
+  };
+
   const loadOrders = () => {
     try {
       const stored = JSON.parse(window.localStorage.getItem(ordersStorageKey) || 'null');
@@ -353,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
     }
     if (pickList) {
-      pickList.innerHTML = order.items.map((item) => {
+      pickList.innerHTML = consolidateScanItems(order.items).map((item) => {
         const scanQuantity = Number(item.scanQuantity || item.quantity);
         const multiplier = Number(item.scanMultiplier || 1);
         const scanSku = String(item.scanSku || item.sku || '');

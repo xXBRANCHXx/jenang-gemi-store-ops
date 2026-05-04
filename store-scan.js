@@ -58,14 +58,59 @@ document.addEventListener('DOMContentLoaded', () => {
   const scanCountFor = (sku) => Number(scans.get(sku) || 0);
   const scanSkuFor = (item) => String(item.scanSku || item.sku || '');
   const scanQuantityFor = (item) => Number(item.scanQuantity || item.quantity || 0);
-  const totalRequired = () => order ? order.items.reduce((sum, item) => sum + scanQuantityFor(item), 0) : 0;
-  const totalScanned = () => order ? order.items.reduce((sum, item) => sum + scanCountFor(scanSkuFor(item)), 0) : 0;
+  const sourceSkusFor = (item) => {
+    if (Array.isArray(item.sourceSkus)) return item.sourceSkus;
+    const sku = String(item.sku || '').trim();
+    return sku ? [sku] : [];
+  };
+  const sourceBarcodesFor = (item) => {
+    if (Array.isArray(item.sourceBarcodes)) return item.sourceBarcodes;
+    const barcode = String(item.barcode || '').trim();
+    return barcode ? [barcode] : [];
+  };
+
+  const consolidateScanItems = (items) => {
+    const grouped = new Map();
+    (items || []).forEach((item) => {
+      const scanSku = scanSkuFor(item);
+      const scanBarcode = String(item.scanBarcode || item.barcode || scanSku);
+      const key = scanSku || scanBarcode || String(item.productName || item.scanProductName || '');
+      const quantity = Number(item.quantity || 0);
+      const scanQuantity = scanQuantityFor(item);
+      if (!key) return;
+
+      const sourceSku = String(item.sku || '').trim();
+      const sourceBarcode = String(item.barcode || '').trim();
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.quantity += quantity;
+        existing.scanQuantity += scanQuantity;
+        if (sourceSku && !existing.sourceSkus.includes(sourceSku)) existing.sourceSkus.push(sourceSku);
+        if (sourceBarcode && !existing.sourceBarcodes.includes(sourceBarcode)) existing.sourceBarcodes.push(sourceBarcode);
+        return;
+      }
+
+      grouped.set(key, {
+        ...item,
+        quantity,
+        scanQuantity,
+        sourceSkus: sourceSku ? [sourceSku] : [],
+        sourceBarcodes: sourceBarcode ? [sourceBarcode] : []
+      });
+    });
+
+    return Array.from(grouped.values());
+  };
+
+  const scanItems = () => order ? consolidateScanItems(order.items) : [];
+  const totalRequired = () => scanItems().reduce((sum, item) => sum + scanQuantityFor(item), 0);
+  const totalScanned = () => scanItems().reduce((sum, item) => sum + Math.min(scanCountFor(scanSkuFor(item)), scanQuantityFor(item)), 0);
 
   const normalizeScanCode = (value) => String(value || '').trim().toUpperCase();
 
   const expectedScanCodes = () => {
     if (!order) return '';
-    return [...new Set(order.items.map((item) => scanSkuFor(item)).filter(Boolean))].join(', ');
+    return [...new Set(scanItems().map((item) => scanSkuFor(item)).filter(Boolean))].join(', ');
   };
 
   const setError = (message) => {
@@ -94,14 +139,14 @@ document.addEventListener('DOMContentLoaded', () => {
       printButton.textContent = `Print ${order.platform} Label`;
     }
     if (scanList) {
-      scanList.innerHTML = order.items.map((item) => {
+      scanList.innerHTML = scanItems().map((item) => {
         const scanSku = scanSkuFor(item);
         const required = scanQuantityFor(item);
         const count = scanCountFor(scanSku);
         const complete = count >= required;
-        const orderSku = String(item.sku || '');
-        const codeLabel = orderSku && orderSku !== scanSku
-          ? `Order ${orderSku} -> scan ${scanSku}`
+        const sourceSkus = sourceSkusFor(item).filter((sku) => sku && sku !== scanSku);
+        const codeLabel = sourceSkus.length === 1
+          ? `Order ${sourceSkus[0]} -> scan ${scanSku}`
           : `${scanSku} / ${item.scanBarcode || item.barcode}`;
         return `
           <article class="admin-scan-item ${complete ? 'is-complete' : ''}">
@@ -120,18 +165,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!order || !value) return false;
     const scannedCode = normalizeScanCode(value);
     setScanStatus(`Received ${scannedCode}`, 'Checking this scan against the active order.');
-    const match = order.items.find((item) => {
+    const items = scanItems();
+    const match = items.find((item) => {
       const itemSku = normalizeScanCode(scanSkuFor(item));
       const itemBarcode = normalizeScanCode(item.scanBarcode || item.barcode);
       return scannedCode === itemSku || scannedCode === itemBarcode;
     });
 
     if (!match) {
-      const soldSkuMatch = order.items.find((item) => {
-        const orderSku = normalizeScanCode(item.sku);
-        const orderBarcode = normalizeScanCode(item.barcode);
+      const soldSkuMatch = items.find((item) => {
+        const sourceSkus = sourceSkusFor(item).map(normalizeScanCode);
+        const sourceBarcodes = sourceBarcodesFor(item).map(normalizeScanCode);
         const scanSku = normalizeScanCode(scanSkuFor(item));
-        return (scannedCode === orderSku || scannedCode === orderBarcode) && scannedCode !== scanSku;
+        return (sourceSkus.includes(scannedCode) || sourceBarcodes.includes(scannedCode)) && scannedCode !== scanSku;
       });
 
       if (soldSkuMatch) {
