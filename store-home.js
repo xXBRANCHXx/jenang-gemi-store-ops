@@ -16,6 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const boardDensity = document.querySelector('[data-board-density]');
   const boardOverflow = document.querySelector('[data-board-overflow]');
   const boardClock = document.querySelector('[data-board-clock]');
+  const reprintModal = document.querySelector('[data-reprint-modal]');
+  const reprintForm = document.querySelector('[data-reprint-form]');
+  const reprintError = document.querySelector('[data-reprint-error]');
   const ordersStorageKey = 'jg-store-demo-orders';
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const activeProfileStorageKey = 'jg-store-active-profile';
@@ -325,6 +328,42 @@ document.addEventListener('DOMContentLoaded', () => {
     return !owner || owner === currentProfile?.username;
   };
 
+  const normalizeOrderId = (value) => String(value || '').trim().toUpperCase();
+
+  const openReprintModal = () => {
+    if (!reprintModal) return;
+    reprintModal.hidden = false;
+    if (reprintError) {
+      reprintError.textContent = '';
+      reprintError.hidden = true;
+    }
+    const input = reprintModal.querySelector('input[name="order_id"]');
+    if (input instanceof HTMLInputElement) {
+      input.value = '';
+      window.setTimeout(() => input.focus(), 40);
+    }
+  };
+
+  const closeReprintModal = () => {
+    if (reprintModal) reprintModal.hidden = true;
+  };
+
+  const showReprintError = (message) => {
+    if (!reprintError) return;
+    reprintError.textContent = message;
+    reprintError.hidden = false;
+  };
+
+  const openPrintLabelPage = (orderId) => {
+    const order = state.orders.find((item) => normalizeOrderId(item.id) === orderId);
+    if (!order) {
+      showReprintError('Order ID not found in this store demo.');
+      return;
+    }
+    const profile = currentProfile?.username || orderOwner(order) || '';
+    window.location.href = `./print-label/?order=${encodeURIComponent(order.id)}${profile ? `&profile=${encodeURIComponent(profile)}` : ''}`;
+  };
+
   const minutesRemaining = (order) => Math.ceil((order.deadlineAt - Date.now()) / 60000);
 
   const formatDeadline = (order) => {
@@ -543,6 +582,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.querySelectorAll('[data-close-fulfillment-modal]').forEach((button) => {
     button.addEventListener('click', closeFulfillment);
+  });
+
+  document.querySelector('[data-open-reprint]')?.addEventListener('click', openReprintModal);
+
+  document.querySelectorAll('[data-close-reprint-modal]').forEach((button) => {
+    button.addEventListener('click', closeReprintModal);
+  });
+
+  reprintForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const formData = new FormData(reprintForm);
+    const orderId = normalizeOrderId(formData.get('order_id'));
+    if (!orderId) {
+      showReprintError('Enter an order ID.');
+      return;
+    }
+    openPrintLabelPage(orderId);
   });
 
   document.addEventListener('pointerdown', unlockAudio, { once: true });

@@ -1156,7 +1156,17 @@ button, input {
   padding: 12px;
 }
 
+.admin-print-label-page {
+  min-height: 100svh;
+  padding: 12px;
+}
+
 .admin-scan-page-layout {
+  display: grid;
+  min-height: calc(100svh - 86px);
+}
+
+.admin-print-page-layout {
   display: grid;
   min-height: calc(100svh - 86px);
 }
@@ -1166,6 +1176,16 @@ button, input {
   align-self: stretch;
   width: 100%;
   min-height: 0;
+}
+
+.admin-print-page-card {
+  justify-self: stretch;
+  align-self: stretch;
+  width: 100%;
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 18px;
 }
 
 .admin-scan-input-page {
@@ -1213,6 +1233,119 @@ button, input {
 .admin-scanner-capture small,
 .admin-phone-scan-card small {
   color: var(--admin-muted);
+}
+
+.admin-label-option-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.admin-label-option-card {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 12px;
+  min-height: 220px;
+  padding: 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: 18px;
+  background: var(--admin-surface-soft);
+  color: var(--admin-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.admin-label-option-card:hover,
+.admin-label-option-card:focus-visible {
+  border-color: rgba(157, 255, 0, 0.45);
+  outline: none;
+}
+
+.admin-label-option-card span {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-label-option-card strong {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.25rem;
+}
+
+.admin-label-option-card small {
+  color: var(--admin-muted);
+  font-weight: 800;
+}
+
+.admin-label-option-card i {
+  align-self: center;
+  justify-self: center;
+  width: var(--label-width);
+  height: var(--label-height);
+  border: 2px solid rgba(157, 255, 0, 0.62);
+  border-radius: 4px;
+  background:
+    linear-gradient(90deg, rgba(15, 23, 42, 0.18) 50%, transparent 50%) 0 0 / 12px 100%,
+    #f8fafc;
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.24);
+}
+
+.admin-label-preview {
+  display: grid;
+  justify-items: center;
+  padding: 18px;
+  border: 1px solid var(--admin-border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.admin-label-preview[hidden] {
+  display: none;
+}
+
+.admin-label-sheet {
+  display: grid;
+  align-content: space-between;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.28);
+}
+
+.admin-label-brand {
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.admin-label-sheet strong {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.admin-label-sheet span,
+.admin-label-sheet small {
+  color: #334155;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.admin-label-barcode {
+  height: 34px;
+  background: repeating-linear-gradient(90deg, #0f172a 0 2px, transparent 2px 5px, #0f172a 5px 6px, transparent 6px 10px);
+}
+
+.admin-reprint-field {
+  display: grid;
+  gap: 8px;
+  color: var(--admin-muted);
+  font-size: 0.86rem;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .admin-phone-scan-card {
@@ -2547,5 +2680,41 @@ button, input {
     position: static;
     margin-top: 10px;
     min-width: 0;
+  }
+
+  .admin-label-option-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media print {
+  body.admin-body {
+    background: #fff;
+  }
+
+  .admin-print-label-page .admin-topbar,
+  .admin-print-label-page .admin-scan-head,
+  .admin-print-label-page .admin-label-option-grid,
+  .admin-print-label-page .admin-form-error {
+    display: none !important;
+  }
+
+  .admin-print-label-page,
+  .admin-print-page-layout,
+  .admin-print-page-card,
+  .admin-label-preview {
+    display: block;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background: #fff;
+    box-shadow: none;
+  }
+
+  .admin-label-sheet {
+    width: var(--print-label-width) !important;
+    height: var(--print-label-height) !important;
+    box-shadow: none;
+    break-inside: avoid;
   }
 }

@@ -12,7 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const scanError = document.querySelector('[data-scan-error]');
   const scanList = document.querySelector('[data-scan-list]');
   const scanProgress = document.querySelector('[data-scan-progress]');
-  const printButton = document.querySelector('[data-print-label]');
   const phoneScanLink = document.querySelector('[data-phone-scan-link]');
   const captureTitle = capturePad?.querySelector('strong');
   const captureHint = capturePad?.querySelector('small');
@@ -97,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let bridgeCursor = null;
   let sessionTimer = 0;
   let phonePollTimer = 0;
+  let printRedirecting = false;
   const bridgeStartedAt = Date.now();
 
   if (orderIdNode) orderIdNode.textContent = order?.id || 'Order missing';
@@ -228,6 +228,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 5000);
   };
 
+  const openPrintLabelPage = () => {
+    if (!order || !currentProfile || printRedirecting) return;
+    printRedirecting = true;
+    postSession(false).catch(() => {});
+    window.clearInterval(sessionTimer);
+    window.clearInterval(phonePollTimer);
+    try {
+      window.sessionStorage.setItem(activeOrderStorageKey, order.id);
+      window.sessionStorage.setItem(activeProfileStorageKey, currentProfile.username);
+    } catch (_error) {
+      // Query string still carries the order id.
+    }
+    setScanStatus('Scan complete', 'Opening label choices.');
+    window.setTimeout(() => {
+      window.location.href = `../print-label/?order=${encodeURIComponent(order.id)}&profile=${encodeURIComponent(currentProfile.username)}`;
+    }, 420);
+  };
+
   const expectedScanCodes = () => {
     if (!order) return '';
     return [...new Set(scanItems().map((item) => scanSkuFor(item)).filter(Boolean))].join(', ');
@@ -247,29 +265,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const render = () => {
     if (!currentProfile) {
       if (scanList) scanList.innerHTML = '<div class="admin-board-empty">Login to your store profile before scanning.</div>';
-      if (printButton) printButton.disabled = true;
       return;
     }
 
     if (!order) {
       if (scanList) scanList.innerHTML = '<div class="admin-board-empty">Return to the order board and start an order first.</div>';
-      if (printButton) printButton.disabled = true;
       return;
     }
 
     if (!hasOrderAccess()) {
       if (scanList) scanList.innerHTML = `<div class="admin-board-empty">This order is assigned to ${escapeHtml(orderOwner())}.</div>`;
-      if (printButton) printButton.disabled = true;
       return;
     }
 
     const scanned = totalScanned();
     const required = totalRequired();
     if (scanProgress) scanProgress.textContent = `${scanned}/${required}`;
-    if (printButton) {
-      printButton.disabled = scanned < required;
-      printButton.textContent = `Print ${order.platform} Label`;
-    }
     if (scanList) {
       scanList.innerHTML = scanItems().map((item) => {
         const scanSku = scanSkuFor(item);
@@ -338,6 +349,9 @@ document.addEventListener('DOMContentLoaded', () => {
     setError('');
     render();
     setScanStatus('Scan accepted', `${match.scanProductName || match.productName} ${current + 1}/${scanQuantityFor(match)}`);
+    if (totalRequired() > 0 && totalScanned() >= totalRequired()) {
+      openPrintLabelPage();
+    }
     return true;
   };
 
@@ -399,19 +413,6 @@ document.addEventListener('DOMContentLoaded', () => {
     pollPhoneScans();
     phonePollTimer = window.setInterval(pollPhoneScans, 700);
   };
-
-  printButton?.addEventListener('click', () => {
-    if (!order || printButton.disabled) return;
-    postSession(false).catch(() => {});
-    printButton.disabled = true;
-    printButton.textContent = 'Printing label...';
-    order.status = 'IS_BEING_FULFILLED';
-    window.setTimeout(() => {
-      writeOrders(orders);
-      window.sessionStorage.removeItem(activeOrderStorageKey);
-      window.location.href = '../';
-    }, 650);
-  });
 
   render();
   updatePhoneScanLink();

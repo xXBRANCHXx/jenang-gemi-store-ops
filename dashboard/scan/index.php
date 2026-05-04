@@ -56,9 +56,6 @@ $storeScanJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/store-scan.js'
                 </div>
                 <p class="admin-form-error" data-scan-error hidden></p>
                 <div class="admin-scan-list" data-scan-list></div>
-                <div class="admin-modal-actions">
-                    <button type="button" class="admin-primary-btn admin-print-btn" data-print-label disabled>Print Label</button>
-                </div>
             </section>
         </main>
     </div>

@@ -54,6 +54,7 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
                 <a class="admin-ghost-btn admin-link-btn" href="../transactions/">Transactions</a>
                 <a class="admin-ghost-btn admin-link-btn" href="../orders/">Orders</a>
                 <a class="admin-ghost-btn admin-link-btn" href="../integrations/">Integrations</a>
+                <button type="button" class="admin-ghost-btn admin-link-btn" data-open-reprint>Reprint</button>
                 <a class="admin-primary-btn admin-link-btn" href="../logout/">Lock</a>
             </div>
         </header>
@@ -84,6 +85,27 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
                     </div>
                 </div>
             </div>
+        </div>
+
+        <div class="admin-modal-shell admin-reprint-modal" data-reprint-modal hidden>
+            <div class="admin-modal-backdrop" data-close-reprint-modal></div>
+            <form class="admin-modal-card admin-reprint-card" data-reprint-form>
+                <div class="admin-modal-head">
+                    <div>
+                        <span class="admin-panel-kicker">Reprint</span>
+                        <h3>Find Order</h3>
+                    </div>
+                    <button type="button" class="admin-ghost-btn" data-close-reprint-modal>Close</button>
+                </div>
+                <label class="admin-reprint-field">
+                    <span>Order ID</span>
+                    <input class="admin-profile-input" name="order_id" autocomplete="off" placeholder="SPX-250504-8801" required>
+                </label>
+                <p class="admin-form-error" data-reprint-error hidden></p>
+                <div class="admin-modal-actions">
+                    <button type="submit" class="admin-primary-btn">Open Label Page</button>
+                </div>
+            </form>
         </div>
     </div>
     <script src="../store-home.js?v=<?php echo urlencode($storeHomeJsVersion ?: '1'); ?>" defer></script>

@@ -268,6 +268,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (detailNode) detailNode.textContent = detail;
   };
 
+  const isConfirmingScan = () => Boolean(pendingScan) || Boolean(confirmShell && !confirmShell.hidden);
+
   const updateStandby = () => {
     const shell = ensureStandbyShell();
     const profile = currentProfile?.username || 'no profile';
@@ -290,6 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const activateScanningIfReady = () => {
     updateStandby();
     if (!activeSession.active) return;
+    if (isConfirmingScan()) return;
     if (!cameraReady) {
       startCamera().catch(() => {});
       return;
@@ -320,8 +323,9 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const resumeScanning = (delay = 700) => {
-    if (!detector || !activeSession.active) return;
+    if (!detector || !activeSession.active || isConfirmingScan()) return;
     window.setTimeout(() => {
+      if (isConfirmingScan()) return;
       scanning = true;
       detectLoop();
     }, delay);
@@ -334,6 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     const normalizedBarcode = normalizeBarcode(rawBarcode);
+    pendingScan = { barcode: normalizedBarcode, productName: '' };
     const productName = await lookupProductName(normalizedBarcode);
     pendingScan = { barcode: normalizedBarcode, productName };
     if (confirmProduct) confirmProduct.textContent = productName;
@@ -374,7 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const detectLoop = async () => {
-    if (!scanning || !detector || !(video instanceof HTMLVideoElement)) return;
+    if (!scanning || isConfirmingScan() || !detector || !(video instanceof HTMLVideoElement)) return;
     try {
       const codes = await detector.detect(video);
       const value = String(codes?.[0]?.rawValue || '').trim();
