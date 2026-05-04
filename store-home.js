@@ -19,10 +19,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const ordersStorageKey = 'jg-store-demo-orders';
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const catalogFingerprintStorageKey = 'jg-store-demo-orders-sku-fingerprint';
-  const orderSchemaVersion = 'astra-scan-units-v1';
+  const orderSchemaVersion = 'astra-32h-test-orders-v1';
   const skuDbEndpoint = '../api/sku-db/';
+  const demoDeadlineMinutes = 32 * 60;
 
   let skuCatalog = [];
+  let demoCatalog = [];
   let state = {
     orders: [],
     activeOrderId: '',
@@ -37,18 +39,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const now = Date.now();
   const seedOrders = [
-    ['SPX-250501-8801', 'Shopee', 7, true, [[0, 2], [3, 1]]],
-    ['SPX-250501-8802', 'Shopee', 13, false, [[1, 1]]],
-    ['TTK-77820391', 'TikTok', 18, false, [[2, 3]]],
-    ['TKP-11993021', 'Tokopedia', 25, false, [[5, 1], [4, 2]]],
-    ['SPX-250501-8803', 'Shopee', 34, true, [[0, 1]]],
-    ['SPX-250501-8804', 'Shopee', 48, false, [[1, 2], [2, 1]]],
-    ['TTK-77820392', 'TikTok', 61, false, [[3, 4]]],
-    ['SPX-250501-8805', 'Shopee', 72, false, [[5, 2]]],
-    ['TKP-11993022', 'Tokopedia', 88, true, [[2, 1], [4, 1]]],
-    ['SPX-250501-8806', 'Shopee', 105, false, [[0, 3]]],
-    ['SPX-250501-8807', 'Shopee', 126, false, [[1, 1], [3, 1]]],
-    ['TTK-77820393', 'TikTok', 144, false, [[2, 2]]]
+    ['SPX-250504-8801', 'Shopee', demoDeadlineMinutes, false, [[0, 2], [3, 1]]],
+    ['SPX-250504-8802', 'Shopee', demoDeadlineMinutes, false, [[1, 1]]],
+    ['TTK-77850391', 'TikTok', demoDeadlineMinutes, false, [[2, 3]]],
+    ['TKP-11995021', 'Tokopedia', demoDeadlineMinutes, false, [[5, 1], [4, 2]]],
+    ['SPX-250504-8803', 'Shopee', demoDeadlineMinutes, false, [[0, 1]]],
+    ['SPX-250504-8804', 'Shopee', demoDeadlineMinutes, false, [[1, 2], [2, 1]]],
+    ['TTK-77850392', 'TikTok', demoDeadlineMinutes, false, [[3, 4]]],
+    ['SPX-250504-8805', 'Shopee', demoDeadlineMinutes, false, [[5, 2]]],
+    ['TKP-11995022', 'Tokopedia', demoDeadlineMinutes, false, [[2, 1], [4, 1]]],
+    ['SPX-250504-8806', 'Shopee', demoDeadlineMinutes, false, [[0, 3]]],
+    ['SPX-250504-8807', 'Shopee', demoDeadlineMinutes, false, [[1, 1], [3, 1]]],
+    ['TTK-77850393', 'TikTok', demoDeadlineMinutes, false, [[2, 2]]]
   ];
 
   const liveCatalogFingerprint = () => `${orderSchemaVersion}:${skuCatalog.map((item) => `${item.sku}:${item.astra}`).join('|')}`;
@@ -111,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
         scanMultiplier: multiplier
       };
     });
+    demoCatalog = [...skuCatalog].sort((left, right) => astraMultiplier(right) - astraMultiplier(left));
   };
 
   const loadSkuCatalog = async () => {
@@ -128,15 +131,18 @@ document.addEventListener('DOMContentLoaded', () => {
     applyAstraScanTargets();
   };
 
-  const catalogItemAt = (index) => skuCatalog[index % skuCatalog.length];
+  const catalogItemAt = (index) => {
+    const catalog = demoCatalog.length ? demoCatalog : skuCatalog;
+    return catalog[index % catalog.length];
+  };
 
   const generatedOrders = () => Array.from({ length: 44 }, (_, index) => {
     const platform = index % 9 === 0 ? 'Tokopedia' : (index % 5 === 0 ? 'TikTok' : 'Shopee');
     return [
       `${platform === 'Shopee' ? 'SPX' : platform === 'TikTok' ? 'TTK' : 'TKP'}-DEMO-${String(index + 1).padStart(3, '0')}`,
       platform,
-      155 + index * 11,
-      index % 13 === 0,
+      demoDeadlineMinutes,
+      false,
       [[index, (index % 3) + 1], ...(index % 4 === 0 ? [[index + 2, 1]] : [])]
     ];
   });
