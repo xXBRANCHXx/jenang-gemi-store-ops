@@ -355,11 +355,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (pickList) {
       pickList.innerHTML = order.items.map((item) => {
         const scanQuantity = Number(item.scanQuantity || item.quantity);
+        const multiplier = Number(item.scanMultiplier || 1);
+        const scanSku = String(item.scanSku || item.sku || '');
+        const scanNote = multiplier > 1 ? `${scanSku} ${multiplier}X` : scanSku;
         return `
           <article class="admin-pick-item">
             <div>
               <strong>${escapeHtml(item.scanProductName || item.productName)}</strong>
-              <span>${escapeHtml(item.productName)}</span>
+              <span>${escapeHtml(scanNote)}</span>
             </div>
             <em>x${escapeHtml(scanQuantity)}</em>
           </article>
