@@ -50,6 +50,26 @@ function jg_scan_bridge_write(array $events): void
     }
 }
 
+function jg_scan_bridge_next_id(array $events): int
+{
+    $max = count($events);
+    foreach ($events as $event) {
+        $max = max($max, (int) ($event['id'] ?? 0));
+    }
+
+    return $max + 1;
+}
+
+function jg_scan_bridge_cursor(array $events): int
+{
+    $max = count($events);
+    foreach ($events as $event) {
+        $max = max($max, (int) ($event['id'] ?? 0));
+    }
+
+    return $max;
+}
+
 function jg_scan_bridge_sku_product(string $sku): array
 {
     try {
@@ -108,6 +128,7 @@ if ($method === 'POST') {
     }
 
     $events[] = [
+        'id' => jg_scan_bridge_next_id($events),
         'barcode' => $barcode,
         'created_at' => gmdate(DATE_ATOM),
     ];
@@ -132,8 +153,11 @@ if ($lookupSku !== '') {
 }
 
 $after = max(0, (int) ($_GET['after'] ?? 0));
-$nextEvents = array_slice($events, $after);
+$nextEvents = array_values(array_filter(
+    $events,
+    static fn (array $event): bool => (int) ($event['id'] ?? 0) > $after
+));
 echo json_encode([
     'events' => $nextEvents,
-    'cursor' => count($events),
+    'cursor' => jg_scan_bridge_cursor($events),
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);

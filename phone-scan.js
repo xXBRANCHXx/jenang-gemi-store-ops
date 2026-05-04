@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let stream = null;
   let scanning = false;
   let pendingScan = null;
+  let audioContext = null;
 
   if (statusNode) statusNode.textContent = 'Ready';
 
@@ -48,7 +49,47 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const vibrateScan = () => {
-    if ('vibrate' in navigator) navigator.vibrate([80, 40, 80]);
+    if ('vibrate' in navigator) navigator.vibrate([160, 60, 160, 60, 240]);
+  };
+
+  const startAudioFeedback = () => {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return null;
+    if (!audioContext) audioContext = new AudioContext();
+    if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
+    return audioContext;
+  };
+
+  const playScanBeep = () => {
+    const context = startAudioFeedback();
+    if (!context) return;
+
+    const now = context.currentTime;
+    const gain = context.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.36, now + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+    gain.connect(context.destination);
+
+    [1040, 1560].forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      oscillator.type = 'square';
+      oscillator.frequency.setValueAtTime(frequency, now + index * 0.045);
+      oscillator.connect(gain);
+      oscillator.start(now + index * 0.045);
+      oscillator.stop(now + 0.2);
+    });
+  };
+
+  const openFullscreenScanner = () => {
+    const target = root instanceof HTMLElement ? root : document.documentElement;
+    if (!document.fullscreenElement && target.requestFullscreen) {
+      target.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+    }
+
+    if (screen.orientation?.lock) {
+      screen.orientation.lock('landscape').catch(() => {});
+    }
   };
 
   const resumeScanning = (delay = 700) => {
@@ -68,6 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (statusNode) statusNode.textContent = 'Confirm scan';
     setError('');
     vibrateScan();
+    playScanBeep();
     if (confirmShell) confirmShell.hidden = false;
   };
 
@@ -109,6 +151,9 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   startButton?.addEventListener('click', async () => {
+    startAudioFeedback();
+    openFullscreenScanner();
+
     if (!('BarcodeDetector' in window)) {
       setError('This phone browser does not support camera barcode detection. Use Demo Scan.');
       return;
@@ -131,6 +176,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   demoButton?.addEventListener('click', () => {
+    startAudioFeedback();
+    openFullscreenScanner();
     const barcode = demoCodes[demoIndex % demoCodes.length];
     demoIndex += 1;
     scanning = false;
@@ -141,6 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!pendingScan) return;
     const { barcode } = pendingScan;
     try {
+      if ('vibrate' in navigator) navigator.vibrate(70);
       await sendScan(barcode);
       closeConfirmation();
       resumeScanning();

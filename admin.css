@@ -1237,11 +1237,25 @@ button, input {
   overflow-wrap: anywhere;
 }
 
+.admin-body.is-phone-scanner {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 .admin-phone-scanner-page {
-  min-height: 100svh;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 10px;
+  overflow: hidden;
+  padding: 8px;
+  overscroll-behavior: none;
+  touch-action: manipulation;
 }
 
 .admin-phone-camera-card {
@@ -1249,7 +1263,7 @@ button, input {
   grid-template-rows: auto auto 1fr auto auto;
   gap: 10px;
   width: min(980px, 100%);
-  min-height: calc(100svh - 20px);
+  height: calc(100dvh - 16px);
   padding: 12px;
   border: 1px solid var(--admin-border);
   border-radius: 18px;
@@ -1281,6 +1295,7 @@ button, input {
 .admin-phone-camera-frame {
   position: relative;
   min-height: 0;
+  height: 100%;
   overflow: hidden;
   border-radius: 16px;
   aspect-ratio: 16 / 9;
@@ -1365,7 +1380,20 @@ button, input {
   }
 
   .admin-phone-camera-card {
-    min-height: auto;
+    grid-template-columns: 210px 1fr;
+    grid-template-rows: auto auto 1fr auto;
+  }
+
+  .admin-phone-camera-head,
+  .admin-phone-orientation-note,
+  .admin-phone-actions,
+  .admin-phone-camera-card > .admin-form-error {
+    grid-column: 1;
+  }
+
+  .admin-phone-camera-frame {
+    grid-column: 2;
+    grid-row: 1 / -1;
   }
 }
 

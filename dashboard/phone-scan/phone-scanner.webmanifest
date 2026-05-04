@@ -1,0 +1,10 @@
+{
+  "name": "Jenang Gemi Phone Scanner",
+  "short_name": "JG Scanner",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#071018",
+  "theme_color": "#071018"
+}

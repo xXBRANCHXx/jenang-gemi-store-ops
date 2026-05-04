@@ -11,10 +11,15 @@ $phoneScanJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/phone-scan.js'
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
     <title>Phone Scanner | Jenang Gemi</title>
     <meta name="robots" content="noindex,nofollow">
+    <meta name="theme-color" content="#071018">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="JG Scanner">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=Space+Grotesk:wght@700&display=swap">
+    <link rel="manifest" href="./phone-scanner.webmanifest">
     <link rel="stylesheet" href="../../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
-<body class="admin-body is-dashboard">
+<body class="admin-body is-dashboard is-phone-scanner">
     <main class="admin-phone-scanner-page" data-phone-scanner>
         <section class="admin-phone-camera-card">
             <div class="admin-phone-camera-head">
