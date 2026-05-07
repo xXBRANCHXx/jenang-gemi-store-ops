@@ -123,6 +123,41 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
                     <span>Add profile</span>
                     <input class="admin-profile-input" name="profile_new" autocomplete="username" placeholder="company-profile" required>
                 </label>
+                <div class="admin-reprint-field">
+                    <span>Theme <small data-theme-label>Default</small></span>
+                    <div class="admin-theme-grid" aria-label="Dashboard themes">
+                        <button type="button" class="admin-theme-option" data-theme-option="dark" aria-pressed="false">
+                            <span class="admin-theme-swatch admin-theme-swatch-default"></span>
+                            <strong>Default</strong>
+                            <small>Original</small>
+                        </button>
+                        <button type="button" class="admin-theme-option" data-theme-option="light" aria-pressed="false">
+                            <span class="admin-theme-swatch admin-theme-swatch-studio"></span>
+                            <strong>Studio</strong>
+                            <small>Clean</small>
+                        </button>
+                        <button type="button" class="admin-theme-option" data-theme-option="graphite" aria-pressed="false">
+                            <span class="admin-theme-swatch admin-theme-swatch-graphite"></span>
+                            <strong>Graphite</strong>
+                            <small>Boardroom</small>
+                        </button>
+                        <button type="button" class="admin-theme-option" data-theme-option="glass" aria-pressed="false">
+                            <span class="admin-theme-swatch admin-theme-swatch-glass"></span>
+                            <strong>Glass</strong>
+                            <small>Frost</small>
+                        </button>
+                        <button type="button" class="admin-theme-option" data-theme-option="ivory" aria-pressed="false">
+                            <span class="admin-theme-swatch admin-theme-swatch-ivory"></span>
+                            <strong>Ivory</strong>
+                            <small>Editorial</small>
+                        </button>
+                        <button type="button" class="admin-theme-option" data-theme-option="prism" aria-pressed="false">
+                            <span class="admin-theme-swatch admin-theme-swatch-prism"></span>
+                            <strong>Prism</strong>
+                            <small>Signal</small>
+                        </button>
+                    </div>
+                </div>
                 <p class="admin-form-error" data-store-settings-error hidden></p>
                 <div class="admin-profile-list" data-profile-list></div>
                 <div class="admin-modal-actions">

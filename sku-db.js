@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const endpoint = root.dataset.skuDbEndpoint || '../api/sku-db/';
   const themeStorageKey = 'jg-admin-theme';
+  const adminThemes = ['dark', 'light', 'graphite', 'glass', 'ivory', 'prism'];
 
   const menuShell = document.querySelector('[data-menu-shell]');
   const menuTrigger = document.querySelector('[data-menu-trigger]');
@@ -48,8 +49,9 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const applyTheme = (theme) => {
-    document.documentElement.dataset.adminTheme = theme;
-    window.localStorage.setItem(themeStorageKey, theme);
+    const nextTheme = adminThemes.includes(theme) ? theme : 'dark';
+    document.documentElement.dataset.adminTheme = nextTheme;
+    window.localStorage.setItem(themeStorageKey, nextTheme);
   };
 
   const closeMenu = () => {
@@ -179,7 +181,9 @@ document.addEventListener('DOMContentLoaded', () => {
   applyTheme(window.localStorage.getItem(themeStorageKey) || 'dark');
   setupTopbarMenu();
   document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
-    applyTheme(document.documentElement.dataset.adminTheme === 'light' ? 'dark' : 'light');
+    const currentTheme = document.documentElement.dataset.adminTheme || 'dark';
+    const currentIndex = adminThemes.indexOf(currentTheme);
+    applyTheme(adminThemes[(Math.max(currentIndex, 0) + 1) % adminThemes.length]);
   });
 
   loadDatabase().catch((error) => {

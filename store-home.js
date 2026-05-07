@@ -2,6 +2,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const root = document.querySelector('[data-store-home]');
   if (!root) return;
 
+  const adminThemes = ['dark', 'light', 'graphite', 'glass', 'ivory', 'prism'];
+  const adminThemeLabels = {
+    dark: 'Default',
+    light: 'Studio',
+    graphite: 'Graphite',
+    glass: 'Glass',
+    ivory: 'Ivory',
+    prism: 'Prism'
+  };
+
   const board = document.querySelector('[data-order-board]');
   const modal = document.querySelector('[data-fulfillment-modal]');
   const modalTitle = document.querySelector('[data-modal-title]');
@@ -32,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const activeProfileStorageKey = 'jg-store-active-profile';
   const catalogFingerprintStorageKey = 'jg-store-demo-orders-sku-fingerprint';
+  const themeStorageKey = 'jg-admin-theme';
   const orderSchemaVersion = 'astra-32h-test-orders-v1';
   const skuDbEndpoint = '../api/sku-db/';
   const scanBridgeEndpoint = '../api/scan-bridge/';
@@ -60,6 +71,20 @@ document.addEventListener('DOMContentLoaded', () => {
     .replace(/[^a-z0-9._-]+/g, '-')
     .replace(/^[._-]+|[._-]+$/g, '')
     .slice(0, 40);
+
+  const applyTheme = (theme) => {
+    const nextTheme = adminThemes.includes(theme) ? theme : 'dark';
+    document.documentElement.dataset.adminTheme = nextTheme;
+    window.localStorage.setItem(themeStorageKey, nextTheme);
+    document.querySelectorAll('[data-theme-option]').forEach((button) => {
+      const isActive = button.dataset.themeOption === nextTheme;
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-pressed', String(isActive));
+    });
+    document.querySelectorAll('[data-theme-label]').forEach((target) => {
+      target.textContent = adminThemeLabels[nextTheme] || adminThemeLabels.dark;
+    });
+  };
 
   const saveProfile = async (username) => {
     const profile = normalizeProfile(username);
@@ -653,6 +678,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.querySelector('[data-open-store-settings]')?.addEventListener('click', openSettingsModal);
 
+  document.querySelectorAll('[data-theme-option]').forEach((button) => {
+    button.addEventListener('click', () => {
+      applyTheme(button.dataset.themeOption || 'dark');
+    });
+  });
+
   document.querySelectorAll('[data-close-store-settings]').forEach((button) => {
     button.addEventListener('click', closeSettingsModal);
   });
@@ -693,6 +724,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.addEventListener('pointerdown', unlockAudio, { once: true });
   document.addEventListener('keydown', unlockAudio, { once: true });
+
+  applyTheme(window.localStorage.getItem(themeStorageKey) || 'dark');
 
   const initialize = async () => {
     try {
