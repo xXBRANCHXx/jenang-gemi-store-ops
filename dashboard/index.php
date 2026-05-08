@@ -133,23 +133,23 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
                         </button>
                         <button type="button" class="admin-theme-option" data-theme-option="light" aria-pressed="false">
                             <span class="admin-theme-swatch admin-theme-swatch-studio"></span>
-                            <strong>Studio</strong>
-                            <small>Clean</small>
+                            <strong>Minimal White</strong>
+                            <small>Flat</small>
                         </button>
                         <button type="button" class="admin-theme-option" data-theme-option="graphite" aria-pressed="false">
                             <span class="admin-theme-swatch admin-theme-swatch-graphite"></span>
-                            <strong>Graphite</strong>
-                            <small>Boardroom</small>
+                            <strong>Flat Black</strong>
+                            <small>Mono</small>
                         </button>
                         <button type="button" class="admin-theme-option" data-theme-option="glass" aria-pressed="false">
                             <span class="admin-theme-swatch admin-theme-swatch-glass"></span>
-                            <strong>Glass</strong>
+                            <strong>Glass Lite</strong>
                             <small>Frost</small>
                         </button>
                         <button type="button" class="admin-theme-option" data-theme-option="ivory" aria-pressed="false">
                             <span class="admin-theme-swatch admin-theme-swatch-ivory"></span>
-                            <strong>Ivory</strong>
-                            <small>Editorial</small>
+                            <strong>Classic White</strong>
+                            <small>Soft</small>
                         </button>
                         <button type="button" class="admin-theme-option" data-theme-option="prism" aria-pressed="false">
                             <span class="admin-theme-swatch admin-theme-swatch-prism"></span>

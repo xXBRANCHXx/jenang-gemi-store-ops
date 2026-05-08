@@ -14,78 +14,78 @@
 }
 
 :root[data-admin-theme='light'] {
-  --admin-bg: #f6f7f5;
+  --admin-bg: #f8faf8;
   --admin-surface: #ffffff;
   --admin-surface-strong: #ffffff;
-  --admin-surface-soft: #f0f3ef;
-  --admin-border: rgba(27, 38, 49, 0.1);
-  --admin-text: #101820;
-  --admin-muted: rgba(49, 60, 72, 0.66);
-  --admin-shadow: 0 18px 42px rgba(29, 41, 57, 0.09);
-  --admin-accent-primary: #2f8f46;
-  --admin-accent-secondary: #b98212;
-  --admin-accent-tertiary: #d64848;
-  --admin-accent-quaternary: #168391;
+  --admin-surface-soft: #f0f3f0;
+  --admin-border: rgba(15, 23, 42, 0.11);
+  --admin-text: #111827;
+  --admin-muted: rgba(55, 65, 81, 0.68);
+  --admin-shadow: none;
+  --admin-accent-primary: #217a3c;
+  --admin-accent-secondary: #0f766e;
+  --admin-accent-tertiary: #b42318;
+  --admin-accent-quaternary: #2563eb;
 }
 
 :root[data-admin-theme='graphite'] {
-  --admin-bg: #090a0c;
-  --admin-surface: #141619;
-  --admin-surface-strong: #1b1e23;
-  --admin-surface-soft: #20242a;
-  --admin-border: rgba(235, 239, 242, 0.1);
-  --admin-text: #f4f1ea;
-  --admin-muted: rgba(220, 224, 226, 0.62);
-  --admin-shadow: 0 22px 60px rgba(0, 0, 0, 0.36);
-  --admin-accent-primary: #d7b56d;
-  --admin-accent-secondary: #51c6bd;
-  --admin-accent-tertiary: #ef7c7c;
-  --admin-accent-quaternary: #8cc3ff;
+  --admin-bg: #000000;
+  --admin-surface: #080808;
+  --admin-surface-strong: #111111;
+  --admin-surface-soft: #171717;
+  --admin-border: rgba(255, 255, 255, 0.12);
+  --admin-text: #f5f5f5;
+  --admin-muted: rgba(163, 163, 163, 0.78);
+  --admin-shadow: none;
+  --admin-accent-primary: #ffffff;
+  --admin-accent-secondary: #d9d9d9;
+  --admin-accent-tertiary: #ffffff;
+  --admin-accent-quaternary: #ffffff;
 }
 
 :root[data-admin-theme='glass'] {
-  --admin-bg: #0a1116;
-  --admin-surface: rgba(18, 28, 35, 0.66);
-  --admin-surface-strong: rgba(25, 39, 47, 0.78);
-  --admin-surface-soft: rgba(255, 255, 255, 0.075);
-  --admin-border: rgba(226, 243, 249, 0.16);
-  --admin-text: #f3fbfb;
-  --admin-muted: rgba(221, 235, 238, 0.66);
-  --admin-shadow: 0 24px 58px rgba(0, 0, 0, 0.34);
-  --admin-accent-primary: #7ddccf;
-  --admin-accent-secondary: #d9b768;
-  --admin-accent-tertiary: #ff8b8b;
-  --admin-accent-quaternary: #a3b8ff;
+  --admin-bg: #edf6f3;
+  --admin-surface: rgba(255, 255, 255, 0.78);
+  --admin-surface-strong: rgba(255, 255, 255, 0.9);
+  --admin-surface-soft: rgba(255, 255, 255, 0.54);
+  --admin-border: rgba(15, 118, 110, 0.16);
+  --admin-text: #10201f;
+  --admin-muted: rgba(37, 60, 58, 0.68);
+  --admin-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  --admin-accent-primary: #0f766e;
+  --admin-accent-secondary: #217a3c;
+  --admin-accent-tertiary: #b42318;
+  --admin-accent-quaternary: #2563eb;
 }
 
 :root[data-admin-theme='ivory'] {
-  --admin-bg: #f7f5ef;
-  --admin-surface: rgba(255, 255, 255, 0.9);
+  --admin-bg: #f7f8f4;
+  --admin-surface: #ffffff;
   --admin-surface-strong: #ffffff;
-  --admin-surface-soft: #eef3f0;
-  --admin-border: rgba(44, 58, 66, 0.12);
-  --admin-text: #1a2026;
-  --admin-muted: rgba(63, 73, 79, 0.66);
-  --admin-shadow: 0 20px 48px rgba(52, 63, 68, 0.11);
-  --admin-accent-primary: #0f8c68;
-  --admin-accent-secondary: #bd7d2a;
-  --admin-accent-tertiary: #c65353;
-  --admin-accent-quaternary: #2f7d9b;
+  --admin-surface-soft: #f2f4ee;
+  --admin-border: rgba(15, 23, 42, 0.12);
+  --admin-text: #0f172a;
+  --admin-muted: rgba(71, 85, 105, 0.7);
+  --admin-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  --admin-accent-primary: #3f7718;
+  --admin-accent-secondary: #0e8f68;
+  --admin-accent-tertiary: #b42318;
+  --admin-accent-quaternary: #2563eb;
 }
 
 :root[data-admin-theme='prism'] {
-  --admin-bg: #0b0714;
-  --admin-surface: rgba(23, 18, 37, 0.92);
-  --admin-surface-strong: rgba(34, 25, 52, 0.96);
-  --admin-surface-soft: rgba(255, 255, 255, 0.07);
-  --admin-border: rgba(239, 221, 255, 0.15);
+  --admin-bg: #100b18;
+  --admin-surface: #1a1326;
+  --admin-surface-strong: #231934;
+  --admin-surface-soft: #2a203b;
+  --admin-border: rgba(239, 221, 255, 0.14);
   --admin-text: #fff8ff;
-  --admin-muted: rgba(238, 226, 246, 0.66);
-  --admin-shadow: 0 26px 64px rgba(13, 8, 28, 0.42);
-  --admin-accent-primary: #ff4ecd;
-  --admin-accent-secondary: #7c5cff;
-  --admin-accent-tertiary: #ff8f70;
-  --admin-accent-quaternary: #37d7ff;
+  --admin-muted: rgba(238, 226, 246, 0.68);
+  --admin-shadow: none;
+  --admin-accent-primary: #e246b6;
+  --admin-accent-secondary: #7357e8;
+  --admin-accent-tertiary: #ef7f63;
+  --admin-accent-quaternary: #22b8cf;
 }
 
 * {
@@ -110,40 +110,23 @@ body {
 }
 
 :root[data-admin-theme='light'] body {
-  background:
-    radial-gradient(circle at 12% -10%, rgba(47, 143, 70, 0.1), transparent 28rem),
-    radial-gradient(circle at 92% 4%, rgba(22, 131, 145, 0.1), transparent 26rem),
-    linear-gradient(135deg, #fbfcfb 0%, #f2f5f0 48%, #eef2f5 100%);
+  background: #f8faf8;
 }
 
 :root[data-admin-theme='graphite'] body {
-  background:
-    radial-gradient(circle at 8% 0%, rgba(215, 181, 109, 0.13), transparent 28rem),
-    radial-gradient(circle at 96% 8%, rgba(81, 198, 189, 0.08), transparent 30rem),
-    linear-gradient(145deg, #070809 0%, #111317 50%, #08090b 100%);
+  background: #000000;
 }
 
 :root[data-admin-theme='glass'] body {
-  background:
-    radial-gradient(circle at 14% 6%, rgba(125, 220, 207, 0.18), transparent 28rem),
-    radial-gradient(circle at 86% 0%, rgba(217, 183, 104, 0.12), transparent 24rem),
-    radial-gradient(circle at 72% 72%, rgba(163, 184, 255, 0.1), transparent 30rem),
-    linear-gradient(145deg, #071015 0%, #0e1a22 48%, #080e12 100%);
+  background: linear-gradient(135deg, #f4fbf8 0%, #e9f3ef 100%);
 }
 
 :root[data-admin-theme='ivory'] body {
-  background:
-    radial-gradient(circle at 16% -8%, rgba(15, 140, 104, 0.11), transparent 26rem),
-    radial-gradient(circle at 92% 6%, rgba(47, 125, 155, 0.12), transparent 25rem),
-    linear-gradient(145deg, #fbfaf6 0%, #f2f3ec 46%, #edf2f3 100%);
+  background: linear-gradient(135deg, #fbfcf8 0%, #f0f3ea 100%);
 }
 
 :root[data-admin-theme='prism'] body {
-  background:
-    radial-gradient(circle at 10% 8%, rgba(255, 78, 205, 0.24), transparent 24rem),
-    radial-gradient(circle at 78% -6%, rgba(55, 215, 255, 0.2), transparent 25rem),
-    radial-gradient(circle at 88% 78%, rgba(124, 92, 255, 0.22), transparent 30rem),
-    linear-gradient(145deg, #090611 0%, #161024 45%, #0a0d1a 100%);
+  background: linear-gradient(135deg, #100b18 0%, #21172f 54%, #111827 100%);
 }
 
 .admin-build-badge {
@@ -242,8 +225,8 @@ button, input {
 :root[data-admin-theme='ivory'] .admin-metric-card,
 :root[data-admin-theme='ivory'] .admin-panel,
 :root[data-admin-theme='ivory'] .admin-control-strip {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.82));
-  box-shadow: var(--admin-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  background: var(--admin-surface);
+  box-shadow: var(--admin-shadow);
 }
 
 :root[data-admin-theme='graphite'] .admin-loader-panel,
@@ -252,8 +235,8 @@ button, input {
 :root[data-admin-theme='graphite'] .admin-metric-card,
 :root[data-admin-theme='graphite'] .admin-panel,
 :root[data-admin-theme='graphite'] .admin-control-strip {
-  background: linear-gradient(180deg, rgba(28, 30, 34, 0.96), rgba(16, 18, 21, 0.94));
-  box-shadow: var(--admin-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  background: var(--admin-surface);
+  box-shadow: none;
 }
 
 :root[data-admin-theme='glass'] .admin-loader-panel,
@@ -262,15 +245,15 @@ button, input {
 :root[data-admin-theme='glass'] .admin-metric-card,
 :root[data-admin-theme='glass'] .admin-panel,
 :root[data-admin-theme='glass'] .admin-control-strip {
-  background: linear-gradient(180deg, rgba(25, 39, 47, 0.72), rgba(12, 20, 26, 0.58));
-  box-shadow: var(--admin-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  background: var(--admin-surface);
+  box-shadow: var(--admin-shadow);
 }
 
 :root[data-admin-theme='glass'] .admin-hero-panel,
 :root[data-admin-theme='glass'] .admin-control-strip,
 :root[data-admin-theme='glass'] .admin-menu-panel {
-  backdrop-filter: blur(12px) saturate(124%);
-  -webkit-backdrop-filter: blur(12px) saturate(124%);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 :root[data-admin-theme='prism'] .admin-loader-panel,
@@ -279,10 +262,8 @@ button, input {
 :root[data-admin-theme='prism'] .admin-metric-card,
 :root[data-admin-theme='prism'] .admin-panel,
 :root[data-admin-theme='prism'] .admin-control-strip {
-  background:
-    linear-gradient(180deg, rgba(34, 25, 52, 0.94), rgba(15, 13, 28, 0.9)),
-    radial-gradient(circle at 0% 0%, rgba(255, 78, 205, 0.18), transparent 18rem);
-  box-shadow: var(--admin-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: var(--admin-surface);
+  box-shadow: none;
 }
 
 .admin-loader-panel {
@@ -442,7 +423,7 @@ button, input {
 
 :root[data-admin-theme='prism'] .admin-primary-btn,
 :root[data-admin-theme='prism'] .admin-toggle-pill.is-active {
-  background: linear-gradient(135deg, #ff4ecd 0%, #7c5cff 52%, #37d7ff 100%);
+  background: linear-gradient(135deg, #e246b6 0%, #7357e8 56%, #22b8cf 100%);
   border-color: rgba(255, 255, 255, 0.18);
 }
 
@@ -1742,26 +1723,23 @@ button, input {
 }
 
 .admin-theme-swatch-studio {
-  background: linear-gradient(135deg, #ffffff, #eff4f1 56%, #2f8f46);
+  background: linear-gradient(135deg, #ffffff 0 62%, #f0f3f0 62% 82%, #217a3c 82% 100%);
 }
 
 .admin-theme-swatch-graphite {
-  background: linear-gradient(135deg, #08090b, #20242a 58%, #d7b56d);
+  background: linear-gradient(135deg, #000000 0 68%, #1a1a1a 68% 84%, #ffffff 84% 100%);
 }
 
 .admin-theme-swatch-glass {
-  background: linear-gradient(135deg, rgba(10, 17, 22, 0.95), rgba(125, 220, 207, 0.32), rgba(217, 183, 104, 0.28));
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(237, 246, 243, 0.82), rgba(15, 118, 110, 0.3));
 }
 
 .admin-theme-swatch-ivory {
-  background: linear-gradient(135deg, #fbfaf6, #edf2f3 54%, #0f8c68);
+  background: linear-gradient(135deg, #ffffff 0 58%, #f2f4ee 58% 78%, #3f7718 78% 100%);
 }
 
 .admin-theme-swatch-prism {
-  background:
-    radial-gradient(circle at 18% 20%, #ff4ecd, transparent 42%),
-    radial-gradient(circle at 86% 18%, #37d7ff, transparent 38%),
-    linear-gradient(135deg, #0b0714 0%, #7c5cff 56%, #ff8f70 100%);
+  background: linear-gradient(135deg, #100b18 0%, #e246b6 35%, #7357e8 68%, #22b8cf 100%);
 }
 
 .admin-body.is-phone-scanner {
@@ -2627,10 +2605,91 @@ button, input {
 
 :root[data-admin-theme='prism'] .admin-metric-card strong,
 :root[data-admin-theme='prism'] .admin-store-stat strong {
-  background: linear-gradient(135deg, #fff8ff 0%, #ffb7eb 42%, #8beaff 100%);
+  background: linear-gradient(135deg, #fff8ff 0%, #f0b1df 46%, #9ee8f0 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+:root[data-admin-theme='light'] :is(
+  .admin-primary-btn:hover,
+  .admin-ghost-btn:hover,
+  .admin-soft-btn:hover,
+  .admin-toggle-pill:hover,
+  .admin-panel:hover,
+  .admin-metric-card:hover,
+  .admin-order-card:hover,
+  .admin-invoice-dropzone:hover,
+  .admin-invoice-dropzone.is-dragging,
+  .admin-launchpad-link:hover
+),
+:root[data-admin-theme='graphite'] :is(
+  .admin-primary-btn:hover,
+  .admin-ghost-btn:hover,
+  .admin-soft-btn:hover,
+  .admin-toggle-pill:hover,
+  .admin-panel:hover,
+  .admin-metric-card:hover,
+  .admin-order-card:hover,
+  .admin-invoice-dropzone:hover,
+  .admin-invoice-dropzone.is-dragging,
+  .admin-launchpad-link:hover
+),
+:root[data-admin-theme='glass'] :is(
+  .admin-primary-btn:hover,
+  .admin-ghost-btn:hover,
+  .admin-soft-btn:hover,
+  .admin-toggle-pill:hover,
+  .admin-panel:hover,
+  .admin-metric-card:hover,
+  .admin-order-card:hover,
+  .admin-invoice-dropzone:hover,
+  .admin-invoice-dropzone.is-dragging,
+  .admin-launchpad-link:hover
+),
+:root[data-admin-theme='ivory'] :is(
+  .admin-primary-btn:hover,
+  .admin-ghost-btn:hover,
+  .admin-soft-btn:hover,
+  .admin-toggle-pill:hover,
+  .admin-panel:hover,
+  .admin-metric-card:hover,
+  .admin-order-card:hover,
+  .admin-invoice-dropzone:hover,
+  .admin-invoice-dropzone.is-dragging,
+  .admin-launchpad-link:hover
+),
+:root[data-admin-theme='prism'] :is(
+  .admin-primary-btn:hover,
+  .admin-ghost-btn:hover,
+  .admin-soft-btn:hover,
+  .admin-toggle-pill:hover,
+  .admin-panel:hover,
+  .admin-metric-card:hover,
+  .admin-order-card:hover,
+  .admin-invoice-dropzone:hover,
+  .admin-invoice-dropzone.is-dragging,
+  .admin-launchpad-link:hover
+) {
+  transform: none;
+  box-shadow: none;
+}
+
+:root[data-admin-theme='light'] :is(.admin-invoice-dropzone, .admin-invoice-dropzone:hover, .admin-invoice-dropzone.is-dragging, .admin-scanner-capture),
+:root[data-admin-theme='graphite'] :is(.admin-invoice-dropzone, .admin-invoice-dropzone:hover, .admin-invoice-dropzone.is-dragging, .admin-scanner-capture),
+:root[data-admin-theme='glass'] :is(.admin-invoice-dropzone, .admin-invoice-dropzone:hover, .admin-invoice-dropzone.is-dragging, .admin-scanner-capture),
+:root[data-admin-theme='ivory'] :is(.admin-invoice-dropzone, .admin-invoice-dropzone:hover, .admin-invoice-dropzone.is-dragging, .admin-scanner-capture),
+:root[data-admin-theme='prism'] :is(.admin-invoice-dropzone, .admin-invoice-dropzone:hover, .admin-invoice-dropzone.is-dragging, .admin-scanner-capture) {
+  background: var(--admin-surface-soft);
+}
+
+:root[data-admin-theme='light'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell, .admin-phone-top-controls .admin-ghost-btn, .admin-phone-profile-badge, .admin-phone-standby-shell, .admin-phone-confirm-shell, .admin-phone-confirm-card),
+:root[data-admin-theme='graphite'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell, .admin-phone-top-controls .admin-ghost-btn, .admin-phone-profile-badge, .admin-phone-standby-shell, .admin-phone-confirm-shell, .admin-phone-confirm-card),
+:root[data-admin-theme='glass'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell, .admin-phone-top-controls .admin-ghost-btn, .admin-phone-profile-badge, .admin-phone-standby-shell, .admin-phone-confirm-shell, .admin-phone-confirm-card),
+:root[data-admin-theme='ivory'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell, .admin-phone-top-controls .admin-ghost-btn, .admin-phone-profile-badge, .admin-phone-standby-shell, .admin-phone-confirm-shell, .admin-phone-confirm-card),
+:root[data-admin-theme='prism'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell, .admin-phone-top-controls .admin-ghost-btn, .admin-phone-profile-badge, .admin-phone-standby-shell, .admin-phone-confirm-shell, .admin-phone-confirm-card) {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .admin-chart-canvas {

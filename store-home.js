@@ -5,10 +5,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const adminThemes = ['dark', 'light', 'graphite', 'glass', 'ivory', 'prism'];
   const adminThemeLabels = {
     dark: 'Default',
-    light: 'Studio',
-    graphite: 'Graphite',
-    glass: 'Glass',
-    ivory: 'Ivory',
+    light: 'Minimal White',
+    graphite: 'Flat Black',
+    glass: 'Glass Lite',
+    ivory: 'Classic White',
     prism: 'Prism'
   };
 
