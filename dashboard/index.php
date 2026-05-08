@@ -18,6 +18,7 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
     <title>Store Fulfillment | Jenang Gemi</title>
     <meta name="robots" content="noindex,nofollow">
+    <?php require dirname(__DIR__) . '/theme-init.php'; ?>
     <link rel="icon" type="image/png" href="https://jenanggemi.com/Media/Jenang%20Gemi%20Website%20Logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -36,7 +37,7 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
                     <strong data-listed-count>0</strong>
                 </article>
                 <article class="admin-store-stat">
-                    <span>&lt;10m</span>
+                    <span>&lt;1h</span>
                     <strong data-critical-count>0</strong>
                 </article>
                 <article class="admin-store-stat">
@@ -50,10 +51,10 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
             </section>
             <div class="admin-topbar-actions">
                 <div class="admin-view-indicator" data-board-clock>Live Queue</div>
-                <a class="admin-ghost-btn admin-link-btn" href="../inventory/">Inventory</a>
-                <a class="admin-ghost-btn admin-link-btn" href="../transactions/">Transactions</a>
-                <a class="admin-ghost-btn admin-link-btn" href="../orders/">Orders</a>
-                <a class="admin-ghost-btn admin-link-btn" href="../integrations/">Integrations</a>
+                <a class="admin-ghost-btn admin-link-btn" href="../inventory/" target="_blank" rel="noopener">Inventory</a>
+                <a class="admin-ghost-btn admin-link-btn" href="../transactions/" target="_blank" rel="noopener">Transactions</a>
+                <a class="admin-ghost-btn admin-link-btn" href="../orders/" target="_blank" rel="noopener">Orders</a>
+                <a class="admin-ghost-btn admin-link-btn" href="../integrations/" target="_blank" rel="noopener">Integrations</a>
                 <button type="button" class="admin-ghost-btn admin-link-btn" data-open-reprint>Reprint</button>
                 <button type="button" class="admin-ghost-btn admin-link-btn" data-open-store-settings>Settings</button>
                 <a class="admin-primary-btn admin-link-btn" href="../logout/">Lock</a>

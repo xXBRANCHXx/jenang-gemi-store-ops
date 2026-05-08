@@ -339,6 +339,15 @@ document.addEventListener('DOMContentLoaded', () => {
     reprintError.hidden = false;
   };
 
+  const openStorePage = (url) => {
+    const page = window.open(url, '_blank');
+    if (page) {
+      page.opener = null;
+      return;
+    }
+    window.location.href = url;
+  };
+
   const openPrintLabelPage = (orderId) => {
     const order = state.orders.find((item) => normalizeOrderId(item.id) === orderId);
     if (!order) {
@@ -346,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     const profile = orderOwner(order) || activeProfile || '';
-    window.location.href = `./print-label/?order=${encodeURIComponent(order.id)}${profile ? `&profile=${encodeURIComponent(profile)}` : ''}`;
+    openStorePage(`./print-label/?order=${encodeURIComponent(order.id)}${profile ? `&profile=${encodeURIComponent(profile)}` : ''}`);
   };
 
   const renderProfileSelect = (selected = '') => {
@@ -647,7 +656,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (_error) {
       // Query string still carries the order id.
     }
-    window.location.href = `./scan/?order=${encodeURIComponent(order.id)}&profile=${encodeURIComponent(profile)}`;
+    openStorePage(`./scan/?order=${encodeURIComponent(order.id)}&profile=${encodeURIComponent(profile)}`);
   });
 
   document.querySelectorAll('[data-close-fulfillment-modal]').forEach((button) => {

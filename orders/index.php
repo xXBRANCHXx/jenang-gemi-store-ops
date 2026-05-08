@@ -17,6 +17,7 @@ $adminCssVersion = (string) @filemtime(dirname(__DIR__) . '/admin.css');
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
     <title>Orders | Jenang Gemi Store Ops</title>
     <meta name="robots" content="noindex,nofollow">
+    <?php require dirname(__DIR__) . '/theme-init.php'; ?>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap">
     <link rel="stylesheet" href="../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
@@ -29,8 +30,8 @@ $adminCssVersion = (string) @filemtime(dirname(__DIR__) . '/admin.css');
                 <p>This route is reserved for partner order creation, edits, deletes, and order status tracking.</p>
             </div>
             <div class="admin-topbar-actions">
-                <a class="admin-ghost-btn admin-link-btn" href="../dashboard/">Dashboard</a>
-                <a class="admin-primary-btn admin-link-btn" href="../sku-db/">SKU Database</a>
+                <a class="admin-ghost-btn admin-link-btn" href="../dashboard/" target="_blank" rel="noopener">Dashboard</a>
+                <a class="admin-primary-btn admin-link-btn" href="../sku-db/" target="_blank" rel="noopener">SKU Database</a>
             </div>
         </header>
     </div>

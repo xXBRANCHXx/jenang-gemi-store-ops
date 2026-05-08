@@ -11,6 +11,7 @@ $phoneScanJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/phone-scan.js'
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
     <title>Phone Scanner | Jenang Gemi</title>
     <meta name="robots" content="noindex,nofollow">
+    <?php require dirname(__DIR__, 2) . '/theme-init.php'; ?>
     <meta name="theme-color" content="#071018">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">

@@ -18,6 +18,7 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
     <title>Transactions | Jenang Gemi Store Ops</title>
     <meta name="robots" content="noindex,nofollow">
+    <?php require dirname(__DIR__) . '/theme-init.php'; ?>
     <link rel="icon" type="image/png" href="https://jenanggemi.com/Media/Jenang%20Gemi%20Website%20Logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -36,9 +37,9 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
                 <p>Track orders by invoice number and apply COGS by PO number. Each product row becomes one transaction record.</p>
             </div>
             <div class="admin-topbar-actions">
-                <a class="admin-ghost-btn admin-link-btn" href="../dashboard/">Dashboard</a>
-                <a class="admin-ghost-btn admin-link-btn" href="../inventory/">Inventory</a>
-                <a class="admin-primary-btn admin-link-btn" href="../sku-db/">SKU Database</a>
+                <a class="admin-ghost-btn admin-link-btn" href="../dashboard/" target="_blank" rel="noopener">Dashboard</a>
+                <a class="admin-ghost-btn admin-link-btn" href="../inventory/" target="_blank" rel="noopener">Inventory</a>
+                <a class="admin-primary-btn admin-link-btn" href="../sku-db/" target="_blank" rel="noopener">SKU Database</a>
             </div>
         </header>
 

@@ -18,6 +18,7 @@ $skuDbJsVersion = (string) @filemtime(dirname(__DIR__) . '/sku-db.js');
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
     <title>SKU Sheet | Jenang Gemi Store Ops</title>
     <meta name="robots" content="noindex,nofollow">
+    <?php require dirname(__DIR__) . '/theme-init.php'; ?>
     <link rel="icon" type="image/png" href="https://jenanggemi.com/Media/Jenang%20Gemi%20Website%20Logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -40,12 +41,12 @@ $skuDbJsVersion = (string) @filemtime(dirname(__DIR__) . '/sku-db.js');
                 <div class="admin-menu-shell" data-menu-shell>
                     <button type="button" class="admin-ghost-btn admin-menu-trigger" data-menu-trigger aria-expanded="false" aria-label="Open dashboard menu">...</button>
                     <div class="admin-menu-panel" data-menu-panel hidden>
-                        <a class="admin-menu-item admin-link-btn" href="../dashboard/" data-dashboard-view-link="home">Home Dashboard</a>
-                        <a class="admin-menu-item admin-link-btn" href="../inventory/">Inventory</a>
-                        <a class="admin-menu-item admin-link-btn" href="../transactions/">Transactions</a>
-                        <a class="admin-menu-item admin-link-btn" href="../orders/">Orders</a>
-                        <a class="admin-menu-item admin-link-btn" href="../integrations/">Integrations</a>
-                        <a class="admin-menu-item admin-link-btn" href="../sku-db/">SKU Database</a>
+                        <a class="admin-menu-item admin-link-btn" href="../dashboard/" target="_blank" rel="noopener" data-dashboard-view-link="home">Home Dashboard</a>
+                        <a class="admin-menu-item admin-link-btn" href="../inventory/" target="_blank" rel="noopener">Inventory</a>
+                        <a class="admin-menu-item admin-link-btn" href="../transactions/" target="_blank" rel="noopener">Transactions</a>
+                        <a class="admin-menu-item admin-link-btn" href="../orders/" target="_blank" rel="noopener">Orders</a>
+                        <a class="admin-menu-item admin-link-btn" href="../integrations/" target="_blank" rel="noopener">Integrations</a>
+                        <a class="admin-menu-item admin-link-btn" href="../sku-db/" target="_blank" rel="noopener">SKU Database</a>
                         <button type="button" class="admin-menu-item" data-theme-toggle>Toggle Theme</button>
                         <a class="admin-menu-item admin-link-btn" href="../logout/">Lock Dashboard</a>
                     </div>
