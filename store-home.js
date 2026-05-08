@@ -428,6 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const minutesRemaining = (order) => Math.ceil((order.deadlineAt - Date.now()) / 60000);
+  const isCriticalOrder = (order) => order.deadlineAt - Date.now() < 60 * 60000;
 
   const formatDeadline = (order) => {
     const minutes = minutesRemaining(order);
@@ -504,7 +505,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const refreshSiren = () => {
-    const hasCritical = listedOrders().some((order) => minutesRemaining(order) <= 10);
+    const hasCritical = listedOrders().some((order) => isCriticalOrder(order));
     if (!hasCritical || !audioUnlocked) {
       window.clearInterval(sirenTimer);
       sirenTimer = 0;
@@ -520,7 +521,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const renderMetrics = () => {
     const listed = listedOrders();
     if (listedCount) listedCount.textContent = String(listed.length);
-    if (criticalCount) criticalCount.textContent = String(listed.filter((order) => minutesRemaining(order) <= 10).length);
+    if (criticalCount) criticalCount.textContent = String(listed.filter((order) => isCriticalOrder(order)).length);
     if (startedCount) startedCount.textContent = String(state.orders.filter((order) => order.status === 'IS_LISTED' && order.started).length);
     if (fulfillingCount) fulfillingCount.textContent = String(state.orders.filter((order) => order.status === 'IS_BEING_FULFILLED').length);
   };
@@ -542,8 +543,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     board.innerHTML = orders.map((order, index) => {
-      const minutes = minutesRemaining(order);
-      const isCritical = minutes <= 10;
+      const isCritical = isCriticalOrder(order);
       const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
       const owner = orderOwner(order);
       const buttonLabel = owner || (index === 0 ? 'Start Next' : 'Start');

@@ -126,7 +126,7 @@ body {
 }
 
 :root[data-admin-theme='prism'] body {
-  background: linear-gradient(135deg, #100b18 0%, #21172f 54%, #111827 100%);
+  background: #100b18;
 }
 
 .admin-build-badge {
@@ -423,7 +423,7 @@ button, input {
 
 :root[data-admin-theme='prism'] .admin-primary-btn,
 :root[data-admin-theme='prism'] .admin-toggle-pill.is-active {
-  background: linear-gradient(135deg, #e246b6 0%, #7357e8 56%, #22b8cf 100%);
+  background: var(--admin-accent-primary);
   border-color: rgba(255, 255, 255, 0.18);
 }
 
@@ -1727,7 +1727,8 @@ button, input {
 }
 
 .admin-theme-swatch-graphite {
-  background: linear-gradient(135deg, #000000 0 68%, #1a1a1a 68% 84%, #ffffff 84% 100%);
+  background: #000000;
+  box-shadow: inset 0 -10px 0 #1a1a1a, inset 0 -14px 0 #ffffff;
 }
 
 .admin-theme-swatch-glass {
@@ -1739,7 +1740,8 @@ button, input {
 }
 
 .admin-theme-swatch-prism {
-  background: linear-gradient(135deg, #100b18 0%, #e246b6 35%, #7357e8 68%, #22b8cf 100%);
+  background: #100b18;
+  box-shadow: inset 0 -10px 0 #e246b6, inset 0 -14px 0 #22b8cf;
 }
 
 .admin-body.is-phone-scanner {
@@ -2603,12 +2605,26 @@ button, input {
   background: rgba(255, 255, 255, 0.065);
 }
 
-:root[data-admin-theme='prism'] .admin-metric-card strong,
-:root[data-admin-theme='prism'] .admin-store-stat strong {
-  background: linear-gradient(135deg, #fff8ff 0%, #f0b1df 46%, #9ee8f0 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+:root[data-admin-theme='graphite'] .admin-order-card,
+:root[data-admin-theme='prism'] .admin-order-card {
+  background: var(--admin-surface-soft);
+  box-shadow: none;
+}
+
+:root[data-admin-theme='graphite'] .admin-order-card.is-critical,
+:root[data-admin-theme='prism'] .admin-order-card.is-critical {
+  animation: admin-critical-flat-pulse 0.86s ease-in-out infinite;
+}
+
+@keyframes admin-critical-flat-pulse {
+  0%, 100% {
+    border-color: rgba(255, 82, 82, 0.48);
+    background: var(--admin-surface-soft);
+  }
+  50% {
+    border-color: rgba(255, 82, 82, 0.95);
+    background: rgba(96, 20, 24, 0.88);
+  }
 }
 
 :root[data-admin-theme='light'] :is(
