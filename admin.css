@@ -1034,8 +1034,8 @@ button, input {
 .admin-board-columns,
 .admin-order-board {
   display: grid;
-  grid-template-columns: repeat(5, minmax(180px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .admin-board-columns {
@@ -1053,13 +1053,14 @@ button, input {
 }
 
 .admin-order-board-wrap {
-  max-height: min(70svh, 980px);
+  max-height: min(78svh, 980px);
   overflow: auto;
-  padding-right: 4px;
+  padding-right: 2px;
 }
 
 .admin-order-board {
-  grid-template-rows: repeat(var(--order-rows, 10), minmax(122px, auto));
+  grid-template-rows: repeat(var(--order-rows, 10), minmax(0, 1fr));
+  grid-auto-columns: minmax(128px, 1fr);
   grid-auto-flow: column;
   align-items: stretch;
 }
@@ -1077,12 +1078,13 @@ button, input {
 
 .admin-order-card {
   display: grid;
-  grid-template-rows: auto 1fr auto auto;
-  gap: 8px;
-  min-height: 122px;
-  padding: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto 1fr;
+  gap: 4px 6px;
+  min-height: 0;
+  padding: 6px 7px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
+  border-radius: 8px;
   background:
     linear-gradient(145deg, rgba(34, 211, 238, 0.08), transparent 58%),
     var(--admin-surface-soft);
@@ -1091,7 +1093,7 @@ button, input {
 }
 
 .admin-order-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   border-color: rgba(34, 211, 238, 0.32);
 }
 
@@ -1128,47 +1130,87 @@ button, input {
   gap: 10px;
 }
 
+.admin-order-card-top {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  gap: 4px;
+}
+
+.admin-order-id {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .admin-instant-badge {
   display: inline-grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--admin-accent-secondary);
   color: #171000;
+  font-size: 8px;
+  flex: 0 0 auto;
 }
 
 .admin-order-deadline {
+  grid-column: 2;
+  grid-row: 1;
   align-self: center;
-  justify-self: center;
+  justify-self: end;
   font-family: 'Space Grotesk', sans-serif;
-  font-size: clamp(2rem, 4vw, 3rem);
+  font-size: clamp(0.85rem, 1.2vw, 1.1rem);
   font-weight: 700;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .admin-order-meta {
-  justify-content: center;
-  flex-wrap: wrap;
-  font-size: 10px;
+  grid-column: 1;
+  grid-row: 2;
+  align-self: end;
+  min-width: 0;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  gap: 3px;
+  overflow: hidden;
+  font-size: 8px;
   font-weight: 800;
   text-transform: uppercase;
 }
 
 .admin-order-meta span {
-  padding: 4px 7px;
-  border-radius: 999px;
+  min-width: 0;
+  padding: 1px 4px;
+  border-radius: 4px;
   background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-start-order-btn {
-  min-height: 44px;
+  grid-column: 2;
+  grid-row: 2;
+  align-self: end;
+  min-height: 22px;
+  max-width: 86px;
+  padding: 0 8px;
   border: 0;
-  border-radius: 14px;
+  border-radius: 7px;
   background: var(--admin-accent-primary);
   color: #091006;
   cursor: pointer;
+  font-size: 10px;
   font-weight: 900;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-queue-notes {
@@ -1281,9 +1323,11 @@ button, input {
 .admin-store-home {
   display: grid;
   grid-template-rows: auto 1fr;
-  gap: 10px;
-  min-height: 100svh;
-  padding: 12px;
+  gap: 6px;
+  height: 100svh;
+  min-height: 0;
+  overflow: hidden;
+  padding: 8px;
 }
 
 .admin-store-topbar {
@@ -1293,20 +1337,21 @@ button, input {
 
 .admin-store-topbar .admin-topbar-actions {
   justify-content: flex-end;
+  gap: 5px;
 }
 
 .admin-store-command {
   display: flex;
-  gap: 8px;
+  gap: 5px;
 }
 
 .admin-store-stat {
   display: grid;
   place-items: center;
-  width: 72px;
-  height: 72px;
+  width: 54px;
+  height: 54px;
   min-height: 0;
-  padding: 7px;
+  padding: 5px;
   border-radius: 50%;
   text-align: center;
 }
@@ -1319,7 +1364,7 @@ button, input {
 
 .admin-store-stat strong {
   margin: 1px 0 0;
-  font-size: 1.45rem;
+  font-size: 1.1rem;
   line-height: 1;
 }
 
@@ -1335,12 +1380,22 @@ button, input {
 
 .admin-fulfillment-panel {
   min-height: 0;
-  padding: 10px;
-  border-radius: 18px;
+  padding: 6px;
+  border-radius: 10px;
 }
 
 .admin-order-board-wrap {
-  max-height: calc(100svh - 116px);
+  width: 100%;
+  height: 100%;
+  max-height: none;
+}
+
+.admin-store-topbar .admin-ghost-btn,
+.admin-store-topbar .admin-primary-btn {
+  min-height: 28px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 11px;
 }
 
 .admin-fulfillment-card,
@@ -2001,7 +2056,7 @@ button, input {
 
   .admin-board-columns,
   .admin-order-board {
-    grid-template-columns: repeat(5, minmax(156px, 1fr));
+    grid-template-columns: repeat(7, minmax(96px, 1fr));
   }
 
   .admin-affiliate-head,
@@ -2024,16 +2079,16 @@ button, input {
   }
 
   .admin-store-home {
-    padding: 8px;
+    padding: 6px;
   }
 
   .admin-store-stat {
-    width: 58px;
-    height: 58px;
+    width: 48px;
+    height: 48px;
   }
 
   .admin-store-stat strong {
-    font-size: 1.1rem;
+    font-size: 1rem;
   }
 
   .admin-topbar,
@@ -2044,7 +2099,7 @@ button, input {
   }
 
   .admin-order-board-wrap {
-    max-height: 68svh;
+    max-height: none;
   }
 
   .admin-phone-scan-card,
@@ -2056,7 +2111,7 @@ button, input {
 
   .admin-board-columns,
   .admin-order-board {
-    grid-template-columns: repeat(5, minmax(142px, 1fr));
+    grid-template-columns: repeat(7, minmax(84px, 1fr));
   }
 }
 
@@ -2172,6 +2227,78 @@ button, input {
 
 .admin-view.is-active {
   display: grid;
+}
+
+.admin-app.admin-store-home {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 6px;
+  height: 100svh;
+  min-height: 0;
+  overflow: hidden;
+  padding: 8px;
+}
+
+.admin-store-home .admin-store-topbar {
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0;
+}
+
+.admin-store-home .admin-topbar-actions {
+  gap: 5px;
+  justify-content: flex-end;
+}
+
+.admin-store-home .admin-layout,
+.admin-store-home .admin-fulfillment-panel {
+  min-height: 0;
+}
+
+.admin-store-home .admin-layout {
+  gap: 0;
+}
+
+.admin-store-home .admin-fulfillment-panel {
+  padding: 6px;
+  border-radius: 10px;
+}
+
+.admin-store-home .admin-store-command {
+  gap: 5px;
+}
+
+.admin-store-home .admin-store-stat {
+  width: 54px;
+  height: 54px;
+  padding: 5px;
+}
+
+.admin-store-home .admin-store-stat strong {
+  font-size: 1.1rem;
+}
+
+.admin-store-home .admin-store-topbar .admin-view-indicator,
+.admin-store-home .admin-store-topbar .admin-ghost-btn,
+.admin-store-home .admin-store-topbar .admin-primary-btn {
+  min-height: 28px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.admin-store-home .admin-store-topbar .admin-view-indicator {
+  letter-spacing: 0.06em;
+}
+
+.admin-store-home .admin-order-board-wrap {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+}
+
+.admin-store-home .admin-order-board {
+  height: 100%;
 }
 
 .admin-view-indicator {

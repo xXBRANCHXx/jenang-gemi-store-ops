@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const activeProfileStorageKey = 'jg-store-active-profile';
   const catalogFingerprintStorageKey = 'jg-store-demo-orders-sku-fingerprint';
   const themeStorageKey = 'jg-admin-theme';
-  const orderSchemaVersion = 'astra-32h-test-orders-v1';
+  const orderSchemaVersion = 'astra-32h-test-orders-v2';
   const skuDbEndpoint = '../api/sku-db/';
   const scanBridgeEndpoint = '../api/scan-bridge/';
   const demoDeadlineMinutes = 32 * 60;
@@ -217,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return catalog[index % catalog.length];
   };
 
-  const generatedOrders = () => Array.from({ length: 44 }, (_, index) => {
+  const generatedOrders = () => Array.from({ length: 58 }, (_, index) => {
     const platform = index % 9 === 0 ? 'Tokopedia' : (index % 5 === 0 ? 'TikTok' : 'Shopee');
     return [
       `${platform === 'Shopee' ? 'SPX' : platform === 'TikTok' ? 'TTK' : 'TKP'}-DEMO-${String(index + 1).padStart(3, '0')}`,
@@ -538,11 +538,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const renderBoard = () => {
     if (!board) return;
     const orders = listedOrders();
-    const rowCount = Math.max(10, Math.ceil(orders.length / 5));
+    const rowCount = 10;
     board.style.setProperty('--order-rows', String(rowCount));
 
-    if (boardDensity) boardDensity.textContent = `5 columns x ${rowCount} rows`;
-    if (boardOverflow) boardOverflow.hidden = orders.length <= 50;
+    if (boardDensity) boardDensity.textContent = `7 columns x ${rowCount} rows`;
+    if (boardOverflow) boardOverflow.hidden = orders.length <= 70;
 
     if (!orders.length) {
       board.innerHTML = '<div class="admin-board-empty">No listed orders waiting.</div>';
