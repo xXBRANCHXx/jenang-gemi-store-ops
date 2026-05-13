@@ -42,11 +42,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const activeProfileStorageKey = 'jg-store-active-profile';
   const catalogFingerprintStorageKey = 'jg-store-demo-orders-sku-fingerprint';
+  const demoSimulationStartStorageKey = 'jg-store-demo-simulation-start';
   const themeStorageKey = 'jg-admin-theme';
-  const orderSchemaVersion = 'astra-32h-test-orders-v2';
+  const orderSchemaVersion = 'astra-32h-test-orders-v3';
   const skuDbEndpoint = '../api/sku-db/';
   const scanBridgeEndpoint = '../api/scan-bridge/';
-  const demoDeadlineMinutes = 32 * 60;
+  const boardVisibleRows = 10;
+  const boardVisibleColumns = 7;
+  const demoInitialOrderCount = boardVisibleRows * boardVisibleColumns;
+  const demoArrivalIntervalMs = 30 * 60 * 1000;
+  const maxScheduledDemoOrders = 210;
 
   let skuCatalog = [];
   let demoCatalog = [];
@@ -119,19 +124,20 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const now = Date.now();
+  const demoDeadlineMinutesFor = (index) => 45 + (index * 23) + (Math.floor(index / 7) * 3);
   const seedOrders = [
-    ['SPX-250504-8801', 'Shopee', demoDeadlineMinutes, false, [[0, 2], [3, 1]]],
-    ['SPX-250504-8802', 'Shopee', demoDeadlineMinutes, false, [[1, 1]]],
-    ['TTK-77850391', 'TikTok', demoDeadlineMinutes, false, [[2, 3]]],
-    ['TKP-11995021', 'Tokopedia', demoDeadlineMinutes, false, [[5, 1], [4, 2]]],
-    ['SPX-250504-8803', 'Shopee', demoDeadlineMinutes, false, [[0, 1]]],
-    ['SPX-250504-8804', 'Shopee', demoDeadlineMinutes, false, [[1, 2], [2, 1]]],
-    ['TTK-77850392', 'TikTok', demoDeadlineMinutes, false, [[3, 4]]],
-    ['SPX-250504-8805', 'Shopee', demoDeadlineMinutes, false, [[5, 2]]],
-    ['TKP-11995022', 'Tokopedia', demoDeadlineMinutes, false, [[2, 1], [4, 1]]],
-    ['SPX-250504-8806', 'Shopee', demoDeadlineMinutes, false, [[0, 3]]],
-    ['SPX-250504-8807', 'Shopee', demoDeadlineMinutes, false, [[1, 1], [3, 1]]],
-    ['TTK-77850393', 'TikTok', demoDeadlineMinutes, false, [[2, 2]]]
+    ['SPX-250504-8801', 'Shopee', demoDeadlineMinutesFor(0), false, [[0, 2], [3, 1]]],
+    ['SPX-250504-8802', 'Shopee', demoDeadlineMinutesFor(1), false, [[1, 1]]],
+    ['TTK-77850391', 'TikTok', demoDeadlineMinutesFor(2), false, [[2, 3]]],
+    ['TKP-11995021', 'Tokopedia', demoDeadlineMinutesFor(3), false, [[5, 1], [4, 2]]],
+    ['SPX-250504-8803', 'Shopee', demoDeadlineMinutesFor(4), false, [[0, 1]]],
+    ['SPX-250504-8804', 'Shopee', demoDeadlineMinutesFor(5), false, [[1, 2], [2, 1]]],
+    ['TTK-77850392', 'TikTok', demoDeadlineMinutesFor(6), false, [[3, 4]]],
+    ['SPX-250504-8805', 'Shopee', demoDeadlineMinutesFor(7), false, [[5, 2]]],
+    ['TKP-11995022', 'Tokopedia', demoDeadlineMinutesFor(8), false, [[2, 1], [4, 1]]],
+    ['SPX-250504-8806', 'Shopee', demoDeadlineMinutesFor(9), false, [[0, 3]]],
+    ['SPX-250504-8807', 'Shopee', demoDeadlineMinutesFor(10), false, [[1, 1], [3, 1]]],
+    ['TTK-77850393', 'TikTok', demoDeadlineMinutesFor(11), false, [[2, 2]]]
   ];
 
   const liveCatalogFingerprint = () => `${orderSchemaVersion}:${skuCatalog.map((item) => `${item.sku}:${item.astra}`).join('|')}`;
@@ -218,37 +224,97 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const generatedOrders = () => Array.from({ length: 58 }, (_, index) => {
+    const orderIndex = seedOrders.length + index;
     const platform = index % 9 === 0 ? 'Tokopedia' : (index % 5 === 0 ? 'TikTok' : 'Shopee');
     return [
       `${platform === 'Shopee' ? 'SPX' : platform === 'TikTok' ? 'TTK' : 'TKP'}-DEMO-${String(index + 1).padStart(3, '0')}`,
       platform,
-      demoDeadlineMinutes,
+      demoDeadlineMinutesFor(orderIndex),
       false,
       [[index, (index % 3) + 1], ...(index % 4 === 0 ? [[index + 2, 1]] : [])]
     ];
   });
 
+  const createDemoOrder = ([id, platform, minutes, instant, items], index, createdAt = now) => ({
+    id,
+    platform,
+    account: index % 3 === 0 ? 'Main' : (index % 3 === 1 ? 'Jamu' : 'Promo'),
+    status: 'IS_LISTED',
+    marketplaceStatus: marketplaceSignals[platform],
+    instant,
+    deadlineAt: createdAt + minutes * 60000,
+    started: false,
+    items: items.map(([skuIndex, quantity]) => {
+      const item = catalogItemAt(skuIndex);
+      return {
+        quantity,
+        scanQuantity: quantity * Number(item.scanMultiplier || 1),
+        ...item
+      };
+    })
+  });
+
+  const resetDemoSimulationStart = () => {
+    const startedAt = Date.now();
+    try {
+      window.localStorage.setItem(demoSimulationStartStorageKey, String(startedAt));
+    } catch (_error) {
+      // Demo simulation still works for the current page load without storage.
+    }
+    return startedAt;
+  };
+
+  const demoSimulationStart = () => {
+    try {
+      const stored = Number(window.localStorage.getItem(demoSimulationStartStorageKey) || '');
+      if (Number.isFinite(stored) && stored > 0) return stored;
+    } catch (_error) {
+      return now;
+    }
+    return resetDemoSimulationStart();
+  };
+
+  const scheduledDemoOrderTuple = (index) => {
+    const platform = index % 8 === 0 ? 'Tokopedia' : (index % 4 === 0 ? 'TikTok' : 'Shopee');
+    const prefix = platform === 'Shopee' ? 'SPX' : platform === 'TikTok' ? 'TTK' : 'TKP';
+    const orderIndex = demoInitialOrderCount + index;
+    return [
+      `${prefix}-SIM-${String(index + 1).padStart(3, '0')}`,
+      platform,
+      demoDeadlineMinutesFor(orderIndex),
+      index % 11 === 0,
+      [[orderIndex, (index % 3) + 1], ...(index % 5 === 0 ? [[orderIndex + 3, 1]] : [])]
+    ];
+  };
+
+  const ensureScheduledDemoOrders = (orders) => {
+    const startedAt = demoSimulationStart();
+    const arrivalCount = Math.min(
+      maxScheduledDemoOrders,
+      Math.max(0, Math.floor((Date.now() - startedAt) / demoArrivalIntervalMs))
+    );
+    if (!arrivalCount) return false;
+
+    const knownIds = new Set(orders.map((order) => order.id));
+    let added = false;
+
+    for (let index = 0; index < arrivalCount; index += 1) {
+      const scheduledAt = startedAt + ((index + 1) * demoArrivalIntervalMs);
+      const order = createDemoOrder(scheduledDemoOrderTuple(index), demoInitialOrderCount + index, scheduledAt);
+      if (knownIds.has(order.id)) continue;
+      orders.push(order);
+      knownIds.add(order.id);
+      added = true;
+    }
+
+    return added;
+  };
+
   const createDemoOrders = () => {
     if (!skuCatalog.length) return [];
 
-    return [...seedOrders, ...generatedOrders()].map(([id, platform, minutes, instant, items], index) => ({
-      id,
-      platform,
-      account: index % 3 === 0 ? 'Main' : (index % 3 === 1 ? 'Jamu' : 'Promo'),
-      status: 'IS_LISTED',
-      marketplaceStatus: marketplaceSignals[platform],
-      instant,
-      deadlineAt: now + minutes * 60000,
-      started: false,
-      items: items.map(([skuIndex, quantity]) => {
-        const item = catalogItemAt(skuIndex);
-        return {
-          quantity,
-          scanQuantity: quantity * Number(item.scanMultiplier || 1),
-          ...item
-        };
-      })
-    }));
+    const startedAt = resetDemoSimulationStart();
+    return [...seedOrders, ...generatedOrders()].map((order, index) => createDemoOrder(order, index, startedAt));
   };
 
   const consolidateScanItems = (items) => {
@@ -282,7 +348,10 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const stored = JSON.parse(window.localStorage.getItem(ordersStorageKey) || 'null');
       const storedFingerprint = window.localStorage.getItem(catalogFingerprintStorageKey) || '';
-      if (Array.isArray(stored) && stored.length && storedFingerprint === liveCatalogFingerprint()) return stored;
+      if (Array.isArray(stored) && stored.length && storedFingerprint === liveCatalogFingerprint()) {
+        ensureScheduledDemoOrders(stored);
+        return stored;
+      }
     } catch (_error) {
       // Keep the demo usable if localStorage is unavailable or corrupted.
     }
@@ -538,11 +607,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const renderBoard = () => {
     if (!board) return;
     const orders = listedOrders();
-    const rowCount = 10;
+    const rowCount = boardVisibleRows;
+    const columnCount = Math.max(boardVisibleColumns, Math.ceil(orders.length / rowCount));
     board.style.setProperty('--order-rows', String(rowCount));
+    board.style.setProperty('--order-columns', String(boardVisibleColumns));
 
-    if (boardDensity) boardDensity.textContent = `7 columns x ${rowCount} rows`;
-    if (boardOverflow) boardOverflow.hidden = orders.length <= 70;
+    if (boardDensity) boardDensity.textContent = `${columnCount} columns x ${rowCount} rows`;
+    if (boardOverflow) boardOverflow.hidden = orders.length <= demoInitialOrderCount;
 
     if (!orders.length) {
       board.innerHTML = '<div class="admin-board-empty">No listed orders waiting.</div>';
@@ -751,6 +822,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderBoard();
     formatClock();
     window.setInterval(() => {
+      if (ensureScheduledDemoOrders(state.orders)) saveOrders();
       formatClock();
       renderBoard();
     }, 15000);
