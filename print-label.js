@@ -51,6 +51,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const profile = params.get('profile') || window.sessionStorage.getItem(activeProfileStorageKey) || '';
   const orders = readOrders();
   const order = orders.find((item) => String(item.id || '') === orderId) || null;
+  let returnTimer = 0;
+  let printInProgress = false;
 
   const setError = (message) => {
     if (!errorNode) return;
@@ -91,10 +93,20 @@ document.addEventListener('DOMContentLoaded', () => {
     writeOrders(orders);
   };
 
+  const returnToDashboard = () => {
+    if (!printInProgress) return;
+    printInProgress = false;
+    window.clearTimeout(returnTimer);
+    window.location.href = '../';
+  };
+
   const printOption = (option) => {
     renderPreview(option);
     markPrinted(option);
     if (statusNode) statusNode.textContent = `Printing ${option.name}`;
+    printInProgress = true;
+    window.clearTimeout(returnTimer);
+    returnTimer = window.setTimeout(returnToDashboard, 1200);
     window.print();
   };
 
@@ -120,6 +132,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   renderOptions();
   if (order) renderPreview(labelOptions[0]);
+
+  window.addEventListener('afterprint', returnToDashboard);
 
   optionsNode?.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
