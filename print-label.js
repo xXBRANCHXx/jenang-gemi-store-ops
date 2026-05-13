@@ -102,12 +102,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const printOption = (option) => {
     renderPreview(option);
-    markPrinted(option);
     if (statusNode) statusNode.textContent = `Printing ${option.name}`;
     printInProgress = true;
     window.clearTimeout(returnTimer);
-    returnTimer = window.setTimeout(returnToDashboard, 1200);
-    window.print();
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        try {
+          markPrinted(option);
+          window.print();
+          returnTimer = window.setTimeout(returnToDashboard, 4000);
+        } catch (_error) {
+          printInProgress = false;
+          if (statusNode) statusNode.textContent = 'Ready';
+          setError('Unable to open the print dialog.');
+        }
+      });
+    });
   };
 
   const renderOptions = () => {
@@ -128,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (orderIdNode) orderIdNode.textContent = order?.id || orderId || 'Order missing';
   if (!order) {
-    setError('Order ID not found in this store demo.');
+    setError('Order ID not found in this store queue.');
   }
   renderOptions();
   if (order) renderPreview(labelOptions[0]);
