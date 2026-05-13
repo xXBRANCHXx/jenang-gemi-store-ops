@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!root) return;
 
   const ordersStorageKey = 'jg-store-demo-orders';
+  const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const activeProfileStorageKey = 'jg-store-active-profile';
   const orderIdNode = document.querySelector('[data-print-order-id]');
@@ -91,13 +92,24 @@ document.addEventListener('DOMContentLoaded', () => {
       printedAt: new Date().toISOString()
     };
     writeOrders(orders);
+    try {
+      window.localStorage.setItem(printedOrderStorageKey, JSON.stringify({
+        orderId: order.id,
+        printedAt: order.printedLabel.printedAt
+      }));
+    } catch (_error) {
+      // Dashboard will still sync the order queue when it regains focus.
+    }
   };
 
   const returnToDashboard = () => {
     if (!printInProgress) return;
     printInProgress = false;
     window.clearTimeout(returnTimer);
-    window.location.href = '../';
+    window.close();
+    window.setTimeout(() => {
+      window.location.href = '../';
+    }, 250);
   };
 
   const printOption = (option) => {
@@ -110,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           markPrinted(option);
           window.print();
-          returnTimer = window.setTimeout(returnToDashboard, 4000);
+          returnTimer = window.setTimeout(returnToDashboard, 60000);
         } catch (_error) {
           printInProgress = false;
           if (statusNode) statusNode.textContent = 'Ready';

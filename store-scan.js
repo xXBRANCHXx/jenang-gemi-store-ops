@@ -249,11 +249,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setScanStatus('Scan complete', 'Opening label choices.');
     window.setTimeout(() => {
       const url = `../print-label/?order=${encodeURIComponent(order.id)}&profile=${encodeURIComponent(currentProfile.username)}`;
-      const page = window.open(url, '_blank');
-      if (page) {
-        page.opener = null;
-        return;
-      }
       window.location.href = url;
     }, 420);
   };

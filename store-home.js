@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const settingsError = document.querySelector('[data-store-settings-error]');
   const profileList = document.querySelector('[data-profile-list]');
   const ordersStorageKey = 'jg-store-demo-orders';
+  const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const activeProfileStorageKey = 'jg-store-active-profile';
   const catalogFingerprintStorageKey = 'jg-store-demo-orders-sku-fingerprint';
@@ -623,6 +624,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!board) return;
     const ordersChanged = syncOrdersFromStorage();
     if (ordersChanged) saveOrders();
+    const currentActiveOrder = activeOrder();
+    if (state.activeOrderId && (!currentActiveOrder || currentActiveOrder.status !== 'IS_LISTED')) {
+      closeFulfillment();
+    }
     const orders = listedOrders();
     const rowCount = boardVisibleRows;
     const columnCount = Math.max(boardVisibleColumns, Math.ceil(orders.length / rowCount));
@@ -823,9 +828,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('pointerdown', unlockAudio, { once: true });
   document.addEventListener('keydown', unlockAudio, { once: true });
   window.addEventListener('storage', (event) => {
+    if (event.key === printedOrderStorageKey) {
+      closeFulfillment();
+      renderBoard();
+      return;
+    }
     if (event.key !== ordersStorageKey && event.key !== catalogFingerprintStorageKey) return;
     renderBoard();
   });
+  window.addEventListener('focus', renderBoard);
 
   applyTheme(window.localStorage.getItem(themeStorageKey) || 'dark');
 
