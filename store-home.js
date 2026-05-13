@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const catalogFingerprintStorageKey = 'jg-store-demo-orders-sku-fingerprint';
   const demoSimulationStartStorageKey = 'jg-store-demo-simulation-start';
   const themeStorageKey = 'jg-admin-theme';
-  const orderSchemaVersion = 'astra-32h-test-orders-v3';
+  const orderSchemaVersion = 'astra-32h-test-orders-v4';
   const skuDbEndpoint = '../api/sku-db/';
   const scanBridgeEndpoint = '../api/scan-bridge/';
   const boardVisibleRows = 10;
@@ -367,6 +367,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  const syncOrdersFromStorage = () => {
+    try {
+      const storedFingerprint = window.localStorage.getItem(catalogFingerprintStorageKey) || '';
+      if (storedFingerprint !== liveCatalogFingerprint()) return false;
+      const stored = JSON.parse(window.localStorage.getItem(ordersStorageKey) || '[]');
+      if (!Array.isArray(stored)) return false;
+      const before = JSON.stringify(state.orders);
+      state.orders = stored;
+      const addedScheduled = ensureScheduledDemoOrders(state.orders);
+      return addedScheduled || before !== JSON.stringify(state.orders);
+    } catch (_error) {
+      return false;
+    }
+  };
+
   const escapeHtml = (value) => String(value ?? '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -583,7 +598,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const refreshSiren = () => {
-    const hasCritical = listedOrders().some((order) => isCriticalOrder(order));
+    const hasCritical = listedOrders().some((order) => !order.started && isCriticalOrder(order));
     if (!hasCritical || !audioUnlocked) {
       window.clearInterval(sirenTimer);
       sirenTimer = 0;
@@ -606,6 +621,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const renderBoard = () => {
     if (!board) return;
+    const ordersChanged = syncOrdersFromStorage();
+    if (ordersChanged) saveOrders();
     const orders = listedOrders();
     const rowCount = boardVisibleRows;
     const columnCount = Math.max(boardVisibleColumns, Math.ceil(orders.length / rowCount));
@@ -696,6 +713,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.activeOrderId = order.id;
     state.scans = new Map();
     saveOrders();
+    refreshSiren();
     renderPickStage(order);
     if (pickStage) pickStage.hidden = false;
     if (modal) modal.hidden = false;
@@ -804,6 +822,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.addEventListener('pointerdown', unlockAudio, { once: true });
   document.addEventListener('keydown', unlockAudio, { once: true });
+  window.addEventListener('storage', (event) => {
+    if (event.key !== ordersStorageKey && event.key !== catalogFingerprintStorageKey) return;
+    renderBoard();
+  });
 
   applyTheme(window.localStorage.getItem(themeStorageKey) || 'dark');
 
