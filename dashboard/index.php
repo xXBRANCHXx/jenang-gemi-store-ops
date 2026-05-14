@@ -26,7 +26,7 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
     <link rel="stylesheet" href="../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
 <body class="admin-body is-dashboard">
-    <div class="admin-build-badge" aria-label="Store build version">Build 1.01.00-demo</div>
+    <div class="admin-build-badge" aria-label="Store build version">Build 1.02.00-live</div>
     <div class="admin-app admin-store-home" data-store-home>
         <div class="admin-backdrop admin-backdrop-a"></div>
         <div class="admin-backdrop admin-backdrop-b"></div>

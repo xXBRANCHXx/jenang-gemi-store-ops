@@ -7,4 +7,7 @@ return [
     'sku_db_user' => 'u558678012_BranchV1',
     'sku_db_password' => 'Z3r0k4l0ri!',
     'sku_db_charset' => 'utf8mb4',
+    'shopee_ingest_base_url' => 'https://api.jenanggemi.com',
+    'shopee_ingest_setup_token' => 'weoifngfj23095jgrkebranchmadethiskey',
+    'shopee_account' => 'jenang-gemi-shopee',
 ];

@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const root = document.querySelector('[data-store-scan]');
   if (!root) return;
 
-  const ordersStorageKey = 'jg-store-demo-orders';
+  const ordersStorageKey = 'jg-store-live-orders';
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const activeProfileStorageKey = 'jg-store-active-profile';
   const profileStorageKey = 'jg-store-profile';
@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       window.localStorage.setItem(ordersStorageKey, JSON.stringify(orders));
     } catch (_error) {
-      // Demo can continue without persistence.
+      // Scanning can continue for this page load without persistence.
     }
   };
 
@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
       window.localStorage.setItem(profileStorageKey, JSON.stringify(profile));
       window.sessionStorage.setItem(activeProfileStorageKey, profile.username);
     } catch (_error) {
-      // Demo can continue without persistence.
+      // Scanning can continue for this page load without persistence.
     }
   };
 
@@ -406,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
       bridgeCursor = Number(payload.cursor || bridgeCursor);
       events.forEach((event) => handleScan(event.barcode || ''));
     } catch (_error) {
-      // Phone bridge is demo-only; hardware scanner still works.
+      // Hardware scanner input still works if the phone bridge is unavailable.
       setScanStatus('Phone scanner disconnected', 'Hardware scanner input still works on this page.');
     }
   };

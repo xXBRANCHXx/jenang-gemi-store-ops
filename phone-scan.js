@@ -452,7 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
     } catch (_error) {
-      // Continue camera preview; fallback demo button remains available.
+      // Continue camera preview; manual scan confirmation remains available.
     }
     window.requestAnimationFrame(detectLoop);
   };

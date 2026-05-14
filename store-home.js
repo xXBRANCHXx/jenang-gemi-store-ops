@@ -38,24 +38,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const settingsForm = document.querySelector('[data-store-settings-form]');
   const settingsError = document.querySelector('[data-store-settings-error]');
   const profileList = document.querySelector('[data-profile-list]');
-  const ordersStorageKey = 'jg-store-demo-orders';
+  const ordersStorageKey = 'jg-store-live-orders';
   const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const activeProfileStorageKey = 'jg-store-active-profile';
-  const catalogFingerprintStorageKey = 'jg-store-demo-orders-sku-fingerprint';
-  const demoSimulationStartStorageKey = 'jg-store-demo-simulation-start';
   const themeStorageKey = 'jg-admin-theme';
-  const orderSchemaVersion = 'astra-32h-test-orders-v4';
   const skuDbEndpoint = '../api/sku-db/';
+  const ordersEndpoint = '../api/orders/';
   const scanBridgeEndpoint = '../api/scan-bridge/';
   const boardVisibleRows = 10;
   const boardVisibleColumns = 7;
-  const demoInitialOrderCount = boardVisibleRows * boardVisibleColumns;
-  const demoArrivalIntervalMs = 30 * 60 * 1000;
-  const maxScheduledDemoOrders = 210;
+  const boardVisibleCapacity = boardVisibleRows * boardVisibleColumns;
 
   let skuCatalog = [];
-  let demoCatalog = [];
   let profiles = [];
   let pendingOrderId = '';
   let activeProfile = '';
@@ -63,12 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
     orders: [],
     activeOrderId: '',
     scans: new Map()
-  };
-
-  const marketplaceSignals = {
-    Shopee: 'READY_TO_SHIP',
-    TikTok: 'AWAITING_SHIPMENT',
-    Tokopedia: 'AWAITING_SHIPMENT'
   };
 
   const normalizeProfile = (value) => String(value || '')
@@ -123,25 +112,6 @@ document.addEventListener('DOMContentLoaded', () => {
       profiles = [];
     }
   };
-
-  const now = Date.now();
-  const demoDeadlineMinutesFor = (index) => 45 + (index * 23) + (Math.floor(index / 7) * 3);
-  const seedOrders = [
-    ['SPX-250504-8801', 'Shopee', demoDeadlineMinutesFor(0), false, [[0, 2], [3, 1]]],
-    ['SPX-250504-8802', 'Shopee', demoDeadlineMinutesFor(1), false, [[1, 1]]],
-    ['TTK-77850391', 'TikTok', demoDeadlineMinutesFor(2), false, [[2, 3]]],
-    ['TKP-11995021', 'Tokopedia', demoDeadlineMinutesFor(3), false, [[5, 1], [4, 2]]],
-    ['SPX-250504-8803', 'Shopee', demoDeadlineMinutesFor(4), false, [[0, 1]]],
-    ['SPX-250504-8804', 'Shopee', demoDeadlineMinutesFor(5), false, [[1, 2], [2, 1]]],
-    ['TTK-77850392', 'TikTok', demoDeadlineMinutesFor(6), false, [[3, 4]]],
-    ['SPX-250504-8805', 'Shopee', demoDeadlineMinutesFor(7), false, [[5, 2]]],
-    ['TKP-11995022', 'Tokopedia', demoDeadlineMinutesFor(8), false, [[2, 1], [4, 1]]],
-    ['SPX-250504-8806', 'Shopee', demoDeadlineMinutesFor(9), false, [[0, 3]]],
-    ['SPX-250504-8807', 'Shopee', demoDeadlineMinutesFor(10), false, [[1, 1], [3, 1]]],
-    ['TTK-77850393', 'TikTok', demoDeadlineMinutesFor(11), false, [[2, 2]]]
-  ];
-
-  const liveCatalogFingerprint = () => `${orderSchemaVersion}:${skuCatalog.map((item) => `${item.sku}:${item.astra}`).join('|')}`;
 
   const astraMultiplier = (item) => {
     const volume = Number(item.volume || 0);
@@ -201,7 +171,6 @@ document.addEventListener('DOMContentLoaded', () => {
         scanMultiplier: multiplier
       };
     });
-    demoCatalog = [...skuCatalog].sort((left, right) => astraMultiplier(right) - astraMultiplier(left));
   };
 
   const loadSkuCatalog = async () => {
@@ -217,105 +186,6 @@ document.addEventListener('DOMContentLoaded', () => {
       .map(normalizeSkuRow)
       .filter((item) => item.sku);
     applyAstraScanTargets();
-  };
-
-  const catalogItemAt = (index) => {
-    const catalog = demoCatalog.length ? demoCatalog : skuCatalog;
-    return catalog[index % catalog.length];
-  };
-
-  const generatedOrders = () => Array.from({ length: 58 }, (_, index) => {
-    const orderIndex = seedOrders.length + index;
-    const platform = index % 9 === 0 ? 'Tokopedia' : (index % 5 === 0 ? 'TikTok' : 'Shopee');
-    return [
-      `${platform === 'Shopee' ? 'SPX' : platform === 'TikTok' ? 'TTK' : 'TKP'}-DEMO-${String(index + 1).padStart(3, '0')}`,
-      platform,
-      demoDeadlineMinutesFor(orderIndex),
-      false,
-      [[index, (index % 3) + 1], ...(index % 4 === 0 ? [[index + 2, 1]] : [])]
-    ];
-  });
-
-  const createDemoOrder = ([id, platform, minutes, instant, items], index, createdAt = now) => ({
-    id,
-    platform,
-    account: index % 3 === 0 ? 'Main' : (index % 3 === 1 ? 'Jamu' : 'Promo'),
-    status: 'IS_LISTED',
-    marketplaceStatus: marketplaceSignals[platform],
-    instant,
-    deadlineAt: createdAt + minutes * 60000,
-    started: false,
-    items: items.map(([skuIndex, quantity]) => {
-      const item = catalogItemAt(skuIndex);
-      return {
-        quantity,
-        scanQuantity: quantity * Number(item.scanMultiplier || 1),
-        ...item
-      };
-    })
-  });
-
-  const resetDemoSimulationStart = () => {
-    const startedAt = Date.now();
-    try {
-      window.localStorage.setItem(demoSimulationStartStorageKey, String(startedAt));
-    } catch (_error) {
-      // Demo simulation still works for the current page load without storage.
-    }
-    return startedAt;
-  };
-
-  const demoSimulationStart = () => {
-    try {
-      const stored = Number(window.localStorage.getItem(demoSimulationStartStorageKey) || '');
-      if (Number.isFinite(stored) && stored > 0) return stored;
-    } catch (_error) {
-      return now;
-    }
-    return resetDemoSimulationStart();
-  };
-
-  const scheduledDemoOrderTuple = (index) => {
-    const platform = index % 8 === 0 ? 'Tokopedia' : (index % 4 === 0 ? 'TikTok' : 'Shopee');
-    const prefix = platform === 'Shopee' ? 'SPX' : platform === 'TikTok' ? 'TTK' : 'TKP';
-    const orderIndex = demoInitialOrderCount + index;
-    return [
-      `${prefix}-SIM-${String(index + 1).padStart(3, '0')}`,
-      platform,
-      demoDeadlineMinutesFor(orderIndex),
-      index % 11 === 0,
-      [[orderIndex, (index % 3) + 1], ...(index % 5 === 0 ? [[orderIndex + 3, 1]] : [])]
-    ];
-  };
-
-  const ensureScheduledDemoOrders = (orders) => {
-    const startedAt = demoSimulationStart();
-    const arrivalCount = Math.min(
-      maxScheduledDemoOrders,
-      Math.max(0, Math.floor((Date.now() - startedAt) / demoArrivalIntervalMs))
-    );
-    if (!arrivalCount) return false;
-
-    const knownIds = new Set(orders.map((order) => order.id));
-    let added = false;
-
-    for (let index = 0; index < arrivalCount; index += 1) {
-      const scheduledAt = startedAt + ((index + 1) * demoArrivalIntervalMs);
-      const order = createDemoOrder(scheduledDemoOrderTuple(index), demoInitialOrderCount + index, scheduledAt);
-      if (knownIds.has(order.id)) continue;
-      orders.push(order);
-      knownIds.add(order.id);
-      added = true;
-    }
-
-    return added;
-  };
-
-  const createDemoOrders = () => {
-    if (!skuCatalog.length) return [];
-
-    const startedAt = resetDemoSimulationStart();
-    return [...seedOrders, ...generatedOrders()].map((order, index) => createDemoOrder(order, index, startedAt));
   };
 
   const consolidateScanItems = (items) => {
@@ -345,39 +215,121 @@ document.addEventListener('DOMContentLoaded', () => {
     return Array.from(grouped.values());
   };
 
-  const loadOrders = () => {
+  const readStoredOrders = () => {
     try {
-      const stored = JSON.parse(window.localStorage.getItem(ordersStorageKey) || 'null');
-      const storedFingerprint = window.localStorage.getItem(catalogFingerprintStorageKey) || '';
-      if (Array.isArray(stored) && stored.length && storedFingerprint === liveCatalogFingerprint()) {
-        ensureScheduledDemoOrders(stored);
-        return stored;
-      }
+      const stored = JSON.parse(window.localStorage.getItem(ordersStorageKey) || '[]');
+      return Array.isArray(stored) ? stored : [];
     } catch (_error) {
-      // Keep the demo usable if localStorage is unavailable or corrupted.
+      return [];
     }
-    return createDemoOrders();
+  };
+
+  const catalogBySku = () => {
+    const rows = new Map();
+    skuCatalog.forEach((item) => {
+      const sku = String(item.sku || '').trim().toUpperCase();
+      if (sku) rows.set(sku, item);
+    });
+    return rows;
+  };
+
+  const normalizeOrderItem = (item, catalogRows) => {
+    const sourceSku = String(item.sku || '').trim().toUpperCase();
+    const quantity = Math.max(1, Number(item.quantity || 1));
+    const catalogItem = sourceSku ? catalogRows.get(sourceSku) : null;
+    if (catalogItem) {
+      return {
+        ...catalogItem,
+        quantity,
+        scanQuantity: quantity * Number(catalogItem.scanMultiplier || 1),
+        sourceSkus: [sourceSku],
+        sourceBarcodes: [String(item.barcode || sourceSku).trim()].filter(Boolean),
+        sourcePlatform: item.sourcePlatform || 'Shopee'
+      };
+    }
+
+    return {
+      tag: sourceSku,
+      sku: sourceSku,
+      barcode: String(item.barcode || sourceSku).trim(),
+      productName: String(item.productName || sourceSku || 'Shopee item').trim(),
+      scanSku: sourceSku,
+      scanBarcode: String(item.barcode || sourceSku).trim(),
+      scanProductName: String(item.productName || sourceSku || 'Shopee item').trim(),
+      scanMultiplier: 1,
+      quantity,
+      scanQuantity: quantity,
+      sourceSkus: sourceSku ? [sourceSku] : [],
+      sourceBarcodes: [String(item.barcode || sourceSku).trim()].filter(Boolean),
+      sourcePlatform: item.sourcePlatform || 'Shopee',
+      missingSku: sourceSku === ''
+    };
+  };
+
+  const mergeLocalOrderState = (order, storedById) => {
+    const stored = storedById.get(String(order.id || ''));
+    if (!stored) return order;
+    return {
+      ...order,
+      status: stored.status && stored.status !== 'IS_LISTED' ? stored.status : order.status,
+      started: Boolean(stored.started),
+      assignedProfile: stored.assignedProfile || order.assignedProfile || '',
+      printedLabel: stored.printedLabel || order.printedLabel || null
+    };
+  };
+
+  const normalizeOrder = (order, catalogRows, storedById) => {
+    const id = String(order.id || '').trim();
+    const deadlineAt = Number(order.deadlineAt || 0);
+    return mergeLocalOrderState({
+      id,
+      platform: String(order.platform || 'Shopee'),
+      account: String(order.account || 'Jenang Gemi'),
+      status: String(order.status || 'IS_LISTED'),
+      marketplaceStatus: String(order.marketplaceStatus || 'READY_TO_SHIP'),
+      instant: Boolean(order.instant),
+      deadlineAt: Number.isFinite(deadlineAt) && deadlineAt > 0 ? deadlineAt : Date.now() + 86400000,
+      started: Boolean(order.started),
+      assignedProfile: String(order.assignedProfile || ''),
+      items: (Array.isArray(order.items) ? order.items : [])
+        .map((item) => normalizeOrderItem(item, catalogRows))
+        .filter((item) => item.sku || item.productName)
+    }, storedById);
+  };
+
+  const loadOrders = async () => {
+    const response = await fetch(ordersEndpoint, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' }
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || 'Unable to load Shopee orders.');
+    }
+
+    const stored = readStoredOrders();
+    const storedById = new Map(stored.map((order) => [String(order.id || ''), order]));
+    const catalogRows = catalogBySku();
+    return (Array.isArray(payload.orders) ? payload.orders : [])
+      .map((order) => normalizeOrder(order, catalogRows, storedById))
+      .filter((order) => order.id);
   };
 
   const saveOrders = () => {
     try {
       window.localStorage.setItem(ordersStorageKey, JSON.stringify(state.orders));
-      window.localStorage.setItem(catalogFingerprintStorageKey, liveCatalogFingerprint());
     } catch (_error) {
-      // Non-persistent demo mode is acceptable.
+      // Keep the visible queue working even when local persistence is unavailable.
     }
   };
 
   const syncOrdersFromStorage = () => {
     try {
-      const storedFingerprint = window.localStorage.getItem(catalogFingerprintStorageKey) || '';
-      if (storedFingerprint !== liveCatalogFingerprint()) return false;
-      const stored = JSON.parse(window.localStorage.getItem(ordersStorageKey) || '[]');
-      if (!Array.isArray(stored)) return false;
       const before = JSON.stringify(state.orders);
-      state.orders = stored;
-      const addedScheduled = ensureScheduledDemoOrders(state.orders);
-      return addedScheduled || before !== JSON.stringify(state.orders);
+      const storedById = new Map(readStoredOrders().map((order) => [String(order.id || ''), order]));
+      state.orders = state.orders.map((order) => mergeLocalOrderState(order, storedById));
+      return before !== JSON.stringify(state.orders);
     } catch (_error) {
       return false;
     }
@@ -436,7 +388,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const openPrintLabelPage = (orderId) => {
     const order = state.orders.find((item) => normalizeOrderId(item.id) === orderId);
     if (!order) {
-      showReprintError('Order ID not found in this store demo.');
+      showReprintError('Order ID not found in the live store queue.');
       return;
     }
     const profile = orderOwner(order) || activeProfile || '';
@@ -635,7 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
     board.style.setProperty('--order-columns', String(boardVisibleColumns));
 
     if (boardDensity) boardDensity.textContent = `${columnCount} columns x ${rowCount} rows`;
-    if (boardOverflow) boardOverflow.hidden = orders.length <= demoInitialOrderCount;
+    if (boardOverflow) boardOverflow.hidden = orders.length <= boardVisibleCapacity;
 
     if (!orders.length) {
       board.innerHTML = '<div class="admin-board-empty">No listed orders waiting.</div>';
@@ -833,31 +785,46 @@ document.addEventListener('DOMContentLoaded', () => {
       renderBoard();
       return;
     }
-    if (event.key !== ordersStorageKey && event.key !== catalogFingerprintStorageKey) return;
+    if (event.key !== ordersStorageKey) return;
     renderBoard();
   });
-  window.addEventListener('focus', renderBoard);
 
   applyTheme(window.localStorage.getItem(themeStorageKey) || 'dark');
+
+  const refreshOrders = async (showError = true) => {
+    try {
+      state.orders = await loadOrders();
+      saveOrders();
+      renderBoard();
+    } catch (error) {
+      if (!showError) return;
+      const message = error instanceof Error ? error.message : 'Unable to load Shopee orders.';
+      if (board) board.innerHTML = `<div class="admin-board-empty">${escapeHtml(message)}</div>`;
+    }
+  };
+
+  window.addEventListener('focus', () => {
+    refreshOrders(false).catch(() => {});
+  });
 
   const initialize = async () => {
     try {
       await loadProfiles();
-      await loadSkuCatalog();
-      state.orders = loadOrders();
-      saveOrders();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to load live SKU database.';
-      if (board) board.innerHTML = `<div class="admin-board-empty">${escapeHtml(message)}</div>`;
-      return;
+    } catch (_error) {
+      profiles = [];
     }
 
-    renderBoard();
+    try {
+      await loadSkuCatalog();
+    } catch (_error) {
+      skuCatalog = [];
+    }
+
+    await refreshOrders();
     formatClock();
     window.setInterval(() => {
-      if (ensureScheduledDemoOrders(state.orders)) saveOrders();
       formatClock();
-      renderBoard();
+      refreshOrders(false).catch(() => {});
     }, 15000);
   };
 

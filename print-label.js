@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const root = document.querySelector('[data-print-label-page]');
   if (!root) return;
 
-  const ordersStorageKey = 'jg-store-demo-orders';
+  const ordersStorageKey = 'jg-store-live-orders';
   const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const activeProfileStorageKey = 'jg-store-active-profile';
@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       window.localStorage.setItem(ordersStorageKey, JSON.stringify(orders));
     } catch (_error) {
-      // Demo can continue without persistence.
+      // Printing can continue for this page load without persistence.
     }
   };
 
