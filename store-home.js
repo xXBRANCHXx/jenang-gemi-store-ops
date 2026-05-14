@@ -224,45 +224,51 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const catalogBySku = () => {
+  const catalogLookup = () => {
     const rows = new Map();
+    const addLookup = (value, item) => {
+      const key = String(value || '').trim().toUpperCase();
+      if (key && !rows.has(key)) rows.set(key, item);
+    };
+
     skuCatalog.forEach((item) => {
-      const sku = String(item.sku || '').trim().toUpperCase();
-      if (sku) rows.set(sku, item);
+      addLookup(item.tag, item);
+      addLookup(item.sku, item);
     });
+
     return rows;
   };
 
   const normalizeOrderItem = (item, catalogRows) => {
-    const sourceSku = String(item.sku || '').trim().toUpperCase();
+    const sourceTag = String(item.sku || '').trim().toUpperCase();
     const quantity = Math.max(1, Number(item.quantity || 1));
-    const catalogItem = sourceSku ? catalogRows.get(sourceSku) : null;
+    const catalogItem = sourceTag ? catalogRows.get(sourceTag) : null;
     if (catalogItem) {
       return {
         ...catalogItem,
         quantity,
         scanQuantity: quantity * Number(catalogItem.scanMultiplier || 1),
-        sourceSkus: [sourceSku],
-        sourceBarcodes: [String(item.barcode || sourceSku).trim()].filter(Boolean),
+        sourceSkus: [sourceTag],
+        sourceBarcodes: [String(item.barcode || sourceTag).trim()].filter(Boolean),
         sourcePlatform: item.sourcePlatform || 'Shopee'
       };
     }
 
     return {
-      tag: sourceSku,
-      sku: sourceSku,
-      barcode: String(item.barcode || sourceSku).trim(),
-      productName: String(item.productName || sourceSku || 'Shopee item').trim(),
-      scanSku: sourceSku,
-      scanBarcode: String(item.barcode || sourceSku).trim(),
-      scanProductName: String(item.productName || sourceSku || 'Shopee item').trim(),
+      tag: sourceTag,
+      sku: sourceTag,
+      barcode: String(item.barcode || sourceTag).trim(),
+      productName: String(item.productName || sourceTag || 'Shopee item').trim(),
+      scanSku: sourceTag,
+      scanBarcode: String(item.barcode || sourceTag).trim(),
+      scanProductName: String(item.productName || sourceTag || 'Shopee item').trim(),
       scanMultiplier: 1,
       quantity,
       scanQuantity: quantity,
-      sourceSkus: sourceSku ? [sourceSku] : [],
-      sourceBarcodes: [String(item.barcode || sourceSku).trim()].filter(Boolean),
+      sourceSkus: sourceTag ? [sourceTag] : [],
+      sourceBarcodes: [String(item.barcode || sourceTag).trim()].filter(Boolean),
       sourcePlatform: item.sourcePlatform || 'Shopee',
-      missingSku: sourceSku === ''
+      missingSku: sourceTag === ''
     };
   };
 
@@ -310,7 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const stored = readStoredOrders();
     const storedById = new Map(stored.map((order) => [String(order.id || ''), order]));
-    const catalogRows = catalogBySku();
+    const catalogRows = catalogLookup();
     return (Array.isArray(payload.orders) ? payload.orders : [])
       .map((order) => normalizeOrder(order, catalogRows, storedById))
       .filter((order) => order.id);
