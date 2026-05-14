@@ -240,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const normalizeOrderItem = (item, catalogRows) => {
-    const sourceTag = String(item.sku || '').trim().toUpperCase();
+    const sourceTag = String(item.source_tag || item.sku || '').trim().toUpperCase();
     const quantity = Math.max(1, Number(item.quantity || 1));
     const catalogItem = sourceTag ? catalogRows.get(sourceTag) : null;
     if (catalogItem) {
@@ -248,8 +248,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ...catalogItem,
         quantity,
         scanQuantity: quantity * Number(catalogItem.scanMultiplier || 1),
-        sourceSkus: [sourceTag],
-        sourceBarcodes: [String(item.barcode || sourceTag).trim()].filter(Boolean),
+        sourceSkus: [catalogItem.sku].filter(Boolean),
+        sourceTags: sourceTag && sourceTag !== String(catalogItem.sku || '').trim().toUpperCase() ? [sourceTag] : [],
+        sourceBarcodes: [String(catalogItem.barcode || catalogItem.sku || '').trim()].filter(Boolean),
+        skuMatchStatus: item.sku_match_status || 'matched',
         sourcePlatform: item.sourcePlatform || 'Shopee'
       };
     }

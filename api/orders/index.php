@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/auth.php';
 require_once dirname(__DIR__, 2) . '/config.php';
+require_once dirname(__DIR__, 2) . '/sku-db-bootstrap.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -70,6 +71,85 @@ function jg_store_ops_orders_fetch(string $url): array
     return [200, $raw];
 }
 
+function jg_store_ops_orders_normalize_lookup_key(string $value): string
+{
+    return strtoupper(trim($value));
+}
+
+function jg_store_ops_orders_sku_lookup(): array
+{
+    try {
+        $pdo = jg_store_ops_sku_db();
+        $stmt = $pdo->query('SELECT sku, tag FROM sku_skus');
+        $rows = $stmt->fetchAll();
+    } catch (Throwable) {
+        return [];
+    }
+
+    $lookup = [];
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+
+        $sku = trim((string) ($row['sku'] ?? ''));
+        $tag = trim((string) ($row['tag'] ?? ''));
+        if ($sku === '') {
+            continue;
+        }
+
+        $skuKey = jg_store_ops_orders_normalize_lookup_key($sku);
+        if ($skuKey !== '' && !isset($lookup[$skuKey])) {
+            $lookup[$skuKey] = $sku;
+        }
+
+        $tagKey = jg_store_ops_orders_normalize_lookup_key($tag);
+        if ($tagKey !== '' && !isset($lookup[$tagKey])) {
+            $lookup[$tagKey] = $sku;
+        }
+    }
+
+    return $lookup;
+}
+
+function jg_store_ops_orders_map_item_skus(array $payload): array
+{
+    $lookup = jg_store_ops_orders_sku_lookup();
+    if ($lookup === [] || !isset($payload['orders']) || !is_array($payload['orders'])) {
+        return $payload;
+    }
+
+    foreach ($payload['orders'] as &$order) {
+        if (!is_array($order) || !isset($order['items']) || !is_array($order['items'])) {
+            continue;
+        }
+
+        foreach ($order['items'] as &$item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $sourceTag = trim((string) ($item['sku'] ?? ''));
+            $key = jg_store_ops_orders_normalize_lookup_key($sourceTag);
+            $matchedSku = $key !== '' ? (string) ($lookup[$key] ?? '') : '';
+            if ($matchedSku === '') {
+                $item['source_tag'] = $sourceTag;
+                $item['sku_match_status'] = 'unmatched';
+                continue;
+            }
+
+            $item['source_tag'] = $sourceTag;
+            $item['sku'] = $matchedSku;
+            $item['barcode'] = $matchedSku;
+            $item['sku_match_status'] = 'matched';
+        }
+        unset($item);
+    }
+    unset($order);
+
+    return $payload;
+}
+
 jg_admin_require_auth_json();
 
 if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'GET') {
@@ -100,5 +180,7 @@ if ($status >= 400 || empty($decoded['ok'])) {
     $message = (string) ($decoded['error'] ?? 'Unable to load Shopee orders.');
     jg_store_ops_orders_fail($message, $status >= 400 ? $status : 502);
 }
+
+$decoded = jg_store_ops_orders_map_item_skus($decoded);
 
 echo json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
