@@ -396,12 +396,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const openPrintLabelPage = (orderId) => {
     const order = state.orders.find((item) => normalizeOrderId(item.id) === orderId);
-    if (!order) {
-      showReprintError('Order ID not found in the live store queue.');
-      return;
-    }
-    const profile = orderOwner(order) || activeProfile || '';
-    openStorePage(`./print-label/?order=${encodeURIComponent(order.id)}${profile ? `&profile=${encodeURIComponent(profile)}` : ''}`);
+    const profile = (order ? orderOwner(order) : '') || activeProfile || '';
+    const printableOrderId = order?.id || orderId;
+    openStorePage(`./print-label/?order=${encodeURIComponent(printableOrderId)}${profile ? `&profile=${encodeURIComponent(profile)}` : ''}`);
   };
 
   const renderProfileSelect = (selected = '') => {

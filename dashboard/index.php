@@ -183,7 +183,7 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
                 </label>
                 <p class="admin-form-error" data-reprint-error hidden></p>
                 <div class="admin-modal-actions">
-                    <button type="submit" class="admin-primary-btn">Open Label Page</button>
+                    <button type="submit" class="admin-primary-btn">Open Shopee Label</button>
                 </div>
             </form>
         </div>

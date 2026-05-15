@@ -41,7 +41,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const orderId = params.get('order') || window.sessionStorage.getItem(activeOrderStorageKey) || '';
   const profile = params.get('profile') || window.sessionStorage.getItem(activeProfileStorageKey) || '';
   const orders = readOrders();
-  const order = orders.find((item) => String(item.id || '') === orderId) || null;
+  const storedOrder = orders.find((item) => String(item.id || '') === orderId) || null;
+  const order = storedOrder || (orderId ? {
+    id: orderId,
+    platform: 'Shopee'
+  } : null);
   let returnTimer = 0;
   let printInProgress = false;
   let labelUrl = '';
@@ -55,19 +59,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const markPrinted = () => {
     if (!order) return;
-    order.status = 'IS_BEING_FULFILLED';
-    order.started = false;
-    order.printedLabel = {
+    const printedLabel = {
       source: 'shopee',
       orderId: order.id,
       profile,
       printedAt: new Date().toISOString()
     };
-    writeOrders(orders);
+    if (storedOrder) {
+      storedOrder.status = 'IS_BEING_FULFILLED';
+      storedOrder.started = false;
+      storedOrder.printedLabel = printedLabel;
+      writeOrders(orders);
+    }
     try {
       window.localStorage.setItem(printedOrderStorageKey, JSON.stringify({
         orderId: order.id,
-        printedAt: order.printedLabel.printedAt
+        printedAt: printedLabel.printedAt
       }));
     } catch (_error) {
       // Dashboard will still sync the order queue when it regains focus.
@@ -172,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (orderIdNode) orderIdNode.textContent = order?.id || orderId || 'Order missing';
   if (!order) {
     if (statusNode) statusNode.textContent = 'Order missing';
-    setError('Order ID not found in this store queue.');
+    setError('Order ID is required.');
   }
   renderOptions();
   if (order) {
