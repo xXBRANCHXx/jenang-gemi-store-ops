@@ -295,6 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
       account: String(order.account || 'Jenang Gemi'),
       status: String(order.status || 'IS_LISTED'),
       marketplaceStatus: String(order.marketplaceStatus || 'READY_TO_SHIP'),
+      packageNumber: String(order.packageNumber || ''),
       instant: Boolean(order.instant),
       deadlineAt: Number.isFinite(deadlineAt) && deadlineAt > 0 ? deadlineAt : Date.now() + 86400000,
       started: Boolean(order.started),

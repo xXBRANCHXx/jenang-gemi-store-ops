@@ -11,17 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const errorNode = document.querySelector('[data-print-error]');
   const optionsNode = document.querySelector('[data-label-options]');
   const previewNode = document.querySelector('[data-label-preview]');
-  const sheetNode = document.querySelector('[data-label-sheet]');
-  const labelOrder = document.querySelector('[data-label-order]');
-  const labelPlatform = document.querySelector('[data-label-platform]');
-  const labelSize = document.querySelector('[data-label-size]');
-
-  const labelOptions = [
-    { id: 'a6', name: 'A6', detail: '100 x 150 mm', width: 100, height: 150 },
-    { id: 'square', name: 'Square', detail: '100 x 100 mm', width: 100, height: 100 },
-    { id: 'compact', name: 'Compact', detail: '80 x 120 mm', width: 80, height: 120 },
-    { id: 'thermal', name: 'Thermal', detail: '58 x 40 mm', width: 58, height: 40 }
-  ];
+  const labelFrame = document.querySelector('[data-label-frame]');
 
   const escapeHtml = (value) => String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -54,6 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const order = orders.find((item) => String(item.id || '') === orderId) || null;
   let returnTimer = 0;
   let printInProgress = false;
+  let labelUrl = '';
+  let labelLoaded = false;
 
   const setError = (message) => {
     if (!errorNode) return;
@@ -61,33 +53,13 @@ document.addEventListener('DOMContentLoaded', () => {
     errorNode.hidden = message === '';
   };
 
-  const labelScale = (option) => {
-    const maxWidth = 116;
-    const maxHeight = 154;
-    return Math.min(maxWidth / option.width, maxHeight / option.height);
-  };
-
-  const renderPreview = (option) => {
-    if (!previewNode || !sheetNode) return;
-    const scale = labelScale(option);
-    sheetNode.style.width = `${option.width * scale}px`;
-    sheetNode.style.height = `${option.height * scale}px`;
-    sheetNode.style.setProperty('--print-label-width', `${option.width}mm`);
-    sheetNode.style.setProperty('--print-label-height', `${option.height}mm`);
-    sheetNode.dataset.labelSize = option.id;
-    if (labelOrder) labelOrder.textContent = order?.id || orderId || 'Order';
-    if (labelPlatform) labelPlatform.textContent = order?.platform || 'Platform';
-    if (labelSize) labelSize.textContent = option.detail;
-    previewNode.hidden = false;
-  };
-
-  const markPrinted = (option) => {
+  const markPrinted = () => {
     if (!order) return;
     order.status = 'IS_BEING_FULFILLED';
     order.started = false;
     order.printedLabel = {
-      size: option.id,
-      dimensions: option.detail,
+      source: 'shopee',
+      orderId: order.id,
       profile,
       printedAt: new Date().toISOString()
     };
@@ -112,16 +84,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 250);
   };
 
-  const printOption = (option) => {
-    renderPreview(option);
-    if (statusNode) statusNode.textContent = `Printing ${option.name}`;
+  const printLabel = () => {
+    if (!order || !labelLoaded) return;
+    if (statusNode) statusNode.textContent = 'Printing';
     printInProgress = true;
     window.clearTimeout(returnTimer);
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         try {
-          markPrinted(option);
-          window.print();
+          markPrinted();
+          const frameWindow = labelFrame instanceof HTMLIFrameElement ? labelFrame.contentWindow : null;
+          if (frameWindow) {
+            frameWindow.focus();
+            frameWindow.print();
+          } else {
+            window.print();
+          }
           returnTimer = window.setTimeout(returnToDashboard, 60000);
         } catch (_error) {
           printInProgress = false;
@@ -134,35 +112,88 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const renderOptions = () => {
     if (!optionsNode) return;
-    optionsNode.innerHTML = labelOptions.map((option) => {
-      const scale = labelScale(option);
-      return `
-        <button type="button" class="admin-label-option-card" data-label-option="${escapeHtml(option.id)}">
-          <span>
-            <strong>${escapeHtml(option.name)}</strong>
-            <small>${escapeHtml(option.detail)}</small>
-          </span>
-          <i style="--label-width:${option.width * scale}px;--label-height:${option.height * scale}px;"></i>
-        </button>
-      `;
-    }).join('');
+    optionsNode.innerHTML = `
+      <button type="button" class="admin-label-option-card admin-label-print-card" data-print-shopee-label disabled>
+        <span>
+          <strong>Shopee Label</strong>
+          <small>${escapeHtml(order?.id || orderId || 'Order')}</small>
+        </span>
+        <i aria-hidden="true"></i>
+      </button>
+    `;
+  };
+
+  const setPrintEnabled = (enabled) => {
+    const button = optionsNode?.querySelector('[data-print-shopee-label]');
+    if (button instanceof HTMLButtonElement) {
+      button.disabled = !enabled;
+    }
+  };
+
+  const loadLabel = async () => {
+    if (!order) return;
+    if (statusNode) statusNode.textContent = 'Fetching Shopee label';
+    const response = await fetch(`../../api/orders/?shipping_label=1&order=${encodeURIComponent(order.id)}`, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/pdf,application/octet-stream,*/*' }
+    });
+    const contentType = response.headers.get('content-type') || '';
+    if (!response.ok || contentType.includes('application/json')) {
+      let message = 'Unable to load Shopee shipping label.';
+      try {
+        const payload = await response.json();
+        message = payload.error || message;
+      } catch (_error) {
+        // Keep the generic label error.
+      }
+      throw new Error(message);
+    }
+
+    const blob = await response.blob();
+    if (labelUrl) URL.revokeObjectURL(labelUrl);
+    labelUrl = URL.createObjectURL(blob);
+    if (labelFrame instanceof HTMLIFrameElement) {
+      labelLoaded = false;
+      labelFrame.addEventListener('load', () => {
+        labelLoaded = true;
+        setPrintEnabled(true);
+        if (statusNode) statusNode.textContent = 'Ready';
+      }, { once: true });
+      labelFrame.src = labelUrl;
+    } else {
+      labelLoaded = true;
+      setPrintEnabled(true);
+      if (statusNode) statusNode.textContent = 'Ready';
+    }
+    if (previewNode) previewNode.hidden = false;
   };
 
   if (orderIdNode) orderIdNode.textContent = order?.id || orderId || 'Order missing';
   if (!order) {
+    if (statusNode) statusNode.textContent = 'Order missing';
     setError('Order ID not found in this store queue.');
   }
   renderOptions();
-  if (order) renderPreview(labelOptions[0]);
+  if (order) {
+    loadLabel().catch((error) => {
+      labelLoaded = false;
+      setPrintEnabled(false);
+      if (statusNode) statusNode.textContent = 'Label unavailable';
+      setError(error instanceof Error ? error.message : 'Unable to load Shopee shipping label.');
+    });
+  }
 
   window.addEventListener('afterprint', returnToDashboard);
+  window.addEventListener('beforeunload', () => {
+    if (labelUrl) URL.revokeObjectURL(labelUrl);
+  });
 
   optionsNode?.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
-    const button = target?.closest('[data-label-option]');
+    const button = target?.closest('[data-print-shopee-label]');
     if (!(button instanceof HTMLButtonElement)) return;
-    const option = labelOptions.find((item) => item.id === button.dataset.labelOption);
-    if (!option || !order) return;
-    printOption(option);
+    if (!order || button.disabled) return;
+    printLabel();
   });
 });

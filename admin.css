@@ -1560,6 +1560,20 @@ button, input {
   box-shadow: 0 18px 36px rgba(0, 0, 0, 0.24);
 }
 
+.admin-label-print-card {
+  min-height: 150px;
+}
+
+.admin-label-print-card:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.admin-label-print-card i {
+  width: 86px;
+  height: 116px;
+}
+
 .admin-label-preview {
   display: grid;
   justify-items: center;
@@ -1571,6 +1585,14 @@ button, input {
 
 .admin-label-preview[hidden] {
   display: none;
+}
+
+.admin-shopee-label-frame {
+  width: min(100%, 900px);
+  height: min(72svh, 920px);
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
 }
 
 .admin-label-sheet {
@@ -3473,5 +3495,12 @@ button, input {
     height: var(--print-label-height) !important;
     box-shadow: none;
     break-inside: avoid;
+  }
+
+  .admin-shopee-label-frame {
+    width: 100vw;
+    height: 100vh;
+    border: 0;
+    border-radius: 0;
   }
 }

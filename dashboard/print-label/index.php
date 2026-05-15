@@ -39,20 +39,14 @@ $printLabelJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/print-label.j
                 <div class="admin-scan-head">
                     <div>
                         <span class="admin-panel-kicker">Shipping Label</span>
-                        <h3>Choose label size</h3>
+                        <h3>Print Shopee label</h3>
                     </div>
-                    <span class="admin-status-badge" data-print-status>Ready</span>
+                    <span class="admin-status-badge" data-print-status>Loading</span>
                 </div>
                 <p class="admin-form-error" data-print-error hidden></p>
                 <div class="admin-label-option-grid" data-label-options></div>
                 <div class="admin-label-preview" data-label-preview hidden>
-                    <div class="admin-label-sheet" data-label-sheet>
-                        <div class="admin-label-brand">Jenang Gemi</div>
-                        <strong data-label-order>Order</strong>
-                        <span data-label-platform>Platform</span>
-                        <div class="admin-label-barcode" aria-hidden="true"></div>
-                        <small data-label-size>Label</small>
-                    </div>
+                    <iframe class="admin-shopee-label-frame" data-label-frame title="Shopee shipping label"></iframe>
                 </div>
             </section>
         </main>
