@@ -293,6 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
       id,
       platform: String(order.platform || 'Shopee'),
       account: String(order.account || 'Jenang Gemi'),
+      sourceAccountKey: String(order.sourceAccountKey || order.account_key || ''),
       status: String(order.status || 'IS_LISTED'),
       marketplaceStatus: String(order.marketplaceStatus || 'READY_TO_SHIP'),
       packageNumber: String(order.packageNumber || ''),
@@ -398,7 +399,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const order = state.orders.find((item) => normalizeOrderId(item.id) === orderId);
     const profile = (order ? orderOwner(order) : '') || activeProfile || '';
     const printableOrderId = order?.id || orderId;
-    openStorePage(`./print-label/?order=${encodeURIComponent(printableOrderId)}${profile ? `&profile=${encodeURIComponent(profile)}` : ''}`);
+    const account = order?.sourceAccountKey || '';
+    openStorePage(`./print-label/?order=${encodeURIComponent(printableOrderId)}${profile ? `&profile=${encodeURIComponent(profile)}` : ''}${account ? `&account=${encodeURIComponent(account)}` : ''}`);
   };
 
   const renderProfileSelect = (selected = '') => {

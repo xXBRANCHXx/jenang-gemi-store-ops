@@ -31,6 +31,32 @@ function jg_store_ops_orders_config(string $envKey, string $configKey, string $d
     return $default;
 }
 
+function jg_store_ops_orders_normalize_account(string $value): string
+{
+    return trim(strtolower((string) preg_replace('/[^a-z0-9._-]+/', '-', $value)), '.-_');
+}
+
+/**
+ * @return array<int, string>
+ */
+function jg_store_ops_orders_configured_accounts(): array
+{
+    $accountsValue = jg_store_ops_orders_config('JG_SHOPEE_ACCOUNTS', 'shopee_accounts');
+    if ($accountsValue === '') {
+        $accountsValue = jg_store_ops_orders_config('JG_SHOPEE_ACCOUNT', 'shopee_account', 'jenang-gemi-shopee');
+    }
+
+    $accounts = [];
+    foreach (explode(',', $accountsValue) as $account) {
+        $account = jg_store_ops_orders_normalize_account($account);
+        if ($account !== '' && !in_array($account, $accounts, true)) {
+            $accounts[] = $account;
+        }
+    }
+
+    return $accounts;
+}
+
 function jg_store_ops_orders_fetch(string $url): array
 {
     if (function_exists('curl_init')) {
@@ -270,7 +296,7 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'GET') {
 
 $baseUrl = rtrim(jg_store_ops_orders_config('JG_SHOPEE_INGEST_BASE_URL', 'shopee_ingest_base_url', 'https://api.jenanggemi.com'), '/');
 $setupToken = jg_store_ops_orders_config('JG_SHOPEE_INGEST_SETUP_TOKEN', 'shopee_ingest_setup_token');
-$account = jg_store_ops_orders_config('JG_SHOPEE_ACCOUNT', 'shopee_account', 'jenang-gemi-shopee');
+$accounts = jg_store_ops_orders_configured_accounts();
 
 if (isset($_GET['shipping_label'])) {
     $orderSn = trim((string) ($_GET['order'] ?? $_GET['order_sn'] ?? ''));
@@ -296,9 +322,14 @@ if (isset($_GET['shipping_label'])) {
         jg_store_ops_orders_proxy_file($labelUrl, $filename);
     }
 
-    if ($baseUrl === '' || $setupToken === '' || $account === '') {
+    if ($baseUrl === '' || $setupToken === '' || $accounts === []) {
         jg_store_ops_orders_fail('Shopee order source is not configured.', 500);
     }
+
+    $requestedAccount = jg_store_ops_orders_normalize_account((string) ($_GET['account'] ?? $_GET['source_account'] ?? ''));
+    $account = $requestedAccount !== '' && in_array($requestedAccount, $accounts, true)
+        ? $requestedAccount
+        : $accounts[0];
 
     $query = http_build_query([
         'account' => $account,
@@ -309,25 +340,53 @@ if (isset($_GET['shipping_label'])) {
     jg_store_ops_orders_proxy_file($url, 'shopee-label-' . preg_replace('/[^A-Za-z0-9_-]+/', '-', $orderSn) . '.pdf');
 }
 
-if ($baseUrl === '' || $setupToken === '' || $account === '') {
+if ($baseUrl === '' || $setupToken === '' || $accounts === []) {
     jg_store_ops_orders_fail('Shopee order source is not configured.', 500);
 }
 
-$query = http_build_query([
-    'account' => $account,
-    'setup_token' => $setupToken,
-]);
-$url = $baseUrl . '/shopee/orders/listed?' . $query;
-[$status, $raw] = jg_store_ops_orders_fetch($url);
-$decoded = json_decode($raw, true);
+$decoded = [
+    'ok' => true,
+    'orders' => [],
+    'meta' => [
+        'source' => 'shopee',
+        'count' => 0,
+        'accounts' => [],
+    ],
+];
+$errors = [];
+$successfulAccounts = 0;
 
-if (!is_array($decoded)) {
-    jg_store_ops_orders_fail('Order source returned invalid JSON.', 502);
+foreach ($accounts as $account) {
+    $query = http_build_query([
+        'account' => $account,
+        'setup_token' => $setupToken,
+    ]);
+    $url = $baseUrl . '/shopee/orders/listed?' . $query;
+    [$status, $raw] = jg_store_ops_orders_fetch($url);
+    $accountPayload = json_decode($raw, true);
+
+    if (!is_array($accountPayload)) {
+        $errors[] = $account . ': invalid JSON';
+        continue;
+    }
+
+    if ($status >= 400 || empty($accountPayload['ok'])) {
+        $errors[] = $account . ': ' . (string) ($accountPayload['error'] ?? 'Unable to load Shopee orders.');
+        continue;
+    }
+
+    $accountOrders = is_array($accountPayload['orders'] ?? null) ? $accountPayload['orders'] : [];
+    $successfulAccounts++;
+    $decoded['orders'] = array_merge($decoded['orders'], $accountOrders);
+    $decoded['meta']['accounts'][] = [
+        'account_key' => $account,
+        'count' => count($accountOrders),
+        'shop_id' => (int) ($accountPayload['meta']['shop_id'] ?? 0),
+    ];
 }
 
-if ($status >= 400 || empty($decoded['ok'])) {
-    $message = (string) ($decoded['error'] ?? 'Unable to load Shopee orders.');
-    jg_store_ops_orders_fail($message, $status >= 400 ? $status : 502);
+if ($successfulAccounts === 0 && $errors !== []) {
+    jg_store_ops_orders_fail(implode('; ', $errors), 502);
 }
 
 $decoded = jg_store_ops_orders_map_item_skus($decoded);
@@ -337,6 +396,7 @@ $decoded['orders'] = array_values(array_merge(
     $partnerOrders['orders']
 ));
 $decoded['meta']['partner_orders'] = $partnerOrders['meta'];
+$decoded['meta']['errors'] = $errors;
 $decoded['meta']['count'] = count($decoded['orders']);
 
 echo json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);

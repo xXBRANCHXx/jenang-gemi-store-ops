@@ -40,12 +40,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(window.location.search);
   const orderId = params.get('order') || window.sessionStorage.getItem(activeOrderStorageKey) || '';
   const profile = params.get('profile') || window.sessionStorage.getItem(activeProfileStorageKey) || '';
+  const requestedAccount = params.get('account') || '';
   const orders = readOrders();
   const storedOrder = orders.find((item) => String(item.id || '') === orderId) || null;
   const order = storedOrder || (orderId ? {
     id: orderId,
     platform: orderId.toUpperCase().startsWith('PARTNER-') ? 'Partner' : 'Shopee'
   } : null);
+  const sourceAccount = requestedAccount || String(order?.sourceAccountKey || '');
   let returnTimer = 0;
   let printInProgress = false;
   let labelUrl = '';
@@ -142,7 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!order) return;
     const platform = String(order.platform || '').toLowerCase() === 'partner' ? 'Partner' : 'Shopee';
     if (statusNode) statusNode.textContent = `Fetching ${platform} label`;
-    const response = await fetch(`../../api/orders/?shipping_label=1&order=${encodeURIComponent(order.id)}`, {
+    const response = await fetch(`../../api/orders/?shipping_label=1&order=${encodeURIComponent(order.id)}${sourceAccount ? `&account=${encodeURIComponent(sourceAccount)}` : ''}`, {
       cache: 'no-store',
       credentials: 'same-origin',
       headers: { Accept: 'application/pdf,application/octet-stream,*/*' }
