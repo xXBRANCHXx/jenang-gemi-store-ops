@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const storedOrder = orders.find((item) => String(item.id || '') === orderId) || null;
   const order = storedOrder || (orderId ? {
     id: orderId,
-    platform: 'Shopee'
+    platform: orderId.toUpperCase().startsWith('PARTNER-') ? 'Partner' : 'Shopee'
   } : null);
   let returnTimer = 0;
   let printInProgress = false;
@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const markPrinted = () => {
     if (!order) return;
     const printedLabel = {
-      source: 'shopee',
+      source: String(order.platform || '').toLowerCase() === 'partner' ? 'partner' : 'shopee',
       orderId: order.id,
       profile,
       printedAt: new Date().toISOString()
@@ -119,10 +119,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const renderOptions = () => {
     if (!optionsNode) return;
+    const platform = String(order?.platform || '').toLowerCase() === 'partner' ? 'Partner' : 'Shopee';
     optionsNode.innerHTML = `
       <button type="button" class="admin-label-option-card admin-label-print-card" data-print-shopee-label disabled>
         <span>
-          <strong>Shopee Label</strong>
+          <strong>${platform} Label</strong>
           <small>${escapeHtml(order?.id || orderId || 'Order')}</small>
         </span>
         <i aria-hidden="true"></i>
@@ -139,7 +140,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const loadLabel = async () => {
     if (!order) return;
-    if (statusNode) statusNode.textContent = 'Fetching Shopee label';
+    const platform = String(order.platform || '').toLowerCase() === 'partner' ? 'Partner' : 'Shopee';
+    if (statusNode) statusNode.textContent = `Fetching ${platform} label`;
     const response = await fetch(`../../api/orders/?shipping_label=1&order=${encodeURIComponent(order.id)}`, {
       cache: 'no-store',
       credentials: 'same-origin',
@@ -147,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     const contentType = response.headers.get('content-type') || '';
     if (!response.ok || contentType.includes('application/json')) {
-      let message = 'Unable to load Shopee shipping label.';
+      let message = `Unable to load ${platform} shipping label.`;
       try {
         const payload = await response.json();
         message = payload.error || message;
@@ -187,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
       labelLoaded = false;
       setPrintEnabled(false);
       if (statusNode) statusNode.textContent = 'Label unavailable';
-      setError(error instanceof Error ? error.message : 'Unable to load Shopee shipping label.');
+      setError(error instanceof Error ? error.message : 'Unable to load shipping label.');
     });
   }
 

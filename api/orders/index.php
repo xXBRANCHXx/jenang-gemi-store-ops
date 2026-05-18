@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once dirname(__DIR__, 2) . '/auth.php';
 require_once dirname(__DIR__, 2) . '/config.php';
 require_once dirname(__DIR__, 2) . '/sku-db-bootstrap.php';
+require_once dirname(__DIR__, 2) . '/partner-orders-bootstrap.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -271,14 +272,32 @@ $baseUrl = rtrim(jg_store_ops_orders_config('JG_SHOPEE_INGEST_BASE_URL', 'shopee
 $setupToken = jg_store_ops_orders_config('JG_SHOPEE_INGEST_SETUP_TOKEN', 'shopee_ingest_setup_token');
 $account = jg_store_ops_orders_config('JG_SHOPEE_ACCOUNT', 'shopee_account', 'jenang-gemi-shopee');
 
-if ($baseUrl === '' || $setupToken === '' || $account === '') {
-    jg_store_ops_orders_fail('Shopee order source is not configured.', 500);
-}
-
 if (isset($_GET['shipping_label'])) {
     $orderSn = trim((string) ($_GET['order'] ?? $_GET['order_sn'] ?? ''));
     if ($orderSn === '') {
         jg_store_ops_orders_fail('Order number is required.');
+    }
+
+    if (str_starts_with(strtoupper($orderSn), 'PARTNER-')) {
+        $partnerLabel = jg_store_ops_partner_orders_find_label($orderSn);
+        if (!is_array($partnerLabel)) {
+            jg_store_ops_orders_fail('Partner shipping label is not available for this order.', 404);
+        }
+
+        $labelUrl = jg_store_ops_partner_orders_label_url($partnerLabel);
+        if ($labelUrl === '') {
+            jg_store_ops_orders_fail('Partner shipping label path is missing.', 404);
+        }
+
+        $filename = trim((string) ($partnerLabel['name'] ?? ''));
+        if ($filename === '') {
+            $filename = 'partner-label-' . preg_replace('/[^A-Za-z0-9_-]+/', '-', $orderSn) . '.pdf';
+        }
+        jg_store_ops_orders_proxy_file($labelUrl, $filename);
+    }
+
+    if ($baseUrl === '' || $setupToken === '' || $account === '') {
+        jg_store_ops_orders_fail('Shopee order source is not configured.', 500);
     }
 
     $query = http_build_query([
@@ -288,6 +307,10 @@ if (isset($_GET['shipping_label'])) {
     ]);
     $url = $baseUrl . '/shopee/orders/shipping-label?' . $query;
     jg_store_ops_orders_proxy_file($url, 'shopee-label-' . preg_replace('/[^A-Za-z0-9_-]+/', '-', $orderSn) . '.pdf');
+}
+
+if ($baseUrl === '' || $setupToken === '' || $account === '') {
+    jg_store_ops_orders_fail('Shopee order source is not configured.', 500);
 }
 
 $query = http_build_query([
@@ -308,5 +331,12 @@ if ($status >= 400 || empty($decoded['ok'])) {
 }
 
 $decoded = jg_store_ops_orders_map_item_skus($decoded);
+$partnerOrders = jg_store_ops_partner_orders_list();
+$decoded['orders'] = array_values(array_merge(
+    is_array($decoded['orders'] ?? null) ? $decoded['orders'] : [],
+    $partnerOrders['orders']
+));
+$decoded['meta']['partner_orders'] = $partnerOrders['meta'];
+$decoded['meta']['count'] = count($decoded['orders']);
 
 echo json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
