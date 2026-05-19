@@ -480,7 +480,9 @@ function jg_store_ops_partner_orders_list(): array
     if (is_array($feed)) {
         $orders = array_map(
             static fn (array $order): array => jg_store_ops_partner_orders_enrich_order($order),
-            array_values(array_filter($feed['orders'] ?? [], 'is_array'))
+            array_values(array_filter($feed['orders'] ?? [], static function ($order): bool {
+                return is_array($order) && jg_store_ops_partner_orders_status_is_visible((string) ($order['status'] ?? ''));
+            }))
         );
         return [
             'orders' => $orders,
