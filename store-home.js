@@ -124,6 +124,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const accountKey = String(order?.sourceAccountKey || order?.account_key || '').trim();
     if (accountKey === 'jenang-gemi-shopee') return 'JG Shopee';
     if (accountKey === 'zero-shopee') return 'ZERO Shopee';
+    if (accountKey === 'zfit-shopee') return 'ZFIT Shopee';
+    if (accountKey === 'jenang-gemi-tiktok') return 'JG TikTok';
+    if (accountKey === 'zero-tiktok') return 'ZERO TikTok';
+    if (accountKey === 'zfit-tiktok') return 'ZFIT TikTok';
+    if (accountKey === 'jenang-gemi-tokopedia') return 'JG Tokopedia';
+    if (accountKey === 'zero-tokopedia') return 'ZERO Tokopedia';
+    if (accountKey === 'zfit-tokopedia') return 'ZFIT Tokopedia';
     if (account) return account;
     return accountKey || String(order?.platform || 'Source');
   };
@@ -141,7 +148,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const detectOrderSources = () => {
     const sources = new Map([
       ['jenang-gemi-shopee', 'JG Shopee'],
-      ['zero-shopee', 'ZERO Shopee']
+      ['zero-shopee', 'ZERO Shopee'],
+      ['jenang-gemi-tiktok', 'JG TikTok'],
+      ['zero-tiktok', 'ZERO TikTok'],
+      ['zfit-tiktok', 'ZFIT TikTok'],
+      ['jenang-gemi-tokopedia', 'JG Tokopedia'],
+      ['zero-tokopedia', 'ZERO Tokopedia'],
+      ['zfit-tokopedia', 'ZFIT Tokopedia']
     ]);
     state.orders.forEach((order) => {
       const sourceKey = sourceKeyFromOrder(order);

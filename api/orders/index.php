@@ -57,6 +57,48 @@ function jg_store_ops_orders_configured_accounts(): array
     return $accounts;
 }
 
+/**
+ * @return array<int, array{platform:string,account:string}>
+ */
+function jg_store_ops_orders_configured_sources(): array
+{
+    $sourcesValue = jg_store_ops_orders_config('JG_MARKETPLACE_SOURCES', 'marketplace_sources');
+    $sources = [];
+    if ($sourcesValue !== '') {
+        foreach (explode(',', $sourcesValue) as $source) {
+            $parts = array_map('trim', explode(':', $source, 2));
+            $platform = jg_store_ops_orders_normalize_account($parts[0] ?? '');
+            $account = jg_store_ops_orders_normalize_account($parts[1] ?? '');
+            if ($platform !== '' && $account !== '') {
+                $sources[] = ['platform' => $platform, 'account' => $account];
+            }
+        }
+    }
+
+    if ($sources === []) {
+        foreach (jg_store_ops_orders_configured_accounts() as $account) {
+            $sources[] = ['platform' => 'shopee', 'account' => $account];
+        }
+        foreach (['tiktok', 'tokopedia'] as $platform) {
+            $accountsValue = jg_store_ops_orders_config('JG_' . strtoupper($platform) . '_ACCOUNTS', $platform . '_accounts');
+            foreach (explode(',', $accountsValue) as $account) {
+                $account = jg_store_ops_orders_normalize_account($account);
+                if ($account !== '') {
+                    $sources[] = ['platform' => $platform, 'account' => $account];
+                }
+            }
+        }
+    }
+
+    $unique = [];
+    foreach ($sources as $source) {
+        $key = $source['platform'] . ':' . $source['account'];
+        $unique[$key] = $source;
+    }
+
+    return array_values($unique);
+}
+
 function jg_store_ops_orders_fetch(string $url): array
 {
     if (function_exists('curl_init')) {
@@ -297,6 +339,7 @@ if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'GET') {
 $baseUrl = rtrim(jg_store_ops_orders_config('JG_SHOPEE_INGEST_BASE_URL', 'shopee_ingest_base_url', 'https://api.jenanggemi.com'), '/');
 $setupToken = jg_store_ops_orders_config('JG_SHOPEE_INGEST_SETUP_TOKEN', 'shopee_ingest_setup_token');
 $accounts = jg_store_ops_orders_configured_accounts();
+$sources = jg_store_ops_orders_configured_sources();
 
 if (isset($_GET['shipping_label'])) {
     $orderSn = trim((string) ($_GET['order'] ?? $_GET['order_sn'] ?? ''));
@@ -340,15 +383,15 @@ if (isset($_GET['shipping_label'])) {
     jg_store_ops_orders_proxy_file($url, 'shopee-label-' . preg_replace('/[^A-Za-z0-9_-]+/', '-', $orderSn) . '.pdf');
 }
 
-if ($baseUrl === '' || $setupToken === '' || $accounts === []) {
-    jg_store_ops_orders_fail('Shopee order source is not configured.', 500);
+if ($baseUrl === '' || $setupToken === '' || $sources === []) {
+    jg_store_ops_orders_fail('Marketplace order sources are not configured.', 500);
 }
 
 $decoded = [
     'ok' => true,
     'orders' => [],
     'meta' => [
-        'source' => 'shopee',
+        'source' => 'marketplace',
         'count' => 0,
         'accounts' => [],
     ],
@@ -356,22 +399,24 @@ $decoded = [
 $errors = [];
 $successfulAccounts = 0;
 
-foreach ($accounts as $account) {
+foreach ($sources as $source) {
+    $platform = $source['platform'];
+    $account = $source['account'];
     $query = http_build_query([
         'account' => $account,
         'setup_token' => $setupToken,
     ]);
-    $url = $baseUrl . '/shopee/orders/listed?' . $query;
+    $url = $baseUrl . '/' . rawurlencode($platform) . '/orders/listed?' . $query;
     [$status, $raw] = jg_store_ops_orders_fetch($url);
     $accountPayload = json_decode($raw, true);
 
     if (!is_array($accountPayload)) {
-        $errors[] = $account . ': invalid JSON';
+        $errors[] = $platform . ':' . $account . ': invalid JSON';
         continue;
     }
 
     if ($status >= 400 || empty($accountPayload['ok'])) {
-        $errors[] = $account . ': ' . (string) ($accountPayload['error'] ?? 'Unable to load Shopee orders.');
+        $errors[] = $platform . ':' . $account . ': ' . (string) ($accountPayload['error'] ?? 'Unable to load marketplace orders.');
         continue;
     }
 
@@ -379,9 +424,10 @@ foreach ($accounts as $account) {
     $successfulAccounts++;
     $decoded['orders'] = array_merge($decoded['orders'], $accountOrders);
     $decoded['meta']['accounts'][] = [
+        'platform' => $platform,
         'account_key' => $account,
         'count' => count($accountOrders),
-        'shop_id' => (int) ($accountPayload['meta']['shop_id'] ?? 0),
+        'shop_id' => (string) ($accountPayload['meta']['shop_id'] ?? ''),
     ];
 }
 

@@ -10,4 +10,6 @@ return [
     'shopee_ingest_base_url' => 'https://api.jenanggemi.com',
     'shopee_ingest_setup_token' => 'weoifngfj23095jgrkebranchmadethiskey',
     'shopee_accounts' => 'jenang-gemi-shopee,zero-shopee',
+    'tiktok_accounts' => 'jenang-gemi-tiktok,zero-tiktok,zfit-tiktok',
+    'tokopedia_accounts' => 'jenang-gemi-tokopedia,zero-tokopedia,zfit-tokopedia',
 ];
