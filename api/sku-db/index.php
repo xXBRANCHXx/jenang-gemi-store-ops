@@ -54,9 +54,13 @@ function jg_store_ops_sku_database(PDO $pdo): array
         $skus[] = [
             'sku' => (string) ($row['sku'] ?? ''),
             'tag' => (string) ($row['tag'] ?? ''),
+            'brand_id' => (string) ($row['brand_id'] ?? ''),
             'brand_name' => (string) ($row['brand_name'] ?? ''),
+            'unit_id' => (string) ($row['unit_id'] ?? ''),
             'product_name' => (string) ($row['product_name'] ?? ''),
+            'flavor_id' => (string) ($row['flavor_id'] ?? ''),
             'flavor_name' => (string) ($row['flavor_name'] ?? ''),
+            'product_id' => (string) ($row['product_id'] ?? ''),
             'unit_name' => (string) ($row['unit_name'] ?? ''),
             'volume' => number_format((float) ($row['volume'] ?? 0), 1, '.', ''),
             'astra' => number_format((float) ($row['astra'] ?? $row['volume'] ?? 0), 2, '.', ''),

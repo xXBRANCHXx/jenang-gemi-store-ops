@@ -262,17 +262,26 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const catalogSignature = (item, volume) => [
-    item.brandId,
-    item.unitId,
+    item.brandId || item.brandName,
+    item.unitId || item.unitName,
     Number(volume || 0).toFixed(2),
-    item.flavorId,
-    item.productId
+    item.flavorId || item.flavorName,
+    item.productId || item.productName
   ].join('|');
 
   const productNameFromSkuRow = (row) => {
-    const parts = [row.brand_name, row.product_name, row.flavor_name, row.volume && Number(row.volume) ? row.volume : '', row.unit_name]
-      .map((part) => String(part || '').trim())
-      .filter(Boolean);
+    const brand = String(row.brand_name || '').trim();
+    const product = String(row.product_name || '').trim();
+    const flavor = String(row.flavor_name || '').trim();
+    const unit = String(row.unit_name || '').trim();
+    const volume = row.volume && Number(row.volume) ? String(Number(row.volume)) : '';
+    const productLower = product.toLowerCase();
+    const parts = [];
+    if (brand && !productLower.startsWith(brand.toLowerCase())) parts.push(brand);
+    if (product) parts.push(product);
+    if (flavor && !productLower.includes(flavor.toLowerCase())) parts.push(flavor);
+    if (volume && !productLower.includes(volume)) parts.push(volume);
+    if (unit && !productLower.includes(unit.toLowerCase())) parts.push(unit);
     return parts.join(' ');
   };
 
@@ -285,11 +294,15 @@ document.addEventListener('DOMContentLoaded', () => {
       sku,
       barcode: sku,
       brandId: String(row.brand_id || ''),
+      brandName: String(row.brand_name || ''),
       unitId: String(row.unit_id || ''),
+      unitName: String(row.unit_name || ''),
       volume,
       astra: astra > 0 ? astra : volume,
       flavorId: String(row.flavor_id || ''),
+      flavorName: String(row.flavor_name || ''),
       productId: String(row.product_id || ''),
+      baseProductName: String(row.product_name || ''),
       skipScan: Boolean(row.skip_scan),
       productName: productNameFromSkuRow(row) || sku
     };
@@ -396,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return {
         ...catalogItem,
         productName,
-        scanProductName: productName,
+        scanProductName: catalogItem.scanProductName || catalogItem.productName,
         quantity,
         scanQuantity: quantity * Number(catalogItem.scanMultiplier || 1),
         skipScan: Boolean(catalogItem.skipScan),
@@ -811,19 +824,22 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
     }
     if (pickList) {
-      pickList.innerHTML = consolidateScanItems(order.items).map((item) => {
+      pickList.innerHTML = order.items.map((item) => {
         const scanQuantity = Number(item.scanQuantity || item.quantity);
         const multiplier = Number(item.scanMultiplier || 1);
         const scanSku = String(item.scanSku || item.sku || '');
         const skipped = Number(item.skipQuantity || (item.skipScan ? scanQuantity : 0));
-        const scanNote = skipped > 0 ? `${scanSku} / Skip Scan` : (multiplier > 1 ? `${scanSku} ${multiplier}X` : scanSku);
+        const orderedSku = String(item.sku || '');
+        const scanNote = skipped > 0
+          ? `${scanSku} / Skip Scan`
+          : (multiplier > 1 ? `Scan ${scanSku} ${multiplier}X per unit (${scanQuantity} scans)` : `Scan ${scanSku || orderedSku}`);
         return `
           <article class="admin-pick-item">
             <div>
-              <strong>${escapeHtml(item.scanProductName || item.productName)}</strong>
+              <strong>${escapeHtml(item.productName || item.scanProductName)}</strong>
               <span>${escapeHtml(scanNote)}</span>
             </div>
-            <em>x${escapeHtml(scanQuantity)}</em>
+            <em>x${escapeHtml(item.quantity || scanQuantity)}</em>
           </article>
         `;
       }).join('');
