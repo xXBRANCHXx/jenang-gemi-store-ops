@@ -463,6 +463,7 @@ function jg_store_ops_partner_orders_list(): array
                 'source' => 'partner',
                 'configured' => false,
                 'count' => 0,
+                'sources' => jg_store_ops_partner_orders_partner_sources(),
                 'error' => jg_store_ops_partner_orders_last_error(),
             ],
         ];
@@ -493,6 +494,7 @@ function jg_store_ops_partner_orders_list(): array
                 'source' => 'partner',
                 'configured' => true,
                 'count' => 0,
+                'sources' => jg_store_ops_partner_orders_partner_sources(),
                 'error' => $exception->getMessage(),
             ],
         ];
