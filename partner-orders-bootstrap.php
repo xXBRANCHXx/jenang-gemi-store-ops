@@ -122,23 +122,27 @@ function jg_store_ops_partner_orders_feed_url(): string
     return $baseUrl . '/api/store-orders/';
 }
 
+function jg_store_ops_partner_orders_partner_registry_url(): string
+{
+    $configured = jg_store_ops_partner_orders_config('JG_PARTNER_REGISTRY_URL', 'partner_registry_url');
+    return $configured !== '' ? $configured : 'https://admin.jenanggemi.com/api/partners/public/';
+}
+
 function jg_store_ops_partner_orders_feed_token(): string
 {
     return jg_store_ops_partner_orders_config('JG_STORE_OPS_ORDERS_TOKEN', 'store_ops_orders_token');
 }
 
-function jg_store_ops_partner_orders_fetch_feed(): ?array
+function jg_store_ops_partner_orders_fetch_json(string $url, array $headers = []): ?array
 {
-    $token = jg_store_ops_partner_orders_feed_token();
-    if ($token === '') {
+    if ($url === '') {
         return null;
     }
 
-    $url = jg_store_ops_partner_orders_feed_url();
-    $headers = [
-        'Accept: application/json',
-        'X-Store-Ops-Token: ' . $token,
-    ];
+    $headers = array_values(array_filter($headers, static fn (string $header): bool => trim($header) !== ''));
+    if (!in_array('Accept: application/json', $headers, true)) {
+        array_unshift($headers, 'Accept: application/json');
+    }
 
     if (function_exists('curl_init')) {
         $curl = curl_init($url);
@@ -149,13 +153,16 @@ function jg_store_ops_partner_orders_fetch_feed(): ?array
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 20,
+            CURLOPT_FOLLOWLOCATION => true,
         ]);
         $raw = curl_exec($curl);
         $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
         $error = curl_error($curl);
         curl_close($curl);
         if (!is_string($raw) || $status >= 400) {
-            jg_store_ops_partner_orders_last_error($error !== '' ? $error : 'Partner order feed returned HTTP ' . $status . '.');
+            if ($error !== '') {
+                jg_store_ops_partner_orders_last_error($error);
+            }
             return null;
         }
     } else {
@@ -168,18 +175,141 @@ function jg_store_ops_partner_orders_fetch_feed(): ?array
         ]);
         $raw = @file_get_contents($url, false, $context);
         if (!is_string($raw)) {
-            jg_store_ops_partner_orders_last_error('Unable to load partner order feed.');
             return null;
         }
     }
 
     $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : null;
+}
+
+function jg_store_ops_partner_orders_fetch_feed(): ?array
+{
+    $token = jg_store_ops_partner_orders_feed_token();
+    if ($token === '') {
+        return null;
+    }
+
+    $decoded = jg_store_ops_partner_orders_fetch_json(jg_store_ops_partner_orders_feed_url(), [
+        'X-Store-Ops-Token: ' . $token,
+    ]);
     if (!is_array($decoded) || empty($decoded['ok'])) {
         jg_store_ops_partner_orders_last_error(is_array($decoded) ? (string) ($decoded['error'] ?? 'Partner order feed returned invalid JSON.') : 'Partner order feed returned invalid JSON.');
         return null;
     }
 
     return $decoded;
+}
+
+function jg_store_ops_partner_orders_source_key(string $partnerCode): string
+{
+    $normalized = strtolower(trim($partnerCode));
+    $normalized = preg_replace('/[^a-z0-9._-]+/', '-', $normalized) ?: $normalized;
+    $normalized = trim($normalized, '._-');
+    return $normalized !== '' ? 'partner-' . $normalized : 'partner-unknown';
+}
+
+function jg_store_ops_partner_orders_partner_registry(): array
+{
+    static $registry = null;
+
+    if (is_array($registry)) {
+        return $registry;
+    }
+
+    $registry = [];
+    $decoded = jg_store_ops_partner_orders_fetch_json(jg_store_ops_partner_orders_partner_registry_url());
+    foreach ((array) ($decoded['partners'] ?? []) as $partner) {
+        if (!is_array($partner)) {
+            continue;
+        }
+        $code = strtoupper(trim((string) ($partner['code'] ?? '')));
+        $name = trim((string) ($partner['name'] ?? ''));
+        if ($code !== '') {
+            $registry[$code] = [
+                'code' => $code,
+                'name' => $name,
+                'source_key' => jg_store_ops_partner_orders_source_key($code),
+            ];
+        }
+    }
+
+    return $registry;
+}
+
+function jg_store_ops_partner_orders_partner_name(string $partnerCode): string
+{
+    $registry = jg_store_ops_partner_orders_partner_registry();
+    $partner = $registry[strtoupper(trim($partnerCode))] ?? null;
+    return is_array($partner) ? (string) ($partner['name'] ?? '') : '';
+}
+
+function jg_store_ops_partner_orders_partner_sources(array $orders = []): array
+{
+    $sources = [];
+    foreach (jg_store_ops_partner_orders_partner_registry() as $partner) {
+        $key = (string) ($partner['source_key'] ?? '');
+        if ($key !== '') {
+            $sources[$key] = [
+                'key' => $key,
+                'label' => (string) ($partner['name'] ?: $partner['code']),
+                'partnerCode' => (string) $partner['code'],
+            ];
+        }
+    }
+
+    foreach ($orders as $order) {
+        if (!is_array($order)) {
+            continue;
+        }
+        $key = (string) ($order['sourceAccountKey'] ?? $order['account_key'] ?? '');
+        $code = (string) ($order['partnerCode'] ?? $order['partner_code'] ?? '');
+        if ($key === '' && $code !== '') {
+            $key = jg_store_ops_partner_orders_source_key($code);
+        }
+        if ($key === '') {
+            continue;
+        }
+        $label = trim((string) ($order['partnerName'] ?? $order['partner_name'] ?? $order['account'] ?? $code));
+        $sources[$key] = [
+            'key' => $key,
+            'label' => $label !== '' ? $label : $key,
+            'partnerCode' => $code,
+        ];
+    }
+
+    uasort($sources, static fn (array $left, array $right): int => strcmp((string) ($left['label'] ?? ''), (string) ($right['label'] ?? '')));
+    return array_values($sources);
+}
+
+function jg_store_ops_partner_orders_enrich_order(array $order): array
+{
+    $partnerCode = strtoupper(trim((string) ($order['partnerCode'] ?? $order['partner_code'] ?? '')));
+    if ($partnerCode === '') {
+        $platform = strtolower(trim((string) ($order['platform'] ?? '')));
+        $account = trim((string) ($order['account'] ?? ''));
+        if ($platform === 'partner' && $account !== '' && strcasecmp($account, 'Partner') !== 0) {
+            $partnerCode = strtoupper($account);
+        }
+    }
+
+    if ($partnerCode === '') {
+        return $order;
+    }
+
+    $partnerName = trim((string) ($order['partnerName'] ?? $order['partner_name'] ?? ''));
+    if ($partnerName === '') {
+        $partnerName = jg_store_ops_partner_orders_partner_name($partnerCode);
+    }
+
+    $order['partnerCode'] = $partnerCode;
+    $order['partnerName'] = $partnerName;
+    $order['sourceAccountKey'] = (string) ($order['sourceAccountKey'] ?? $order['account_key'] ?? '') ?: jg_store_ops_partner_orders_source_key($partnerCode);
+    if ($partnerName !== '') {
+        $order['account'] = $partnerName;
+    }
+
+    return $order;
 }
 
 function jg_store_ops_partner_orders_status_is_visible(string $status): bool
@@ -287,7 +417,10 @@ function jg_store_ops_partner_orders_normalize(array $row, array $labels): array
         'id' => jg_store_ops_partner_orders_display_id($orderId),
         'sourceOrderId' => $orderId,
         'platform' => 'Partner',
-        'account' => (string) ($row['partner_code'] ?? 'Partner'),
+        'account' => jg_store_ops_partner_orders_partner_name((string) ($row['partner_code'] ?? '')) ?: (string) ($row['partner_code'] ?? 'Partner'),
+        'partnerCode' => strtoupper(trim((string) ($row['partner_code'] ?? ''))),
+        'partnerName' => jg_store_ops_partner_orders_partner_name((string) ($row['partner_code'] ?? '')),
+        'sourceAccountKey' => jg_store_ops_partner_orders_source_key((string) ($row['partner_code'] ?? '')),
         'status' => 'IS_LISTED',
         'marketplaceStatus' => 'PARTNER_ORDER',
         'instant' => false,
@@ -305,13 +438,17 @@ function jg_store_ops_partner_orders_list(): array
 {
     $feed = jg_store_ops_partner_orders_fetch_feed();
     if (is_array($feed)) {
-        $orders = array_values(array_filter($feed['orders'] ?? [], 'is_array'));
+        $orders = array_map(
+            static fn (array $order): array => jg_store_ops_partner_orders_enrich_order($order),
+            array_values(array_filter($feed['orders'] ?? [], 'is_array'))
+        );
         return [
             'orders' => $orders,
             'meta' => [
                 'source' => 'partner-portal',
                 'configured' => true,
                 'count' => count($orders),
+                'sources' => jg_store_ops_partner_orders_partner_sources($orders),
                 'fetched_at' => gmdate(DATE_ATOM),
                 'upstream' => is_array($feed['meta'] ?? null) ? $feed['meta'] : [],
             ],
@@ -367,6 +504,7 @@ function jg_store_ops_partner_orders_list(): array
             'source' => 'partner',
             'configured' => true,
             'count' => count($orders),
+            'sources' => jg_store_ops_partner_orders_partner_sources($orders),
             'fetched_at' => gmdate(DATE_ATOM),
         ],
     ];

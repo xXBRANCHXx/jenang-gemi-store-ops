@@ -54,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let skuCatalog = [];
   let profiles = [];
+  let partnerOrderSources = [];
   let pendingOrderId = '';
   let activeProfile = '';
   let sourceColorMap = {};
@@ -111,17 +112,28 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const sourceKeyFromOrder = (order) => {
+    const platform = normalizeSourceKey(order?.platform || '');
     const accountKey = normalizeSourceKey(order?.sourceAccountKey || order?.account_key || '');
     if (accountKey) return accountKey;
-    const platform = normalizeSourceKey(order?.platform || '');
+    if (platform === 'partner') {
+      const partnerCode = normalizeSourceKey(order?.partnerCode || order?.partner_code || order?.account || '');
+      return `partner-${partnerCode || 'unknown'}`;
+    }
     const account = normalizeSourceKey(order?.account || '');
-    if (platform === 'partner') return `partner-${account || 'unknown'}`;
     return account || platform || 'unknown';
   };
 
   const sourceLabelFromOrder = (order) => {
+    const platform = normalizeSourceKey(order?.platform || '');
     const account = String(order?.account || '').trim();
     const accountKey = String(order?.sourceAccountKey || order?.account_key || '').trim();
+    if (platform === 'partner') {
+      const partnerName = String(order?.partnerName || order?.partner_name || '').trim();
+      const partnerCode = String(order?.partnerCode || order?.partner_code || '').trim();
+      if (partnerName) return partnerName;
+      if (account && account.toLowerCase() !== 'partner') return account;
+      if (partnerCode) return partnerCode;
+    }
     if (accountKey === 'jenang-gemi-shopee') return 'JG Shopee';
     if (accountKey === 'zero-shopee') return 'ZERO Shopee';
     if (accountKey === 'zfit-shopee') return 'ZFIT Shopee';
@@ -146,10 +158,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const sources = new Map([
       ['jenang-gemi-shopee', 'JG Shopee'],
       ['zero-shopee', 'ZERO Shopee'],
+      ['zfit-shopee', 'ZFIT Shopee'],
       ['jenang-gemi-tiktok', 'JG TikTok'],
       ['zero-tiktok', 'ZERO TikTok'],
       ['zfit-tiktok', 'ZFIT TikTok']
     ]);
+    partnerOrderSources.forEach((source) => {
+      const sourceKey = normalizeSourceKey(source.key || source.sourceKey || '');
+      const label = String(source.label || source.name || '').trim();
+      if (sourceKey && label) sources.set(sourceKey, label);
+    });
     state.orders.forEach((order) => {
       const sourceKey = sourceKeyFromOrder(order);
       if (sourceKey && !sources.has(sourceKey)) {
@@ -425,6 +443,8 @@ document.addEventListener('DOMContentLoaded', () => {
       platform: String(order.platform || 'Shopee'),
       account: String(order.account || 'Jenang Gemi'),
       sourceAccountKey: String(order.sourceAccountKey || order.account_key || ''),
+      partnerCode: String(order.partnerCode || order.partner_code || ''),
+      partnerName: String(order.partnerName || order.partner_name || ''),
       status: String(order.status || 'IS_LISTED'),
       marketplaceStatus: String(order.marketplaceStatus || 'READY_TO_SHIP'),
       packageNumber: String(order.packageNumber || ''),
@@ -448,6 +468,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!response.ok || !payload.ok) {
       throw new Error(payload.error || 'Unable to load Shopee orders.');
     }
+
+    partnerOrderSources = (Array.isArray(payload.meta?.partner_orders?.sources) ? payload.meta.partner_orders.sources : [])
+      .map((source) => ({
+        key: normalizeSourceKey(source.key || source.sourceKey || ''),
+        label: String(source.label || source.name || '').trim()
+      }))
+      .filter((source) => source.key && source.label);
 
     const stored = readStoredOrders();
     const storedById = new Map(stored.map((order) => [String(order.id || ''), order]));
