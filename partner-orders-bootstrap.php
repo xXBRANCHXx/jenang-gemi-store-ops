@@ -532,6 +532,7 @@ function jg_store_ops_partner_orders_normalize(array $row, array $labels): array
     $orderId = (string) ($row['id'] ?? '');
     $createdAt = (string) ($row['created_at'] ?? '');
     $updatedAt = (string) ($row['updated_at'] ?? '');
+    $status = strtoupper(trim((string) ($row['status'] ?? '')));
 
     return [
         'id' => jg_store_ops_partner_orders_display_id($orderId),
@@ -541,7 +542,7 @@ function jg_store_ops_partner_orders_normalize(array $row, array $labels): array
         'partnerCode' => strtoupper(trim((string) ($row['partner_code'] ?? ''))),
         'partnerName' => jg_store_ops_partner_orders_partner_name((string) ($row['partner_code'] ?? '')),
         'sourceAccountKey' => jg_store_ops_partner_orders_source_key((string) ($row['partner_code'] ?? '')),
-        'status' => 'IS_LISTED',
+        'status' => $status !== '' ? $status : 'IS_LISTED',
         'marketplaceStatus' => 'PARTNER_ORDER',
         'instant' => false,
         'deadlineAt' => jg_store_ops_partner_orders_deadline_at($row),
