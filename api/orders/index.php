@@ -257,6 +257,302 @@ function jg_store_ops_orders_normalize_lookup_key(string $value): string
     return strtoupper(trim($value));
 }
 
+function jg_store_ops_orders_partner_host_candidates(string $host): array
+{
+    $hosts = [$host];
+    if ($host === 'local.server') {
+        $hosts[] = 'localhost';
+    }
+
+    return array_values(array_unique(array_filter(array_map('trim', $hosts))));
+}
+
+function jg_store_ops_orders_partner_db(): ?PDO
+{
+    static $pdo = false;
+
+    if ($pdo instanceof PDO) {
+        return $pdo;
+    }
+
+    if ($pdo === null) {
+        return null;
+    }
+
+    $config = [
+        'host' => jg_store_ops_orders_config('JG_PARTNER_DB_HOST', 'partner_db_host', 'localhost'),
+        'port' => jg_store_ops_orders_config('JG_PARTNER_DB_PORT', 'partner_db_port', '3306'),
+        'name' => jg_store_ops_orders_config('JG_PARTNER_DB_NAME', 'partner_db_name'),
+        'user' => jg_store_ops_orders_config('JG_PARTNER_DB_USER', 'partner_db_user'),
+        'pass' => jg_store_ops_orders_config('JG_PARTNER_DB_PASSWORD', 'partner_db_password'),
+        'charset' => jg_store_ops_orders_config('JG_PARTNER_DB_CHARSET', 'partner_db_charset', 'utf8mb4'),
+    ];
+
+    if ($config['name'] === '' || $config['user'] === '' || $config['pass'] === '') {
+        $pdo = null;
+        return null;
+    }
+
+    foreach (jg_store_ops_orders_partner_host_candidates($config['host']) as $host) {
+        $dsn = sprintf(
+            'mysql:host=%s;port=%s;dbname=%s;charset=%s',
+            $host,
+            $config['port'],
+            $config['name'],
+            $config['charset']
+        );
+
+        try {
+            $pdo = new PDO(
+                $dsn,
+                $config['user'],
+                $config['pass'],
+                [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                ]
+            );
+            return $pdo;
+        } catch (Throwable) {
+            $pdo = null;
+        }
+    }
+
+    return null;
+}
+
+function jg_store_ops_orders_partner_original_id(string $displayId): string
+{
+    $trimmed = trim($displayId);
+    if (str_starts_with(strtoupper($trimmed), 'PARTNER-')) {
+        return substr($trimmed, 8);
+    }
+
+    return $trimmed;
+}
+
+function jg_store_ops_orders_partner_feed_url(): string
+{
+    $configured = jg_store_ops_orders_config('JG_PARTNER_ORDERS_FEED_URL', 'partner_orders_feed_url');
+    if ($configured !== '') {
+        return $configured;
+    }
+
+    $baseUrl = rtrim(jg_store_ops_orders_config('JG_PARTNER_PORTAL_BASE_URL', 'partner_portal_base_url', 'https://partner.jenanggemi.com'), '/');
+    return $baseUrl . '/api/store-orders/';
+}
+
+function jg_store_ops_orders_partner_feed_token(): string
+{
+    return jg_store_ops_orders_config('JG_STORE_OPS_ORDERS_TOKEN', 'store_ops_orders_token');
+}
+
+function jg_store_ops_orders_partner_request_json(string $method, string $url, array $headers = [], ?array $body = null): ?array
+{
+    if ($url === '') {
+        return null;
+    }
+
+    $headers = array_values(array_filter($headers, static fn (string $header): bool => trim($header) !== ''));
+    if (!in_array('Accept: application/json', $headers, true)) {
+        array_unshift($headers, 'Accept: application/json');
+    }
+
+    $encodedBody = null;
+    if ($body !== null) {
+        $encodedBody = json_encode($body, JSON_UNESCAPED_SLASHES);
+        if (!is_string($encodedBody)) {
+            return null;
+        }
+        $headers[] = 'Content-Type: application/json';
+    }
+
+    if (function_exists('curl_init')) {
+        $curl = curl_init($url);
+        if ($curl === false) {
+            return null;
+        }
+
+        curl_setopt_array($curl, [
+            CURLOPT_CUSTOMREQUEST => strtoupper($method),
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 20,
+            CURLOPT_FOLLOWLOCATION => true,
+        ]);
+        if ($encodedBody !== null) {
+            curl_setopt($curl, CURLOPT_POSTFIELDS, $encodedBody);
+        }
+
+        $raw = curl_exec($curl);
+        $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        curl_close($curl);
+
+        if (!is_string($raw) || $status >= 400) {
+            return null;
+        }
+    } else {
+        $context = stream_context_create([
+            'http' => [
+                'method' => strtoupper($method),
+                'header' => implode("\r\n", $headers) . "\r\n",
+                'content' => $encodedBody ?? '',
+                'timeout' => 20,
+            ],
+        ]);
+        $raw = @file_get_contents($url, false, $context);
+        if (!is_string($raw)) {
+            return null;
+        }
+    }
+
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : null;
+}
+
+function jg_store_ops_orders_partner_status_is_visible(string $status): bool
+{
+    $normalized = strtoupper(trim($status));
+    return in_array($normalized, ['', 'DRAFT', 'READY', 'SUBMITTED', 'LISTED', 'IS_LISTED'], true);
+}
+
+function jg_store_ops_orders_partner_set_status_direct(string $orderId, string $status): bool
+{
+    $pdo = jg_store_ops_orders_partner_db();
+    if (!$pdo instanceof PDO) {
+        return false;
+    }
+
+    $stmt = $pdo->prepare(
+        'UPDATE partner_orders
+         SET status = :status, updated_at = :updated_at
+         WHERE id = :id'
+    );
+    $stmt->execute([
+        ':status' => $status,
+        ':updated_at' => gmdate('Y-m-d H:i:s'),
+        ':id' => $orderId,
+    ]);
+
+    if ($stmt->rowCount() > 0) {
+        return true;
+    }
+
+    $checkStmt = $pdo->prepare('SELECT COUNT(*) FROM partner_orders WHERE id = :id AND status = :status');
+    $checkStmt->execute([
+        ':id' => $orderId,
+        ':status' => $status,
+    ]);
+    return (int) $checkStmt->fetchColumn() > 0;
+}
+
+function jg_store_ops_orders_partner_set_status_feed(string $orderId, string $status): bool
+{
+    $token = jg_store_ops_orders_partner_feed_token();
+    if ($token === '') {
+        return false;
+    }
+
+    $feedUrl = jg_store_ops_orders_partner_feed_url();
+    $separator = str_contains($feedUrl, '?') ? '&' : '?';
+    $response = jg_store_ops_orders_partner_request_json('POST', $feedUrl . $separator . 'token=' . rawurlencode($token), [
+        'X-Store-Ops-Token: ' . $token,
+    ], [
+        'action' => 'update_status',
+        'order_id' => $orderId,
+        'status' => $status,
+    ]);
+
+    return is_array($response) && !empty($response['ok']);
+}
+
+function jg_store_ops_orders_partner_update_status(string $displayId, string $status): bool
+{
+    $normalizedStatus = strtoupper(trim($status));
+    if (!in_array($normalizedStatus, ['IS_LISTED', 'IS_BEING_FULFILLED', 'FULFILLED'], true)) {
+        return false;
+    }
+
+    $originalId = jg_store_ops_orders_partner_original_id($displayId);
+    if ($originalId === '') {
+        return false;
+    }
+
+    $updatedFeed = jg_store_ops_orders_partner_set_status_feed($originalId, $normalizedStatus);
+    $updatedDirect = jg_store_ops_orders_partner_set_status_direct($originalId, $normalizedStatus);
+
+    return $updatedFeed || $updatedDirect;
+}
+
+function jg_store_ops_orders_partner_status_map(array $partnerOrders): array
+{
+    $orderIds = array_values(array_unique(array_filter(array_map(
+        static fn (array $order): string => trim((string) ($order['sourceOrderId'] ?? '')),
+        $partnerOrders
+    ))));
+
+    if ($orderIds === []) {
+        return [];
+    }
+
+    $pdo = jg_store_ops_orders_partner_db();
+    if (!$pdo instanceof PDO) {
+        return [];
+    }
+
+    $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
+    $stmt = $pdo->prepare("SELECT id, status FROM partner_orders WHERE id IN ($placeholders)");
+    $stmt->execute($orderIds);
+
+    $statuses = [];
+    foreach ($stmt->fetchAll() as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $id = trim((string) ($row['id'] ?? ''));
+        if ($id === '') {
+            continue;
+        }
+        $statuses[$id] = strtoupper(trim((string) ($row['status'] ?? '')));
+    }
+
+    return $statuses;
+}
+
+function jg_store_ops_orders_refresh_partner_orders(array $partnerOrders): array
+{
+    $statusMap = jg_store_ops_orders_partner_status_map($partnerOrders['orders'] ?? []);
+    if ($statusMap === []) {
+        return $partnerOrders;
+    }
+
+    $orders = [];
+    foreach ((array) ($partnerOrders['orders'] ?? []) as $order) {
+        if (!is_array($order)) {
+            continue;
+        }
+
+        $sourceOrderId = trim((string) ($order['sourceOrderId'] ?? ''));
+        if ($sourceOrderId !== '' && isset($statusMap[$sourceOrderId])) {
+            $order['status'] = $statusMap[$sourceOrderId] !== '' ? $statusMap[$sourceOrderId] : (string) ($order['status'] ?? 'IS_LISTED');
+        }
+
+        if (!jg_store_ops_orders_partner_status_is_visible((string) ($order['status'] ?? ''))) {
+            continue;
+        }
+
+        $orders[] = $order;
+    }
+
+    $partnerOrders['orders'] = $orders;
+    if (is_array($partnerOrders['meta'] ?? null)) {
+        $partnerOrders['meta']['count'] = count($orders);
+    }
+
+    return $partnerOrders;
+}
+
 function jg_store_ops_orders_sku_lookup(): array
 {
     try {
@@ -355,7 +651,7 @@ if ($method === 'POST') {
     if (!str_starts_with(strtoupper($orderId), 'PARTNER-')) {
         jg_store_ops_orders_fail('Partner order number is required.');
     }
-    if (!jg_store_ops_partner_orders_update_status($orderId, $status)) {
+    if (!jg_store_ops_orders_partner_update_status($orderId, $status)) {
         jg_store_ops_orders_fail('Unable to update partner order status.', 422);
     }
 
@@ -467,7 +763,7 @@ if ($successfulAccounts === 0 && $errors !== []) {
 }
 
 $decoded = jg_store_ops_orders_map_item_skus($decoded);
-$partnerOrders = jg_store_ops_partner_orders_list();
+$partnerOrders = jg_store_ops_orders_refresh_partner_orders(jg_store_ops_partner_orders_list());
 $decoded['orders'] = array_values(array_merge(
     is_array($decoded['orders'] ?? null) ? $decoded['orders'] : [],
     $partnerOrders['orders']
