@@ -261,7 +261,7 @@ function jg_store_ops_orders_sku_lookup(): array
 {
     try {
         $pdo = jg_store_ops_sku_db();
-        $stmt = $pdo->query('SELECT sku, tag FROM sku_skus');
+        $stmt = $pdo->query('SELECT sku, tag, skip_scan FROM sku_skus');
         $rows = $stmt->fetchAll();
     } catch (Throwable) {
         return [];
@@ -280,13 +280,18 @@ function jg_store_ops_orders_sku_lookup(): array
         }
 
         $skuKey = jg_store_ops_orders_normalize_lookup_key($sku);
+        $skuPayload = [
+            'sku' => $sku,
+            'skip_scan' => (int) ($row['skip_scan'] ?? 0) === 1,
+        ];
+
         if ($skuKey !== '' && !isset($lookup[$skuKey])) {
-            $lookup[$skuKey] = $sku;
+            $lookup[$skuKey] = $skuPayload;
         }
 
         $tagKey = jg_store_ops_orders_normalize_lookup_key($tag);
         if ($tagKey !== '' && !isset($lookup[$tagKey])) {
-            $lookup[$tagKey] = $sku;
+            $lookup[$tagKey] = $skuPayload;
         }
     }
 
@@ -312,7 +317,8 @@ function jg_store_ops_orders_map_item_skus(array $payload): array
 
             $sourceTag = trim((string) ($item['sku'] ?? ''));
             $key = jg_store_ops_orders_normalize_lookup_key($sourceTag);
-            $matchedSku = $key !== '' ? (string) ($lookup[$key] ?? '') : '';
+            $matchedRow = $key !== '' && isset($lookup[$key]) && is_array($lookup[$key]) ? $lookup[$key] : null;
+            $matchedSku = is_array($matchedRow) ? (string) ($matchedRow['sku'] ?? '') : '';
             if ($matchedSku === '') {
                 $item['source_tag'] = $sourceTag;
                 $item['sku_match_status'] = 'unmatched';
@@ -322,6 +328,7 @@ function jg_store_ops_orders_map_item_skus(array $payload): array
             $item['source_tag'] = $sourceTag;
             $item['sku'] = $matchedSku;
             $item['barcode'] = $matchedSku;
+            $item['skip_scan'] = !empty($matchedRow['skip_scan']);
             $item['sku_match_status'] = 'matched';
         }
         unset($item);

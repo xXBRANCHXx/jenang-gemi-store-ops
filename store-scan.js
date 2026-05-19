@@ -112,6 +112,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const scanCountFor = (sku) => Number(scans.get(sku) || 0);
   const scanSkuFor = (item) => String(item.scanSku || item.sku || '');
   const scanQuantityFor = (item) => Number(item.scanQuantity || item.quantity || 0);
+  const skipScanFor = (item) => Boolean(item.skipScan || item.skip_scan);
+  const skipQuantityFor = (item) => Number(item.skipQuantity || (skipScanFor(item) ? scanQuantityFor(item) : 0));
+  const manualQuantityFor = (item) => Math.max(0, scanQuantityFor(item) - skipQuantityFor(item));
   const sourceSkusFor = (item) => {
     if (Array.isArray(item.sourceSkus)) return item.sourceSkus;
     const sku = String(item.sku || '').trim();
@@ -131,6 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const key = scanSku || scanBarcode || String(item.productName || item.scanProductName || '');
       const quantity = Number(item.quantity || 0);
       const scanQuantity = scanQuantityFor(item);
+      const skipQuantity = skipScanFor(item) ? scanQuantity : 0;
       if (!key) return;
 
       const sourceSku = String(item.sku || '').trim();
@@ -139,6 +143,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (existing) {
         existing.quantity += quantity;
         existing.scanQuantity += scanQuantity;
+        existing.skipQuantity = Number(existing.skipQuantity || 0) + skipQuantity;
+        existing.skipScan = Number(existing.skipQuantity || 0) >= existing.scanQuantity;
         if (sourceSku && !existing.sourceSkus.includes(sourceSku)) existing.sourceSkus.push(sourceSku);
         if (sourceBarcode && !existing.sourceBarcodes.includes(sourceBarcode)) existing.sourceBarcodes.push(sourceBarcode);
         return;
@@ -148,6 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ...item,
         quantity,
         scanQuantity,
+        skipQuantity,
         sourceSkus: sourceSku ? [sourceSku] : [],
         sourceBarcodes: sourceBarcode ? [sourceBarcode] : []
       });
@@ -158,7 +165,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const scanItems = () => order ? consolidateScanItems(order.items) : [];
   const totalRequired = () => scanItems().reduce((sum, item) => sum + scanQuantityFor(item), 0);
-  const totalScanned = () => scanItems().reduce((sum, item) => sum + Math.min(scanCountFor(scanSkuFor(item)), scanQuantityFor(item)), 0);
+  const totalScanned = () => scanItems().reduce((sum, item) => {
+    const required = scanQuantityFor(item);
+    return sum + skipQuantityFor(item) + Math.min(scanCountFor(scanSkuFor(item)), manualQuantityFor(item), required);
+  }, 0);
 
   const normalizeScanCode = (value) => String(value || '').trim().toUpperCase();
   const orderOwner = () => normalizeProfile(order?.assignedProfile || '');
@@ -289,7 +299,9 @@ document.addEventListener('DOMContentLoaded', () => {
       scanList.innerHTML = scanItems().map((item) => {
         const scanSku = scanSkuFor(item);
         const required = scanQuantityFor(item);
-        const count = scanCountFor(scanSku);
+        const skipped = skipQuantityFor(item);
+        const manualRequired = manualQuantityFor(item);
+        const count = skipped + Math.min(scanCountFor(scanSku), manualRequired, required);
         const complete = count >= required;
         const sourceSkus = sourceSkusFor(item).filter((sku) => sku && sku !== scanSku);
         const codeLabel = sourceSkus.length === 1
@@ -299,12 +311,16 @@ document.addEventListener('DOMContentLoaded', () => {
           <article class="admin-scan-item ${complete ? 'is-complete' : ''}">
             <div>
               <strong>${escapeHtml(item.scanProductName || item.productName)}</strong>
-              <span>${escapeHtml(codeLabel)}</span>
+              <span>${escapeHtml(skipped > 0 ? `${codeLabel} / Skip Scan` : codeLabel)}</span>
             </div>
             <em>${count}/${escapeHtml(required)}</em>
           </article>
         `;
       }).join('');
+    }
+
+    if (required > 0 && scanned >= required) {
+      window.setTimeout(openPrintLabelPage, 120);
     }
   };
 
@@ -341,9 +357,16 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
 
+    const matchManualRequired = manualQuantityFor(match);
+    if (matchManualRequired <= 0) {
+      setError(`${match.scanProductName || match.productName} is set to Skip Scan.`);
+      setScanStatus('Scan skipped', `${match.scanProductName || match.productName} is already counted as scanned.`);
+      return false;
+    }
+
     const matchSku = scanSkuFor(match);
     const current = scanCountFor(matchSku);
-    if (current >= scanQuantityFor(match)) {
+    if (current >= matchManualRequired) {
       setError(`${match.scanProductName || match.productName} is already fully scanned.`);
       setScanStatus('Already complete', `${match.scanProductName || match.productName} does not need more scans.`);
       return false;
@@ -352,7 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
     scans.set(matchSku, current + 1);
     setError('');
     render();
-    setScanStatus('Scan accepted', `${match.scanProductName || match.productName} ${current + 1}/${scanQuantityFor(match)}`);
+    setScanStatus('Scan accepted', `${match.scanProductName || match.productName} ${skipQuantityFor(match) + current + 1}/${scanQuantityFor(match)}`);
     if (totalRequired() > 0 && totalScanned() >= totalRequired()) {
       openPrintLabelPage();
     }

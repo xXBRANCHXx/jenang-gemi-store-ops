@@ -38,6 +38,7 @@ function jg_store_ops_sku_database(PDO $pdo): array
             s.current_stock,
             s.stock_trigger,
             s.inventory_mode,
+            s.skip_scan,
             s.cogs,
             s.created_at,
             s.updated_at
@@ -63,6 +64,7 @@ function jg_store_ops_sku_database(PDO $pdo): array
             'current_stock' => (int) ($row['current_stock'] ?? 0),
             'stock_trigger' => (int) ($row['stock_trigger'] ?? 0),
             'inventory_mode' => (string) ($row['inventory_mode'] ?? ''),
+            'skip_scan' => (int) ($row['skip_scan'] ?? 0) === 1,
             'cogs' => number_format((float) ($row['cogs'] ?? 0), 2, '.', ''),
             'created_at' => (string) ($row['created_at'] ?? ''),
             'updated_at' => (string) ($row['updated_at'] ?? ''),

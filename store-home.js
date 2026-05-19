@@ -272,6 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
       astra: astra > 0 ? astra : volume,
       flavorId: String(row.flavor_id || ''),
       productId: String(row.product_id || ''),
+      skipScan: Boolean(row.skip_scan),
       productName: productNameFromSkuRow(row) || sku
     };
   };
@@ -291,6 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
         scanSku: scanItem.sku,
         scanBarcode: scanItem.barcode,
         scanProductName: scanItem.productName,
+        skipScan: Boolean(item.skipScan),
         scanMultiplier: multiplier
       };
     });
@@ -319,19 +321,23 @@ document.addEventListener('DOMContentLoaded', () => {
       const key = scanSku || scanBarcode || String(item.productName || item.scanProductName || '');
       const quantity = Number(item.quantity || 0);
       const scanQuantity = Number(item.scanQuantity || quantity);
+      const skipQuantity = item.skipScan ? scanQuantity : 0;
       if (!key) return;
 
       const existing = grouped.get(key);
       if (existing) {
         existing.quantity += quantity;
         existing.scanQuantity += scanQuantity;
+        existing.skipQuantity = Number(existing.skipQuantity || 0) + skipQuantity;
+        existing.skipScan = Number(existing.skipQuantity || 0) >= existing.scanQuantity;
         return;
       }
 
       grouped.set(key, {
         ...item,
         quantity,
-        scanQuantity
+        scanQuantity,
+        skipQuantity
       });
     });
 
@@ -371,6 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ...catalogItem,
         quantity,
         scanQuantity: quantity * Number(catalogItem.scanMultiplier || 1),
+        skipScan: Boolean(catalogItem.skipScan),
         sourceSkus: [catalogItem.sku].filter(Boolean),
         sourceTags: sourceTag && sourceTag !== String(catalogItem.sku || '').trim().toUpperCase() ? [sourceTag] : [],
         sourceBarcodes: [String(catalogItem.barcode || catalogItem.sku || '').trim()].filter(Boolean),
@@ -388,6 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
       scanBarcode: String(item.barcode || sourceTag).trim(),
       scanProductName: String(item.productName || sourceTag || 'Shopee item').trim(),
       scanMultiplier: 1,
+      skipScan: Boolean(item.skip_scan || item.skipScan),
       quantity,
       scanQuantity: quantity,
       sourceSkus: sourceTag ? [sourceTag] : [],
@@ -776,7 +784,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const scanQuantity = Number(item.scanQuantity || item.quantity);
         const multiplier = Number(item.scanMultiplier || 1);
         const scanSku = String(item.scanSku || item.sku || '');
-        const scanNote = multiplier > 1 ? `${scanSku} ${multiplier}X` : scanSku;
+        const skipped = Number(item.skipQuantity || (item.skipScan ? scanQuantity : 0));
+        const scanNote = skipped > 0 ? `${scanSku} / Skip Scan` : (multiplier > 1 ? `${scanSku} ${multiplier}X` : scanSku);
         return `
           <article class="admin-pick-item">
             <div>

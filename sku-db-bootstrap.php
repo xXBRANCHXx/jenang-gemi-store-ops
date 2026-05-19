@@ -48,12 +48,19 @@ function jg_store_ops_sku_db(): PDO
             PDO::ATTR_EMULATE_PREPARES => false,
         ]
     );
-    jg_store_ops_sku_ensure_astra_schema($pdo);
+    jg_store_ops_sku_ensure_schema($pdo);
 
     return $pdo;
 }
 
-function jg_store_ops_sku_ensure_astra_schema(PDO $pdo): void
+function jg_store_ops_sku_ensure_schema(PDO $pdo): void
+{
+    jg_store_ops_sku_ensure_column($pdo, 'sku_skus', 'astra', 'DECIMAL(6,2) NOT NULL DEFAULT 0.00 AFTER volume');
+    jg_store_ops_sku_ensure_column($pdo, 'sku_skus', 'skip_scan', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER inventory_mode');
+    $pdo->exec('UPDATE sku_skus SET astra = volume WHERE astra <= 0');
+}
+
+function jg_store_ops_sku_ensure_column(PDO $pdo, string $tableName, string $columnName, string $definition): void
 {
     $stmt = $pdo->prepare(
         'SELECT COUNT(*)
@@ -63,13 +70,11 @@ function jg_store_ops_sku_ensure_astra_schema(PDO $pdo): void
            AND COLUMN_NAME = :column_name'
     );
     $stmt->execute([
-        ':table_name' => 'sku_skus',
-        ':column_name' => 'astra',
+        ':table_name' => $tableName,
+        ':column_name' => $columnName,
     ]);
 
     if ((int) $stmt->fetchColumn() === 0) {
-        $pdo->exec('ALTER TABLE sku_skus ADD COLUMN astra DECIMAL(6,2) NOT NULL DEFAULT 0.00 AFTER volume');
+        $pdo->exec(sprintf('ALTER TABLE `%s` ADD COLUMN `%s` %s', $tableName, $columnName, $definition));
     }
-
-    $pdo->exec('UPDATE sku_skus SET astra = volume WHERE astra <= 0');
 }
