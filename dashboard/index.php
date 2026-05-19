@@ -159,6 +159,10 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
                         </button>
                     </div>
                 </div>
+                <div class="admin-reprint-field">
+                    <span>Order colors</span>
+                    <div class="admin-source-color-list" data-source-color-list></div>
+                </div>
                 <p class="admin-form-error" data-store-settings-error hidden></p>
                 <div class="admin-profile-list" data-profile-list></div>
                 <div class="admin-modal-actions">

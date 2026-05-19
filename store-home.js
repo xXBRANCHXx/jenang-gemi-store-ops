@@ -38,11 +38,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const settingsForm = document.querySelector('[data-store-settings-form]');
   const settingsError = document.querySelector('[data-store-settings-error]');
   const profileList = document.querySelector('[data-profile-list]');
+  const sourceColorList = document.querySelector('[data-source-color-list]');
   const ordersStorageKey = 'jg-store-live-orders';
   const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const activeProfileStorageKey = 'jg-store-active-profile';
   const themeStorageKey = 'jg-admin-theme';
+  const sourceColorStorageKey = 'jg-store-source-colors';
   const skuDbEndpoint = '../api/sku-db/';
   const ordersEndpoint = '../api/orders/';
   const scanBridgeEndpoint = '../api/scan-bridge/';
@@ -54,10 +56,26 @@ document.addEventListener('DOMContentLoaded', () => {
   let profiles = [];
   let pendingOrderId = '';
   let activeProfile = '';
+  let sourceColorMap = {};
   let state = {
     orders: [],
     activeOrderId: '',
     scans: new Map()
+  };
+
+  const sourceColorOptions = [
+    { value: 'aqua', label: 'Aqua' },
+    { value: 'lime', label: 'Lime' },
+    { value: 'amber', label: 'Amber' },
+    { value: 'violet', label: 'Violet' },
+    { value: 'rose', label: 'Rose' },
+    { value: 'indigo', label: 'Indigo' },
+    { value: 'slate', label: 'Slate' }
+  ];
+
+  const defaultSourceColors = {
+    'jenang-gemi-shopee': 'aqua',
+    'zero-shopee': 'lime'
   };
 
   const normalizeProfile = (value) => String(value || '')
@@ -66,6 +84,98 @@ document.addEventListener('DOMContentLoaded', () => {
     .replace(/[^a-z0-9._-]+/g, '-')
     .replace(/^[._-]+|[._-]+$/g, '')
     .slice(0, 40);
+
+  const normalizeSourceKey = (value) => String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^[._-]+|[._-]+$/g, '')
+    .slice(0, 80);
+
+  const readSourceColorMap = () => {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(sourceColorStorageKey) || '{}');
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (_error) {
+      return {};
+    }
+  };
+
+  const saveSourceColorMap = () => {
+    try {
+      window.localStorage.setItem(sourceColorStorageKey, JSON.stringify(sourceColorMap));
+    } catch (_error) {
+      // Source colors are optional; keep fulfillment usable if storage is blocked.
+    }
+  };
+
+  const sourceKeyFromOrder = (order) => {
+    const accountKey = normalizeSourceKey(order?.sourceAccountKey || order?.account_key || '');
+    if (accountKey) return accountKey;
+    const platform = normalizeSourceKey(order?.platform || '');
+    const account = normalizeSourceKey(order?.account || '');
+    if (platform === 'partner') return `partner-${account || 'unknown'}`;
+    return account || platform || 'unknown';
+  };
+
+  const sourceLabelFromOrder = (order) => {
+    const account = String(order?.account || '').trim();
+    const accountKey = String(order?.sourceAccountKey || order?.account_key || '').trim();
+    if (accountKey === 'jenang-gemi-shopee') return 'JG Shopee';
+    if (accountKey === 'zero-shopee') return 'ZERO Shopee';
+    if (account) return account;
+    return accountKey || String(order?.platform || 'Source');
+  };
+
+  const colorForSource = (sourceKey) => {
+    const configured = String(sourceColorMap[sourceKey] || '').trim();
+    return configured || defaultSourceColors[sourceKey] || '';
+  };
+
+  const detectOrderSources = () => {
+    const sources = new Map([
+      ['jenang-gemi-shopee', 'JG Shopee'],
+      ['zero-shopee', 'ZERO Shopee']
+    ]);
+    state.orders.forEach((order) => {
+      const sourceKey = sourceKeyFromOrder(order);
+      if (sourceKey && !sources.has(sourceKey)) {
+        sources.set(sourceKey, sourceLabelFromOrder(order));
+      }
+    });
+    return [...sources.entries()].sort((left, right) => left[1].localeCompare(right[1]));
+  };
+
+  const renderSourceColorList = () => {
+    if (!sourceColorList) return;
+    const sources = detectOrderSources();
+    sourceColorList.innerHTML = sources.length
+      ? sources.map(([sourceKey, label]) => {
+        const selectedColor = colorForSource(sourceKey);
+        return `
+          <div class="admin-source-color-row">
+            <strong>${escapeHtml(label)}</strong>
+            <div class="admin-source-color-swatches">
+              ${sourceColorOptions.map((option) => `
+                <button
+                  type="button"
+                  class="admin-source-color-btn ${selectedColor === option.value ? 'is-active' : ''}"
+                  data-source-color-key="${escapeHtml(sourceKey)}"
+                  data-source-color-value="${escapeHtml(option.value)}"
+                  data-source-color="${escapeHtml(option.value)}"
+                  title="${escapeHtml(option.label)}"
+                  aria-label="${escapeHtml(label)} ${escapeHtml(option.label)}"
+                  aria-pressed="${selectedColor === option.value ? 'true' : 'false'}"
+                ></button>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }).join('')
+      : '<small>No order sources loaded yet.</small>';
+  };
+
+  sourceColorMap = readSourceColorMap();
 
   const applyTheme = (theme) => {
     const nextTheme = adminThemes.includes(theme) ? theme : 'dark';
@@ -428,6 +538,7 @@ document.addEventListener('DOMContentLoaded', () => {
       settingsError.hidden = true;
     }
     renderProfileList();
+    renderSourceColorList();
     settingsModal.hidden = false;
     const input = settingsModal.querySelector('input[name="profile_new"]');
     if (input instanceof HTMLInputElement) {
@@ -608,16 +719,23 @@ document.addEventListener('DOMContentLoaded', () => {
       const isCritical = isCriticalOrder(order);
       const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
       const owner = orderOwner(order);
+      const sourceKey = sourceKeyFromOrder(order);
+      const sourceLabel = sourceLabelFromOrder(order);
+      const sourceColor = colorForSource(sourceKey);
       const buttonLabel = owner || (index === 0 ? 'Start Next' : 'Start');
       return `
-        <article class="admin-order-card ${isCritical ? 'is-critical' : ''} ${order.started ? 'is-started' : ''}">
+        <article
+          class="admin-order-card ${isCritical ? 'is-critical' : ''} ${order.started ? 'is-started' : ''}"
+          data-source-key="${escapeHtml(sourceKey)}"
+          ${sourceColor ? `data-source-color="${escapeHtml(sourceColor)}"` : ''}
+        >
           <div class="admin-order-card-top">
             <span class="admin-order-id">${escapeHtml(order.id)}</span>
             ${order.instant ? '<span class="admin-instant-badge" title="Instant order">I</span>' : ''}
           </div>
           <div class="admin-order-deadline">${escapeHtml(formatDeadline(order))}</div>
           <div class="admin-order-meta">
-            <span>${escapeHtml(order.platform)}</span>
+            <span>${escapeHtml(sourceLabel)}</span>
             <span>${escapeHtml(order.marketplaceStatus)}</span>
             <span>${itemCount} item${itemCount === 1 ? '' : 's'}</span>
           </div>
@@ -747,6 +865,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  sourceColorList?.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const button = target?.closest('[data-source-color-key][data-source-color-value]');
+    if (!(button instanceof HTMLButtonElement)) return;
+    const sourceKey = normalizeSourceKey(button.dataset.sourceColorKey || '');
+    const color = String(button.dataset.sourceColorValue || '').trim();
+    if (!sourceKey || !sourceColorOptions.some((option) => option.value === color)) return;
+    sourceColorMap[sourceKey] = color;
+    saveSourceColorMap();
+    renderSourceColorList();
+    renderBoard();
+  });
+
   document.querySelectorAll('[data-close-store-settings]').forEach((button) => {
     button.addEventListener('click', closeSettingsModal);
   });
@@ -793,6 +924,12 @@ document.addEventListener('DOMContentLoaded', () => {
       renderBoard();
       return;
     }
+    if (event.key === sourceColorStorageKey) {
+      sourceColorMap = readSourceColorMap();
+      renderSourceColorList();
+      renderBoard();
+      return;
+    }
     if (event.key !== ordersStorageKey) return;
     renderBoard();
   });
@@ -804,6 +941,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.orders = await loadOrders();
       saveOrders();
       renderBoard();
+      renderSourceColorList();
     } catch (error) {
       if (!showError) return;
       const message = error instanceof Error ? error.message : 'Unable to load Shopee orders.';
