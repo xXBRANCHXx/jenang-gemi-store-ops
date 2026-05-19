@@ -183,6 +183,70 @@ function jg_store_ops_partner_orders_fetch_json(string $url, array $headers = []
     return is_array($decoded) ? $decoded : null;
 }
 
+function jg_store_ops_partner_orders_request_json(string $method, string $url, array $headers = [], ?array $body = null): ?array
+{
+    if ($url === '') {
+        return null;
+    }
+
+    $headers = array_values(array_filter($headers, static fn (string $header): bool => trim($header) !== ''));
+    if (!in_array('Accept: application/json', $headers, true)) {
+        array_unshift($headers, 'Accept: application/json');
+    }
+
+    $encodedBody = null;
+    if ($body !== null) {
+        $encodedBody = json_encode($body, JSON_UNESCAPED_SLASHES);
+        if (!is_string($encodedBody)) {
+            return null;
+        }
+        $headers[] = 'Content-Type: application/json';
+    }
+
+    if (function_exists('curl_init')) {
+        $curl = curl_init($url);
+        if ($curl === false) {
+            return null;
+        }
+        curl_setopt_array($curl, [
+            CURLOPT_CUSTOMREQUEST => strtoupper($method),
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 20,
+            CURLOPT_FOLLOWLOCATION => true,
+        ]);
+        if ($encodedBody !== null) {
+            curl_setopt($curl, CURLOPT_POSTFIELDS, $encodedBody);
+        }
+        $raw = curl_exec($curl);
+        $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        $error = curl_error($curl);
+        curl_close($curl);
+        if (!is_string($raw) || $status >= 400) {
+            if ($error !== '') {
+                jg_store_ops_partner_orders_last_error($error);
+            }
+            return null;
+        }
+    } else {
+        $context = stream_context_create([
+            'http' => [
+                'method' => strtoupper($method),
+                'header' => implode("\r\n", $headers) . "\r\n",
+                'content' => $encodedBody ?? '',
+                'timeout' => 20,
+            ],
+        ]);
+        $raw = @file_get_contents($url, false, $context);
+        if (!is_string($raw)) {
+            return null;
+        }
+    }
+
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : null;
+}
+
 function jg_store_ops_partner_orders_fetch_feed(): ?array
 {
     $token = jg_store_ops_partner_orders_feed_token();
@@ -325,13 +389,29 @@ function jg_store_ops_partner_orders_update_status(string $displayId, string $st
         return false;
     }
 
-    $pdo = jg_store_ops_partner_orders_db();
-    if (!$pdo instanceof PDO) {
+    $originalId = jg_store_ops_partner_orders_original_id($displayId);
+    if ($originalId === '') {
         return false;
     }
 
-    $originalId = jg_store_ops_partner_orders_original_id($displayId);
-    if ($originalId === '') {
+    $token = jg_store_ops_partner_orders_feed_token();
+    if ($token !== '') {
+        $feedUrl = jg_store_ops_partner_orders_feed_url();
+        $separator = str_contains($feedUrl, '?') ? '&' : '?';
+        $response = jg_store_ops_partner_orders_request_json('POST', $feedUrl . $separator . 'token=' . rawurlencode($token), [
+            'X-Store-Ops-Token: ' . $token,
+        ], [
+            'action' => 'update_status',
+            'order_id' => $originalId,
+            'status' => $normalizedStatus,
+        ]);
+        if (is_array($response) && !empty($response['ok'])) {
+            return true;
+        }
+    }
+
+    $pdo = jg_store_ops_partner_orders_db();
+    if (!$pdo instanceof PDO) {
         return false;
     }
 

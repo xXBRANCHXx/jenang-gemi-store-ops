@@ -52,6 +52,16 @@ document.addEventListener('DOMContentLoaded', () => {
   let printInProgress = false;
   let labelUrl = '';
   let labelLoaded = false;
+  const dashboardUrl = (() => {
+    try {
+      if (window.opener && !window.opener.closed && window.opener.location) {
+        return window.opener.location.href || '../';
+      }
+    } catch (_error) {
+      // Cross-window reads can fail; fall back to the dashboard path.
+    }
+    return '../';
+  })();
 
   const persistPartnerStatus = async (status) => {
     if (!order || String(order.platform || '').toLowerCase() !== 'partner') return true;
@@ -112,10 +122,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!printInProgress) return;
     printInProgress = false;
     window.clearTimeout(returnTimer);
+    try {
+      if (window.opener && !window.opener.closed) {
+        window.opener.focus();
+      }
+    } catch (_error) {
+      // Ignore cross-window focus issues.
+    }
+    try {
+      window.open('', '_self');
+    } catch (_error) {
+      // Ignore close-prep issues.
+    }
     window.close();
     window.setTimeout(() => {
-      window.location.href = '../';
-    }, 250);
+      window.location.replace(dashboardUrl);
+    }, 150);
   };
 
   const printLabel = async () => {

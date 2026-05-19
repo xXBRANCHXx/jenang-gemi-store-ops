@@ -564,7 +564,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const openStorePage = (url) => {
     const page = window.open(url, '_blank');
     if (page) {
-      page.opener = null;
       return;
     }
     window.location.href = url;
