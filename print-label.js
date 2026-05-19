@@ -53,6 +53,31 @@ document.addEventListener('DOMContentLoaded', () => {
   let labelUrl = '';
   let labelLoaded = false;
 
+  const persistPartnerStatus = async (status) => {
+    if (!order || String(order.platform || '').toLowerCase() !== 'partner') return true;
+    const response = await fetch('../../api/orders/', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        action: 'partner_status',
+        order: order.id,
+        status
+      })
+    });
+    if (!response.ok) {
+      let message = 'Unable to update partner order status.';
+      try {
+        const payload = await response.json();
+        message = payload.error || message;
+      } catch (_error) {
+        // Keep generic message.
+      }
+      throw new Error(message);
+    }
+    return true;
+  };
+
   const setError = (message) => {
     if (!errorNode) return;
     errorNode.textContent = message;
@@ -81,24 +106,6 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (_error) {
       // Dashboard will still sync the order queue when it regains focus.
     }
-    if (String(order.platform || '').toLowerCase() === 'partner') {
-      const body = JSON.stringify({
-        action: 'partner_status',
-        order: order.id,
-        status: 'IS_BEING_FULFILLED'
-      });
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon('../../api/orders/', new Blob([body], { type: 'application/json' }));
-      } else {
-        fetch('../../api/orders/', {
-          method: 'POST',
-          credentials: 'same-origin',
-          keepalive: true,
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body
-        }).catch(() => {});
-      }
-    }
   };
 
   const returnToDashboard = () => {
@@ -111,15 +118,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 250);
   };
 
-  const printLabel = () => {
+  const printLabel = async () => {
     if (!order || !labelLoaded) return;
     if (statusNode) statusNode.textContent = 'Printing';
     printInProgress = true;
     window.clearTimeout(returnTimer);
+    try {
+      await persistPartnerStatus('IS_BEING_FULFILLED');
+      markPrinted();
+    } catch (error) {
+      printInProgress = false;
+      if (statusNode) statusNode.textContent = 'Ready';
+      setError(error instanceof Error ? error.message : 'Unable to update order status.');
+      return;
+    }
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         try {
-          markPrinted();
           const frameWindow = labelFrame instanceof HTMLIFrameElement ? labelFrame.contentWindow : null;
           if (frameWindow) {
             frameWindow.focus();
@@ -127,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
           } else {
             window.print();
           }
-          returnTimer = window.setTimeout(returnToDashboard, 60000);
+          returnTimer = window.setTimeout(returnToDashboard, 1500);
         } catch (_error) {
           printInProgress = false;
           if (statusNode) statusNode.textContent = 'Ready';
