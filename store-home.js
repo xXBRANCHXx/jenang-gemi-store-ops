@@ -391,12 +391,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const quantity = Math.max(1, Number(item.quantity || 1));
     const catalogItem = sourceTag ? catalogRows.get(sourceTag) : null;
     if (catalogItem) {
+      const orderedProductName = String(item.productName || '').trim();
+      const productName = orderedProductName || catalogItem.productName;
       return {
         ...catalogItem,
+        productName,
+        scanProductName: productName,
         quantity,
         scanQuantity: quantity * Number(catalogItem.scanMultiplier || 1),
         skipScan: Boolean(catalogItem.skipScan),
-        sourceSkus: [catalogItem.sku].filter(Boolean),
+        sourceSkus: Array.from(new Set([sourceTag, catalogItem.sku].filter(Boolean))),
         sourceTags: sourceTag && sourceTag !== String(catalogItem.sku || '').trim().toUpperCase() ? [sourceTag] : [],
         sourceBarcodes: [String(catalogItem.barcode || catalogItem.sku || '').trim()].filter(Boolean),
         skuMatchStatus: item.sku_match_status || 'matched',
