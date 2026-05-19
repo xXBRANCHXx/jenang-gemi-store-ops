@@ -128,9 +128,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (accountKey === 'jenang-gemi-tiktok') return 'JG TikTok';
     if (accountKey === 'zero-tiktok') return 'ZERO TikTok';
     if (accountKey === 'zfit-tiktok') return 'ZFIT TikTok';
-    if (accountKey === 'jenang-gemi-tokopedia') return 'JG Tokopedia';
-    if (accountKey === 'zero-tokopedia') return 'ZERO Tokopedia';
-    if (accountKey === 'zfit-tokopedia') return 'ZFIT Tokopedia';
     if (account) return account;
     return accountKey || String(order?.platform || 'Source');
   };
@@ -151,10 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ['zero-shopee', 'ZERO Shopee'],
       ['jenang-gemi-tiktok', 'JG TikTok'],
       ['zero-tiktok', 'ZERO TikTok'],
-      ['zfit-tiktok', 'ZFIT TikTok'],
-      ['jenang-gemi-tokopedia', 'JG Tokopedia'],
-      ['zero-tokopedia', 'ZERO Tokopedia'],
-      ['zfit-tokopedia', 'ZFIT Tokopedia']
+      ['zfit-tiktok', 'ZFIT TikTok']
     ]);
     state.orders.forEach((order) => {
       const sourceKey = sourceKeyFromOrder(order);

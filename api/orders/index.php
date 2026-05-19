@@ -64,12 +64,13 @@ function jg_store_ops_orders_configured_sources(): array
 {
     $sourcesValue = jg_store_ops_orders_config('JG_MARKETPLACE_SOURCES', 'marketplace_sources');
     $sources = [];
+    $supportedMarketplacePlatforms = ['shopee', 'tiktok'];
     if ($sourcesValue !== '') {
         foreach (explode(',', $sourcesValue) as $source) {
             $parts = array_map('trim', explode(':', $source, 2));
             $platform = jg_store_ops_orders_normalize_account($parts[0] ?? '');
             $account = jg_store_ops_orders_normalize_account($parts[1] ?? '');
-            if ($platform !== '' && $account !== '') {
+            if ($platform !== '' && $account !== '' && in_array($platform, $supportedMarketplacePlatforms, true)) {
                 $sources[] = ['platform' => $platform, 'account' => $account];
             }
         }
@@ -79,7 +80,7 @@ function jg_store_ops_orders_configured_sources(): array
         foreach (jg_store_ops_orders_configured_accounts() as $account) {
             $sources[] = ['platform' => 'shopee', 'account' => $account];
         }
-        foreach (['tiktok', 'tokopedia'] as $platform) {
+        foreach (['tiktok'] as $platform) {
             $accountsValue = jg_store_ops_orders_config('JG_' . strtoupper($platform) . '_ACCOUNTS', $platform . '_accounts');
             foreach (explode(',', $accountsValue) as $account) {
                 $account = jg_store_ops_orders_normalize_account($account);
