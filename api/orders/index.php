@@ -340,7 +340,30 @@ function jg_store_ops_orders_map_item_skus(array $payload): array
 
 jg_admin_require_auth_json();
 
-if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'GET') {
+$method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+if ($method === 'POST') {
+    $raw = file_get_contents('php://input');
+    $payload = json_decode(is_string($raw) ? $raw : '', true);
+    $payload = is_array($payload) ? $payload : [];
+    $action = (string) ($payload['action'] ?? '');
+    if ($action !== 'partner_status') {
+        jg_store_ops_orders_fail('Unknown action.', 400);
+    }
+
+    $orderId = trim((string) ($payload['order'] ?? $payload['order_id'] ?? ''));
+    $status = trim((string) ($payload['status'] ?? ''));
+    if (!str_starts_with(strtoupper($orderId), 'PARTNER-')) {
+        jg_store_ops_orders_fail('Partner order number is required.');
+    }
+    if (!jg_store_ops_partner_orders_update_status($orderId, $status)) {
+        jg_store_ops_orders_fail('Unable to update partner order status.', 422);
+    }
+
+    echo json_encode(['ok' => true], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+if ($method !== 'GET') {
     jg_store_ops_orders_fail('Method not allowed.', 405);
 }
 

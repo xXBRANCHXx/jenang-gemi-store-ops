@@ -81,6 +81,24 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (_error) {
       // Dashboard will still sync the order queue when it regains focus.
     }
+    if (String(order.platform || '').toLowerCase() === 'partner') {
+      const body = JSON.stringify({
+        action: 'partner_status',
+        order: order.id,
+        status: 'IS_BEING_FULFILLED'
+      });
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('../../api/orders/', new Blob([body], { type: 'application/json' }));
+      } else {
+        fetch('../../api/orders/', {
+          method: 'POST',
+          credentials: 'same-origin',
+          keepalive: true,
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body
+        }).catch(() => {});
+      }
+    }
   };
 
   const returnToDashboard = () => {

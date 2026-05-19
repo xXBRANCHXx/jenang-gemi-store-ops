@@ -318,6 +318,46 @@ function jg_store_ops_partner_orders_status_is_visible(string $status): bool
     return in_array($normalized, ['', 'DRAFT', 'READY', 'SUBMITTED', 'LISTED', 'IS_LISTED'], true);
 }
 
+function jg_store_ops_partner_orders_update_status(string $displayId, string $status): bool
+{
+    $normalizedStatus = strtoupper(trim($status));
+    if (!in_array($normalizedStatus, ['IS_LISTED', 'IS_BEING_FULFILLED', 'FULFILLED'], true)) {
+        return false;
+    }
+
+    $pdo = jg_store_ops_partner_orders_db();
+    if (!$pdo instanceof PDO) {
+        return false;
+    }
+
+    $originalId = jg_store_ops_partner_orders_original_id($displayId);
+    if ($originalId === '') {
+        return false;
+    }
+
+    $stmt = $pdo->prepare(
+        'UPDATE partner_orders
+         SET status = :status, updated_at = :updated_at
+         WHERE id = :id'
+    );
+    $stmt->execute([
+        ':status' => $normalizedStatus,
+        ':updated_at' => gmdate('Y-m-d H:i:s'),
+        ':id' => $originalId,
+    ]);
+
+    if ($stmt->rowCount() > 0) {
+        return true;
+    }
+
+    $checkStmt = $pdo->prepare('SELECT COUNT(*) FROM partner_orders WHERE id = :id AND status = :status');
+    $checkStmt->execute([
+        ':id' => $originalId,
+        ':status' => $normalizedStatus,
+    ]);
+    return (int) $checkStmt->fetchColumn() > 0;
+}
+
 function jg_store_ops_partner_orders_display_id(string $orderId): string
 {
     $normalized = strtoupper(trim($orderId));
