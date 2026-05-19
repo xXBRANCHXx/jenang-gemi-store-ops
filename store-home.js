@@ -64,6 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const sourceColorOptions = [
+    { value: 'none', label: 'No color' },
     { value: 'aqua', label: 'Aqua' },
     { value: 'lime', label: 'Lime' },
     { value: 'amber', label: 'Amber' },
@@ -127,9 +128,14 @@ document.addEventListener('DOMContentLoaded', () => {
     return accountKey || String(order?.platform || 'Source');
   };
 
-  const colorForSource = (sourceKey) => {
+  const colorSettingForSource = (sourceKey) => {
     const configured = String(sourceColorMap[sourceKey] || '').trim();
-    return configured || defaultSourceColors[sourceKey] || '';
+    return configured || defaultSourceColors[sourceKey] || 'none';
+  };
+
+  const colorForSource = (sourceKey) => {
+    const setting = colorSettingForSource(sourceKey);
+    return setting === 'none' ? '' : setting;
   };
 
   const detectOrderSources = () => {
@@ -151,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sources = detectOrderSources();
     sourceColorList.innerHTML = sources.length
       ? sources.map(([sourceKey, label]) => {
-        const selectedColor = colorForSource(sourceKey);
+        const selectedColor = colorSettingForSource(sourceKey);
         return `
           <div class="admin-source-color-row">
             <strong>${escapeHtml(label)}</strong>

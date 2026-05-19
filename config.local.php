@@ -9,5 +9,5 @@ return [
     'sku_db_charset' => 'utf8mb4',
     'shopee_ingest_base_url' => 'https://api.jenanggemi.com',
     'shopee_ingest_setup_token' => 'weoifngfj23095jgrkebranchmadethiskey',
-    'shopee_account' => 'jenang-gemi-shopee',
+    'shopee_accounts' => 'jenang-gemi-shopee,zero-shopee',
 ];
