@@ -52,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let printInProgress = false;
   let labelUrl = '';
   let labelLoaded = false;
+  let partnerOrderClaimed = false;
   const dashboardUrl = (() => {
     try {
       if (window.opener && !window.opener.closed && window.opener.location) {
@@ -94,6 +95,22 @@ document.addEventListener('DOMContentLoaded', () => {
     errorNode.hidden = message === '';
   };
 
+  const updateStoredOrder = (mutator) => {
+    if (!order) return;
+    if (storedOrder) {
+      mutator(storedOrder);
+      writeOrders(orders);
+    }
+  };
+
+  const markClaimedForFulfillment = () => {
+    if (!order) return;
+    updateStoredOrder((currentOrder) => {
+      currentOrder.status = 'IS_BEING_FULFILLED';
+      currentOrder.started = false;
+    });
+  };
+
   const markPrinted = () => {
     if (!order) return;
     const printedLabel = {
@@ -102,12 +119,11 @@ document.addEventListener('DOMContentLoaded', () => {
       profile,
       printedAt: new Date().toISOString()
     };
-    if (storedOrder) {
-      storedOrder.status = 'IS_BEING_FULFILLED';
-      storedOrder.started = false;
-      storedOrder.printedLabel = printedLabel;
-      writeOrders(orders);
-    }
+    updateStoredOrder((currentOrder) => {
+      currentOrder.status = 'IS_BEING_FULFILLED';
+      currentOrder.started = false;
+      currentOrder.printedLabel = printedLabel;
+    });
     try {
       window.localStorage.setItem(printedOrderStorageKey, JSON.stringify({
         orderId: order.id,
@@ -116,6 +132,13 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (_error) {
       // Dashboard will still sync the order queue when it regains focus.
     }
+  };
+
+  const claimPartnerOrder = async () => {
+    if (!order || String(order.platform || '').toLowerCase() !== 'partner' || partnerOrderClaimed) return;
+    await persistPartnerStatus('IS_BEING_FULFILLED');
+    partnerOrderClaimed = true;
+    markClaimedForFulfillment();
   };
 
   const returnToDashboard = () => {
@@ -146,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
     printInProgress = true;
     window.clearTimeout(returnTimer);
     try {
-      await persistPartnerStatus('IS_BEING_FULFILLED');
+      await claimPartnerOrder();
       markPrinted();
     } catch (error) {
       printInProgress = false;
@@ -242,7 +265,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   renderOptions();
   if (order) {
-    loadLabel().catch((error) => {
+    (async () => {
+      if (String(order.platform || '').toLowerCase() === 'partner') {
+        if (statusNode) statusNode.textContent = 'Marking order as processing';
+        await claimPartnerOrder();
+      }
+      await loadLabel();
+    })().catch((error) => {
       labelLoaded = false;
       setPrintEnabled(false);
       if (statusNode) statusNode.textContent = 'Label unavailable';
