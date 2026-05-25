@@ -102,6 +102,7 @@ function jg_store_ops_orders_configured_sources(): array
 
 function jg_store_ops_orders_fetch(string $url): array
 {
+    $cached = jg_store_ops_orders_cache_read($url);
     if (function_exists('curl_init')) {
         $curl = curl_init($url);
         if ($curl === false) {
@@ -111,7 +112,8 @@ function jg_store_ops_orders_fetch(string $url): array
         curl_setopt_array($curl, [
             CURLOPT_HTTPHEADER => ['Accept: application/json'],
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 120,
         ]);
 
         $raw = curl_exec($curl);
@@ -120,7 +122,13 @@ function jg_store_ops_orders_fetch(string $url): array
         curl_close($curl);
 
         if (!is_string($raw)) {
-            jg_store_ops_orders_fail($error !== '' ? $error : 'Unable to load orders.', 502);
+            if ($cached !== null) {
+                return [200, $cached];
+            }
+            return [599, json_encode([
+                'ok' => false,
+                'error' => $error !== '' ? $error : 'Unable to load orders.',
+            ], JSON_UNESCAPED_SLASHES) ?: '{"ok":false,"error":"Unable to load orders."}'];
         }
 
         return [$status, $raw];
@@ -130,15 +138,50 @@ function jg_store_ops_orders_fetch(string $url): array
         'http' => [
             'method' => 'GET',
             'header' => "Accept: application/json\r\n",
-            'timeout' => 30,
+            'timeout' => 120,
         ],
     ]);
     $raw = @file_get_contents($url, false, $context);
     if (!is_string($raw)) {
-        jg_store_ops_orders_fail('Unable to load orders.', 502);
+        if ($cached !== null) {
+            return [200, $cached];
+        }
+        return [599, '{"ok":false,"error":"Unable to load orders."}'];
     }
 
     return [200, $raw];
+}
+
+function jg_store_ops_orders_cache_dir(): string
+{
+    $dir = sys_get_temp_dir() . '/jg-store-ops-orders-cache';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    return $dir;
+}
+
+function jg_store_ops_orders_cache_path(string $url): string
+{
+    return jg_store_ops_orders_cache_dir() . '/' . hash('sha256', $url) . '.json';
+}
+
+function jg_store_ops_orders_cache_read(string $url): ?string
+{
+    $path = jg_store_ops_orders_cache_path($url);
+    if (!is_file($path)) {
+        return null;
+    }
+    $raw = @file_get_contents($path);
+    return is_string($raw) && $raw !== '' ? $raw : null;
+}
+
+function jg_store_ops_orders_cache_write(string $url, string $raw): void
+{
+    if ($raw === '' || json_decode($raw, true) === null) {
+        return;
+    }
+    @file_put_contents(jg_store_ops_orders_cache_path($url), $raw, LOCK_EX);
 }
 
 function jg_store_ops_orders_proxy_file(string $url, string $fallbackFilename): void
@@ -732,6 +775,9 @@ foreach ($sources as $source) {
     $query = http_build_query([
         'account' => $account,
         'setup_token' => $setupToken,
+        'fast' => '1',
+        'persist' => '0',
+        'escrow' => '0',
     ]);
     $url = $baseUrl . '/' . rawurlencode($platform) . '/orders/listed?' . $query;
     [$status, $raw] = jg_store_ops_orders_fetch($url);
@@ -747,6 +793,7 @@ foreach ($sources as $source) {
         continue;
     }
 
+    jg_store_ops_orders_cache_write($url, $raw);
     $accountOrders = is_array($accountPayload['orders'] ?? null) ? $accountPayload['orders'] : [];
     $successfulAccounts++;
     $decoded['orders'] = array_merge($decoded['orders'], $accountOrders);
@@ -756,10 +803,6 @@ foreach ($sources as $source) {
         'count' => count($accountOrders),
         'shop_id' => (string) ($accountPayload['meta']['shop_id'] ?? ''),
     ];
-}
-
-if ($successfulAccounts === 0 && $errors !== []) {
-    jg_store_ops_orders_fail(implode('; ', $errors), 502);
 }
 
 $decoded = jg_store_ops_orders_map_item_skus($decoded);
