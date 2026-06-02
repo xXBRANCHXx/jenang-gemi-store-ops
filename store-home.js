@@ -29,20 +29,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const reprintModal = document.querySelector('[data-reprint-modal]');
   const reprintForm = document.querySelector('[data-reprint-form]');
   const reprintError = document.querySelector('[data-reprint-error]');
-  const assignModal = document.querySelector('[data-profile-assign-modal]');
-  const assignForm = document.querySelector('[data-profile-assign-form]');
-  const assignTitle = document.querySelector('[data-profile-assign-title]');
-  const assignSelect = document.querySelector('[data-profile-select]');
-  const assignError = document.querySelector('[data-profile-assign-error]');
   const settingsModal = document.querySelector('[data-store-settings-modal]');
   const settingsForm = document.querySelector('[data-store-settings-form]');
   const settingsError = document.querySelector('[data-store-settings-error]');
-  const profileList = document.querySelector('[data-profile-list]');
   const sourceColorList = document.querySelector('[data-source-color-list]');
+  const scannerSettingsSummary = document.querySelector('[data-scanner-settings-summary]');
   const ordersStorageKey = 'jg-store-live-orders';
   const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
-  const activeProfileStorageKey = 'jg-store-active-profile';
   const themeStorageKey = 'jg-admin-theme';
   const sourceColorStorageKey = 'jg-store-source-colors';
   const skuDbEndpoint = '../api/sku-db/';
@@ -53,11 +47,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const boardVisibleCapacity = boardVisibleRows * boardVisibleColumns;
 
   let skuCatalog = [];
-  let profiles = [];
   let partnerOrderSources = [];
-  let pendingOrderId = '';
-  let activeProfile = '';
   let sourceColorMap = {};
+  let scannerSettings = {
+    interface: 'USB-COM',
+    volume: 'MEDIUM',
+    scan_mode: 'BUTTON_TRIGGER',
+    auto_induction: false,
+    baud_rate: 9600
+  };
   let state = {
     orders: [],
     activeOrderId: '',
@@ -79,13 +77,6 @@ document.addEventListener('DOMContentLoaded', () => {
     'jenang-gemi-shopee': 'aqua',
     'zero-shopee': 'lime'
   };
-
-  const normalizeProfile = (value) => String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, '-')
-    .replace(/^[._-]+|[._-]+$/g, '')
-    .slice(0, 40);
 
   const normalizeSourceKey = (value) => String(value || '')
     .trim()
@@ -222,36 +213,74 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
-  const saveProfile = async (username) => {
-    const profile = normalizeProfile(username);
-    if (!profile) throw new Error('Enter a username.');
+  const normalizeScannerSettings = (settings) => {
+    const volume = ['LOW', 'MEDIUM', 'HIGH'].includes(settings?.volume) ? settings.volume : 'MEDIUM';
+    const scanMode = ['BUTTON_TRIGGER', 'CONTINUOUS'].includes(settings?.scan_mode) ? settings.scan_mode : 'BUTTON_TRIGGER';
+    const baudRate = [9600, 19200, 38400, 57600, 115200].includes(Number(settings?.baud_rate)) ? Number(settings.baud_rate) : 9600;
+    return {
+      interface: 'USB-COM',
+      volume,
+      scan_mode: scanMode,
+      auto_induction: Boolean(settings?.auto_induction),
+      baud_rate: baudRate
+    };
+  };
+
+  const renderScannerSettings = () => {
+    scannerSettings = normalizeScannerSettings(scannerSettings);
+    const volumeSelect = settingsForm?.querySelector('[data-scanner-setting="volume"]');
+    const modeSelect = settingsForm?.querySelector('[data-scanner-setting="scan_mode"]');
+    const autoInductionInput = settingsForm?.querySelector('[data-scanner-setting="auto_induction"]');
+    if (volumeSelect instanceof HTMLSelectElement) volumeSelect.value = scannerSettings.volume;
+    if (modeSelect instanceof HTMLSelectElement) modeSelect.value = scannerSettings.scan_mode;
+    if (autoInductionInput instanceof HTMLInputElement) autoInductionInput.checked = scannerSettings.auto_induction;
+    if (scannerSettingsSummary) {
+      scannerSettingsSummary.textContent = [
+        scannerSettings.interface,
+        scannerSettings.volume,
+        scannerSettings.scan_mode.replace('_', ' '),
+        `AUTO-INDUCTION ${scannerSettings.auto_induction ? 'ON' : 'OFF'}`
+      ].join(' / ');
+    }
+  };
+
+  const readScannerSettingsForm = () => {
+    const formData = new FormData(settingsForm);
+    return normalizeScannerSettings({
+      volume: String(formData.get('volume') || ''),
+      scan_mode: String(formData.get('scan_mode') || ''),
+      auto_induction: formData.has('auto_induction'),
+      baud_rate: scannerSettings.baud_rate
+    });
+  };
+
+  const saveScannerSettings = async (settings) => {
+    const normalized = normalizeScannerSettings(settings);
     const response = await fetch(scanBridgeEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ action: 'profile', profile })
+      body: JSON.stringify({ action: 'settings', ...normalized })
     });
-    if (!response.ok) throw new Error('Unable to save profile.');
-    if (!profiles.includes(profile)) {
-      profiles.push(profile);
-      profiles.sort();
-    }
-    return profile;
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || 'Unable to save scanner settings.');
+    scannerSettings = normalizeScannerSettings(payload.settings || normalized);
+    renderScannerSettings();
+    return scannerSettings;
   };
 
-  const loadProfiles = async () => {
+  const loadScannerSettings = async () => {
     try {
-      const response = await fetch(`${scanBridgeEndpoint}?profiles=1`, {
+      const response = await fetch(scanBridgeEndpoint, {
+        cache: 'no-store',
         credentials: 'same-origin',
         headers: { Accept: 'application/json' }
       });
       const payload = await response.json();
-      profiles = (Array.isArray(payload.profiles) ? payload.profiles : [])
-        .map((profile) => normalizeProfile(profile.username || profile))
-        .filter(Boolean)
-        .sort();
+      scannerSettings = normalizeScannerSettings(payload.settings || scannerSettings);
     } catch (_error) {
-      profiles = [];
+      scannerSettings = normalizeScannerSettings(scannerSettings);
     }
+    renderScannerSettings();
   };
 
   const astraMultiplier = (item) => {
@@ -447,7 +476,6 @@ document.addEventListener('DOMContentLoaded', () => {
       ...order,
       status: stored.status && stored.status !== 'IS_LISTED' ? stored.status : order.status,
       started: Boolean(stored.started),
-      assignedProfile: stored.assignedProfile || order.assignedProfile || '',
       printedLabel: stored.printedLabel || order.printedLabel || null
     };
   };
@@ -468,7 +496,6 @@ document.addEventListener('DOMContentLoaded', () => {
       instant: Boolean(order.instant),
       deadlineAt: Number.isFinite(deadlineAt) && deadlineAt > 0 ? deadlineAt : Date.now() + 86400000,
       started: Boolean(order.started),
-      assignedProfile: String(order.assignedProfile || ''),
       items: (Array.isArray(order.items) ? order.items : [])
         .map((item) => normalizeOrderItem(item, catalogRows))
         .filter((item) => item.sku || item.productName)
@@ -533,8 +560,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const activeOrder = () => state.orders.find((order) => order.id === state.activeOrderId) || null;
 
-  const orderOwner = (order) => normalizeProfile(order.assignedProfile || '');
-
   const normalizeOrderId = (value) => String(value || '').trim().toUpperCase();
 
   const openReprintModal = () => {
@@ -571,28 +596,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const openPrintLabelPage = (orderId) => {
     const order = state.orders.find((item) => normalizeOrderId(item.id) === orderId);
-    const profile = (order ? orderOwner(order) : '') || activeProfile || '';
     const printableOrderId = order?.id || orderId;
     const account = order?.sourceAccountKey || '';
-    openStorePage(`./print-label/?order=${encodeURIComponent(printableOrderId)}${profile ? `&profile=${encodeURIComponent(profile)}` : ''}${account ? `&account=${encodeURIComponent(account)}` : ''}`);
-  };
-
-  const renderProfileSelect = (selected = '') => {
-    if (!(assignSelect instanceof HTMLSelectElement)) return;
-    const options = profiles.includes(selected) || !selected
-      ? profiles
-      : [...profiles, selected].sort();
-    assignSelect.innerHTML = [
-      '<option value="">Select company profile</option>',
-      ...options.map((profile) => `<option value="${escapeHtml(profile)}" ${profile === selected ? 'selected' : ''}>${escapeHtml(profile)}</option>`)
-    ].join('');
-  };
-
-  const renderProfileList = () => {
-    if (!profileList) return;
-    profileList.innerHTML = profiles.length
-      ? profiles.map((profile) => `<span>${escapeHtml(profile)}</span>`).join('')
-      : '<small>No company profiles yet.</small>';
+    openStorePage(`./print-label/?order=${encodeURIComponent(printableOrderId)}${account ? `&account=${encodeURIComponent(account)}` : ''}`);
   };
 
   const openSettingsModal = () => {
@@ -601,12 +607,11 @@ document.addEventListener('DOMContentLoaded', () => {
       settingsError.textContent = '';
       settingsError.hidden = true;
     }
-    renderProfileList();
+    renderScannerSettings();
     renderSourceColorList();
     settingsModal.hidden = false;
-    const input = settingsModal.querySelector('input[name="profile_new"]');
-    if (input instanceof HTMLInputElement) {
-      input.value = '';
+    const input = settingsModal.querySelector('[data-scanner-setting="volume"]');
+    if (input instanceof HTMLSelectElement) {
       window.setTimeout(() => input.focus(), 40);
     }
   };
@@ -619,41 +624,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!settingsError) return;
     settingsError.textContent = message;
     settingsError.hidden = false;
-  };
-
-  const showAssignError = (message) => {
-    if (!assignError) return;
-    assignError.textContent = message;
-    assignError.hidden = false;
-  };
-
-  const openAssignModal = (orderId) => {
-    const order = state.orders.find((item) => item.id === orderId);
-    if (!order || !assignModal) return;
-    pendingOrderId = order.id;
-    const owner = orderOwner(order);
-    renderProfileSelect(owner);
-    if (assignTitle) assignTitle.textContent = order.id;
-    if (assignError) {
-      assignError.textContent = '';
-      assignError.hidden = true;
-    }
-    assignModal.hidden = false;
-    window.setTimeout(() => {
-      if (assignSelect instanceof HTMLSelectElement) {
-        assignSelect.focus();
-      }
-    }, 40);
-  };
-
-  const closeAssignModal = () => {
-    if (assignModal) assignModal.hidden = true;
-    pendingOrderId = '';
-  };
-
-  const selectedProfileFromForm = (form) => {
-    const formData = new FormData(form);
-    return normalizeProfile(formData.get('profile_select'));
   };
 
   const minutesRemaining = (order) => Math.ceil((order.deadlineAt - Date.now()) / 60000);
@@ -782,11 +752,10 @@ document.addEventListener('DOMContentLoaded', () => {
     board.innerHTML = orders.map((order, index) => {
       const isCritical = isCriticalOrder(order);
       const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
-      const owner = orderOwner(order);
       const sourceKey = sourceKeyFromOrder(order);
       const sourceLabel = sourceLabelFromOrder(order);
       const sourceColor = colorForSource(sourceKey);
-      const buttonLabel = owner || (index === 0 ? 'Start Next' : 'Start');
+      const buttonLabel = index === 0 ? 'Start Next' : 'Start';
       return `
         <article
           class="admin-order-card ${isCritical ? 'is-critical' : ''} ${order.started ? 'is-started' : ''}"
@@ -845,22 +814,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const openFulfillment = async (orderId, profile) => {
+  const openFulfillment = async (orderId) => {
     const order = state.orders.find((item) => item.id === orderId);
     if (!order) return;
-    const selectedProfile = normalizeProfile(profile);
-    const owner = orderOwner(order);
-    if (owner && owner !== selectedProfile) {
-      showAssignError(`This order is assigned to ${owner}.`);
-      return;
-    }
-    if (!selectedProfile || (!profiles.includes(selectedProfile) && selectedProfile !== owner)) {
-      showAssignError('Choose a company profile. Add new profiles in Settings.');
-      return;
-    }
     order.started = true;
-    order.assignedProfile = selectedProfile;
-    activeProfile = selectedProfile;
     state.activeOrderId = order.id;
     state.scans = new Map();
     saveOrders();
@@ -882,45 +839,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const target = event.target instanceof Element ? event.target : null;
     const button = target?.closest('[data-start-order]');
     if (!(button instanceof HTMLButtonElement)) return;
-    openAssignModal(button.dataset.startOrder || '');
+    openFulfillment(button.dataset.startOrder || '');
   });
 
   document.querySelector('[data-next-scan]')?.addEventListener('click', () => {
     const order = activeOrder();
-    const profile = order ? orderOwner(order) || activeProfile : '';
-    if (!order || !profile) return;
+    if (!order) return;
     saveOrders();
     try {
       window.sessionStorage.setItem(activeOrderStorageKey, order.id);
-      window.sessionStorage.setItem(activeProfileStorageKey, profile);
     } catch (_error) {
       // Query string still carries the order id.
     }
-    openStorePage(`./scan/?order=${encodeURIComponent(order.id)}&profile=${encodeURIComponent(profile)}`);
+    openStorePage(`./scan/?order=${encodeURIComponent(order.id)}`);
   });
 
   document.querySelectorAll('[data-close-fulfillment-modal]').forEach((button) => {
     button.addEventListener('click', closeFulfillment);
-  });
-
-  document.querySelectorAll('[data-close-profile-assign]').forEach((button) => {
-    button.addEventListener('click', closeAssignModal);
-  });
-
-  assignForm?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const profile = selectedProfileFromForm(assignForm);
-    if (!profile) {
-      showAssignError('Choose a company profile. Add new profiles in Settings.');
-      return;
-    }
-    try {
-      await openFulfillment(pendingOrderId, profile);
-      closeAssignModal();
-      renderProfileSelect(profile);
-    } catch (error) {
-      showAssignError(error instanceof Error ? error.message : 'Unable to assign order.');
-    }
   });
 
   document.querySelector('[data-open-reprint]')?.addEventListener('click', openReprintModal);
@@ -952,20 +887,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   settingsForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const formData = new FormData(settingsForm);
-    const profile = normalizeProfile(formData.get('profile_new'));
-    if (!profile) {
-      showSettingsError('Enter a company profile name.');
-      return;
-    }
     try {
-      await saveProfile(profile);
-      renderProfileSelect(profile);
-      renderProfileList();
-      const input = settingsForm.querySelector('input[name="profile_new"]');
-      if (input instanceof HTMLInputElement) input.value = '';
+      await saveScannerSettings(readScannerSettingsForm());
+      if (settingsError) {
+        settingsError.textContent = 'Scanner settings saved.';
+        settingsError.hidden = false;
+      }
     } catch (error) {
-      showSettingsError(error instanceof Error ? error.message : 'Unable to add profile.');
+      showSettingsError(error instanceof Error ? error.message : 'Unable to save scanner settings.');
     }
   });
 
@@ -1022,11 +951,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   const initialize = async () => {
-    try {
-      await loadProfiles();
-    } catch (_error) {
-      profiles = [];
-    }
+    await loadScannerSettings();
 
     try {
       await loadSkuCatalog();

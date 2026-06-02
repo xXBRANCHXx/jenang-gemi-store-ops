@@ -39,9 +39,16 @@ $storeScanJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/store-scan.js'
                 <div class="admin-scan-head">
                     <div>
                         <span class="admin-panel-kicker">Barcode Check</span>
-                        <h3>Scan products</h3>
+                        <h3>USB-COM product scan</h3>
                     </div>
                     <span class="admin-status-badge" data-scan-progress>0/0</span>
+                </div>
+                <div class="admin-scanner-status-card">
+                    <div data-scan-status>
+                        <strong>Scanner waiting</strong>
+                        <span>Connect the USB-COM scanner, then scan each product barcode.</span>
+                    </div>
+                    <button type="button" class="admin-ghost-btn" data-scanner-connect>Connect USB-COM Scanner</button>
                 </div>
                 <p class="admin-form-error" data-scan-error hidden></p>
                 <div class="admin-scan-list" data-scan-list></div>

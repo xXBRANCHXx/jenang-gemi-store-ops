@@ -89,41 +89,46 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
             </div>
         </div>
 
-        <div class="admin-modal-shell admin-profile-assign-modal" data-profile-assign-modal hidden>
-            <div class="admin-modal-backdrop" data-close-profile-assign></div>
-            <form class="admin-modal-card admin-profile-assign-card" data-profile-assign-form>
-                <div class="admin-modal-head">
-                    <div>
-                        <span class="admin-panel-kicker">Assign Scanner</span>
-                        <h3 data-profile-assign-title>Order</h3>
-                    </div>
-                    <button type="button" class="admin-ghost-btn" data-close-profile-assign>Close</button>
-                </div>
-                <label class="admin-reprint-field">
-                    <span>Company profile</span>
-                    <select class="admin-profile-input" name="profile_select" data-profile-select></select>
-                </label>
-                <p class="admin-form-error" data-profile-assign-error hidden></p>
-                <div class="admin-modal-actions">
-                    <button type="submit" class="admin-primary-btn">Process Order</button>
-                </div>
-            </form>
-        </div>
-
         <div class="admin-modal-shell admin-store-settings-modal" data-store-settings-modal hidden>
             <div class="admin-modal-backdrop" data-close-store-settings></div>
             <form class="admin-modal-card admin-store-settings-card" data-store-settings-form>
                 <div class="admin-modal-head">
                     <div>
                         <span class="admin-panel-kicker">Store Settings</span>
-                        <h3>Company Profiles</h3>
+                        <h3>Scanner</h3>
                     </div>
                     <button type="button" class="admin-ghost-btn" data-close-store-settings>Close</button>
                 </div>
-                <label class="admin-reprint-field">
-                    <span>Add profile</span>
-                    <input class="admin-profile-input" name="profile_new" autocomplete="username" placeholder="company-profile" required>
-                </label>
+                <div class="admin-scanner-settings-grid">
+                    <label class="admin-reprint-field">
+                        <span>Interface</span>
+                        <input class="admin-settings-input" value="USB-COM" readonly>
+                    </label>
+                    <label class="admin-reprint-field">
+                        <span>Volume</span>
+                        <select class="admin-settings-input" name="volume" data-scanner-setting="volume">
+                            <option value="LOW">LOW</option>
+                            <option value="MEDIUM">MEDIUM</option>
+                            <option value="HIGH">HIGH</option>
+                        </select>
+                    </label>
+                    <label class="admin-reprint-field">
+                        <span>Scan mode</span>
+                        <select class="admin-settings-input" name="scan_mode" data-scanner-setting="scan_mode">
+                            <option value="BUTTON_TRIGGER">BUTTON TRIGGER</option>
+                            <option value="CONTINUOUS">CONTINUOUS</option>
+                        </select>
+                    </label>
+                    <label class="admin-checkbox-line admin-scanner-toggle">
+                        <input type="checkbox" name="auto_induction" data-scanner-setting="auto_induction">
+                        <span>AUTO-INDUCTION</span>
+                    </label>
+                </div>
+                <div class="admin-scanner-setup-card">
+                    <strong>USB-COM setup</strong>
+                    <span>Set the scanner to USB-COM mode from its setup sheet, then use the scan page's Connect USB-COM Scanner button. Saved settings define the intended store configuration.</span>
+                    <small data-scanner-settings-summary>USB-COM / MEDIUM / BUTTON TRIGGER / AUTO-INDUCTION OFF</small>
+                </div>
                 <div class="admin-reprint-field">
                     <span>Theme <small data-theme-label>Default</small></span>
                     <div class="admin-theme-grid" aria-label="Dashboard themes">
@@ -164,9 +169,8 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
                     <div class="admin-source-color-list" data-source-color-list></div>
                 </div>
                 <p class="admin-form-error" data-store-settings-error hidden></p>
-                <div class="admin-profile-list" data-profile-list></div>
                 <div class="admin-modal-actions">
-                    <button type="submit" class="admin-primary-btn">Add Profile</button>
+                    <button type="submit" class="admin-primary-btn">Save Scanner Settings</button>
                 </div>
             </form>
         </div>
@@ -183,7 +187,7 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
                 </div>
                 <label class="admin-reprint-field">
                     <span>Order ID</span>
-                    <input class="admin-profile-input" name="order_id" autocomplete="off" placeholder="SPX-250504-8801" required>
+                    <input class="admin-settings-input" name="order_id" autocomplete="off" placeholder="SPX-250504-8801" required>
                 </label>
                 <p class="admin-form-error" data-reprint-error hidden></p>
                 <div class="admin-modal-actions">

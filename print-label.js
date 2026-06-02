@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const ordersStorageKey = 'jg-store-live-orders';
   const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
-  const activeProfileStorageKey = 'jg-store-active-profile';
   const orderIdNode = document.querySelector('[data-print-order-id]');
   const statusNode = document.querySelector('[data-print-status]');
   const errorNode = document.querySelector('[data-print-error]');
@@ -39,7 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const params = new URLSearchParams(window.location.search);
   const orderId = params.get('order') || window.sessionStorage.getItem(activeOrderStorageKey) || '';
-  const profile = params.get('profile') || window.sessionStorage.getItem(activeProfileStorageKey) || '';
   const requestedAccount = params.get('account') || '';
   const orders = readOrders();
   const storedOrder = orders.find((item) => String(item.id || '') === orderId) || null;
@@ -116,7 +114,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const printedLabel = {
       source: String(order.platform || '').toLowerCase() === 'partner' ? 'partner' : 'shopee',
       orderId: order.id,
-      profile,
       printedAt: new Date().toISOString()
     };
     updateStoredOrder((currentOrder) => {

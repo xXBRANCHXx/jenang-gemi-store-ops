@@ -4,13 +4,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const ordersStorageKey = 'jg-store-live-orders';
   const activeOrderStorageKey = 'jg-store-active-order-id';
-  const activeProfileStorageKey = 'jg-store-active-profile';
-  const profileStorageKey = 'jg-store-profile';
   const scanBridgeEndpoint = '../../api/scan-bridge/';
   const orderIdNode = document.querySelector('[data-scan-order-id]');
   const scanError = document.querySelector('[data-scan-error]');
   const scanList = document.querySelector('[data-scan-list]');
   const scanProgress = document.querySelector('[data-scan-progress]');
+  const scanStatus = document.querySelector('[data-scan-status]');
+  const scannerConnect = document.querySelector('[data-scanner-connect]');
 
   const escapeHtml = (value) => String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -36,79 +36,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const normalizeProfile = (value) => String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, '-')
-    .replace(/^[._-]+|[._-]+$/g, '')
-    .slice(0, 40);
-
-  const readProfile = () => {
-    const params = new URLSearchParams(window.location.search);
-    const fromUrl = normalizeProfile(params.get('profile') || '');
-    if (fromUrl) return { username: fromUrl };
-    try {
-      const fromSession = normalizeProfile(window.sessionStorage.getItem(activeProfileStorageKey) || '');
-      if (fromSession) return { username: fromSession };
-      const stored = JSON.parse(window.localStorage.getItem(profileStorageKey) || 'null');
-      const username = normalizeProfile(stored?.username || stored);
-      return username ? { username } : null;
-    } catch (_error) {
-      return null;
-    }
-  };
-
-  const writeProfile = (profile) => {
-    try {
-      window.localStorage.setItem(profileStorageKey, JSON.stringify(profile));
-      window.sessionStorage.setItem(activeProfileStorageKey, profile.username);
-    } catch (_error) {
-      // Scanning can continue for this page load without persistence.
-    }
-  };
-
-  const setCurrentProfile = (username) => {
-    const profile = normalizeProfile(username);
-    if (!profile) throw new Error('Choose a company profile.');
-    if (!profiles.includes(profile)) throw new Error('Choose a company profile from Settings.');
-    currentProfile = { username: profile };
-    writeProfile(currentProfile);
-    return currentProfile;
-  };
-
-  const loadProfiles = async () => {
-    try {
-      const response = await fetch(`${scanBridgeEndpoint}?profiles=1`, {
-        cache: 'no-store',
-        credentials: 'same-origin',
-        headers: { Accept: 'application/json' }
-      });
-      const payload = await response.json();
-      profiles = (Array.isArray(payload.profiles) ? payload.profiles : [])
-        .map((profile) => normalizeProfile(profile.username || profile))
-        .filter(Boolean)
-        .sort();
-    } catch (_error) {
-      profiles = [];
-    }
-  };
-
   const params = new URLSearchParams(window.location.search);
   const orderId = params.get('order') || window.sessionStorage.getItem(activeOrderStorageKey) || '';
-  let currentProfile = readProfile();
   const orders = readOrders();
   const order = orders.find((item) => item.id === orderId) || null;
   const scans = new Map();
   let scanBuffer = '';
   let scanBufferTimer = 0;
-  let bridgeCursor = null;
-  let sessionTimer = 0;
-  let phonePollTimer = 0;
   let printRedirecting = false;
-  let profiles = [];
-  const bridgeStartedAt = Date.now();
+  let scannerSettings = { baud_rate: 9600 };
+  let serialPort = null;
+  let serialReader = null;
+  let serialReadBuffer = '';
 
   if (orderIdNode) orderIdNode.textContent = order?.id || 'Order missing';
+
   const scanCountFor = (sku) => Number(scans.get(sku) || 0);
   const scanSkuFor = (item) => String(item.scanSku || item.sku || '');
   const scanQuantityFor = (item) => Number(item.scanQuantity || item.quantity || 0);
@@ -171,95 +113,32 @@ document.addEventListener('DOMContentLoaded', () => {
   }, 0);
 
   const normalizeScanCode = (value) => String(value || '').trim().toUpperCase();
-  const orderOwner = () => normalizeProfile(order?.assignedProfile || '');
 
-  const hasOrderAccess = () => {
-    const owner = orderOwner();
-    return !owner || owner === currentProfile?.username;
+  const setError = (message) => {
+    if (!scanError) return;
+    scanError.textContent = message;
+    scanError.hidden = message === '';
   };
 
-  const showProfileGate = () => {
-    const gate = document.createElement('div');
-    gate.className = 'admin-store-login-shell';
-    gate.innerHTML = `
-      <form class="admin-store-login-card" data-store-profile-form>
-        <span class="admin-panel-kicker">Store Login</span>
-        <strong>Choose company profile</strong>
-        <select class="admin-profile-input" name="profile" required>
-          <option value="">Select company profile</option>
-          ${profiles.map((profile) => `<option value="${escapeHtml(profile)}">${escapeHtml(profile)}</option>`).join('')}
-        </select>
-        <p class="admin-form-error" data-profile-error hidden></p>
-        <button type="submit" class="admin-primary-btn">Continue</button>
-      </form>
+  const setScanStatus = (title, detail = '') => {
+    if (!scanStatus) return;
+    scanStatus.innerHTML = `
+      <strong>${escapeHtml(title)}</strong>
+      <span>${escapeHtml(detail)}</span>
     `;
-    document.body.appendChild(gate);
-    const form = gate.querySelector('[data-store-profile-form]');
-    const select = form?.querySelector('select[name="profile"]');
-    const error = gate.querySelector('[data-profile-error]');
-    if (error && !profiles.length) {
-      error.textContent = 'Add company profiles in Store Settings first.';
-      error.hidden = false;
-    }
-    select?.focus();
-    form?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      try {
-        setCurrentProfile(select?.value || '');
-        gate.remove();
-        initializeScanSession();
-        startPhonePolling();
-        render();
-      } catch (saveError) {
-        if (error) {
-          error.textContent = saveError instanceof Error ? saveError.message : 'Unable to choose profile.';
-          error.hidden = false;
-        }
-      }
-    });
-  };
-
-  const postSession = async (active) => {
-    if (!currentProfile?.username || !order?.id) return;
-    await fetch(scanBridgeEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        action: 'session',
-        profile: currentProfile.username,
-        order_id: order.id,
-        active
-      })
-    });
-  };
-
-  const initializeScanSession = () => {
-    if (!order || !currentProfile || !hasOrderAccess()) return;
-    order.assignedProfile = currentProfile.username;
-    writeOrders(orders);
-    postSession(true).catch(() => {});
-    window.clearInterval(sessionTimer);
-    sessionTimer = window.setInterval(() => {
-      postSession(true).catch(() => {});
-    }, 5000);
   };
 
   const openPrintLabelPage = () => {
-    if (!order || !currentProfile || printRedirecting) return;
+    if (!order || printRedirecting) return;
     printRedirecting = true;
-    postSession(false).catch(() => {});
-    window.clearInterval(sessionTimer);
-    window.clearInterval(phonePollTimer);
     try {
       window.sessionStorage.setItem(activeOrderStorageKey, order.id);
-      window.sessionStorage.setItem(activeProfileStorageKey, currentProfile.username);
     } catch (_error) {
       // Query string still carries the order id.
     }
     setScanStatus('Scan complete', 'Opening label choices.');
     window.setTimeout(() => {
-      const url = `../print-label/?order=${encodeURIComponent(order.id)}&profile=${encodeURIComponent(currentProfile.username)}`;
-      window.location.href = url;
+      window.location.href = `../print-label/?order=${encodeURIComponent(order.id)}`;
     }, 420);
   };
 
@@ -268,27 +147,10 @@ document.addEventListener('DOMContentLoaded', () => {
     return [...new Set(scanItems().map((item) => scanSkuFor(item)).filter(Boolean))].join(', ');
   };
 
-  const setError = (message) => {
-    if (!scanError) return;
-    scanError.textContent = message;
-    scanError.hidden = message === '';
-  };
-
-  const setScanStatus = () => {};
-
   const render = () => {
-    if (!currentProfile) {
-      if (scanList) scanList.innerHTML = '<div class="admin-board-empty">Login to your store profile before scanning.</div>';
-      return;
-    }
-
     if (!order) {
       if (scanList) scanList.innerHTML = '<div class="admin-board-empty">Return to the order board and start an order first.</div>';
-      return;
-    }
-
-    if (!hasOrderAccess()) {
-      if (scanList) scanList.innerHTML = `<div class="admin-board-empty">This order is assigned to ${escapeHtml(orderOwner())}.</div>`;
+      if (scanProgress) scanProgress.textContent = '0/0';
       return;
     }
 
@@ -325,7 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const handleScan = (value) => {
-    if (!order || !currentProfile || !hasOrderAccess() || !value) return false;
+    if (!order || !value) return false;
     const scannedCode = normalizeScanCode(value);
     setScanStatus(`Received ${scannedCode}`, 'Checking this scan against the active order.');
     const items = scanItems();
@@ -389,6 +251,64 @@ document.addEventListener('DOMContentLoaded', () => {
     handleScan(value);
   };
 
+  const pushSerialChunk = (chunk) => {
+    serialReadBuffer += chunk;
+    const parts = serialReadBuffer.split(/\r\n|\r|\n|\t/);
+    serialReadBuffer = parts.pop() || '';
+    parts.forEach((part) => handleScan(part));
+    window.clearTimeout(scanBufferTimer);
+    scanBufferTimer = window.setTimeout(() => {
+      if (!serialReadBuffer.trim()) return;
+      const value = serialReadBuffer;
+      serialReadBuffer = '';
+      handleScan(value);
+    }, 160);
+  };
+
+  const readSerialLoop = async () => {
+    if (!serialPort?.readable) return;
+    const decoder = new TextDecoderStream();
+    const closed = serialPort.readable.pipeTo(decoder.writable);
+    serialReader = decoder.readable.getReader();
+    try {
+      while (true) {
+        const { value, done } = await serialReader.read();
+        if (done) break;
+        if (value) pushSerialChunk(value);
+      }
+    } catch (_error) {
+      setScanStatus('Scanner disconnected', 'Reconnect the USB-COM scanner or use keyboard-wedge input.');
+    } finally {
+      serialReader?.releaseLock();
+      serialReader = null;
+      await closed.catch(() => {});
+    }
+  };
+
+  const openSerialPort = async (port) => {
+    serialPort = port;
+    if (!serialPort.readable && !serialPort.writable) {
+      await serialPort.open({ baudRate: Number(scannerSettings.baud_rate || 9600) });
+    }
+    if (scannerConnect) scannerConnect.textContent = 'USB-COM Connected';
+    setScanStatus('USB-COM scanner ready', 'Scan each product barcode.');
+    readSerialLoop().catch(() => {});
+  };
+
+  const connectSerialScanner = async () => {
+    if (!navigator.serial) {
+      setError('This browser does not support USB-COM scanner access. Use Chrome or Edge, or keep the scanner in keyboard input mode.');
+      return;
+    }
+
+    try {
+      const port = await navigator.serial.requestPort();
+      await openSerialPort(port);
+    } catch (_error) {
+      setScanStatus('Scanner not connected', 'Use the Connect USB-COM Scanner button when the scanner is plugged in.');
+    }
+  };
+
   document.addEventListener('keydown', (event) => {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
 
@@ -405,60 +325,43 @@ document.addEventListener('DOMContentLoaded', () => {
     scanBufferTimer = window.setTimeout(submitScanBuffer, 260);
   });
 
-  const pollPhoneScans = async () => {
+  scannerConnect?.addEventListener('click', connectSerialScanner);
+
+  const initialize = async () => {
     try {
-      const after = bridgeCursor === null ? 0 : bridgeCursor;
-      const query = new URLSearchParams({
-        after: String(after),
-        profile: currentProfile?.username || '',
-        order_id: order?.id || ''
-      });
-      const response = await fetch(`${scanBridgeEndpoint}?${query.toString()}`, {
+      const response = await fetch(scanBridgeEndpoint, {
+        cache: 'no-store',
         credentials: 'same-origin',
         headers: { Accept: 'application/json' }
       });
       const payload = await response.json();
-      const events = Array.isArray(payload.events) ? payload.events : [];
-      if (bridgeCursor === null) {
-        bridgeCursor = Number(payload.cursor || 0);
-        events
-          .filter((event) => Date.parse(event.created_at || '') >= bridgeStartedAt - 2000)
-          .forEach((event) => handleScan(event.barcode || ''));
-        return;
-      }
-      bridgeCursor = Number(payload.cursor || bridgeCursor);
-      events.forEach((event) => handleScan(event.barcode || ''));
+      scannerSettings = payload.settings || scannerSettings;
     } catch (_error) {
-      // Hardware scanner input still works if the phone bridge is unavailable.
-      setScanStatus('Phone scanner disconnected', 'Hardware scanner input still works on this page.');
+      scannerSettings = { baud_rate: 9600 };
     }
-  };
 
-  const startPhonePolling = () => {
-    if (phonePollTimer || !currentProfile || !order || !hasOrderAccess()) return;
-    pollPhoneScans();
-    phonePollTimer = window.setInterval(pollPhoneScans, 700);
-  };
-
-  const initialize = async () => {
-    await loadProfiles();
-    currentProfile = readProfile();
-    if (currentProfile && !profiles.includes(currentProfile.username)) {
-      currentProfile = null;
-    }
     render();
-    if (!currentProfile) {
-      showProfileGate();
-    } else {
-      writeProfile(currentProfile);
-      initializeScanSession();
-      startPhonePolling();
+    if (!navigator.serial) {
+      setScanStatus('Hardware scanner input ready', 'USB-COM needs Chrome or Edge Web Serial access. Keyboard-style scanner input also works here.');
+      return;
+    }
+
+    try {
+      const ports = await navigator.serial.getPorts();
+      if (ports.length) {
+        await openSerialPort(ports[0]);
+      } else {
+        setScanStatus('USB-COM scanner waiting', 'Click Connect USB-COM Scanner, then scan each product barcode.');
+      }
+    } catch (_error) {
+      setScanStatus('USB-COM scanner waiting', 'Click Connect USB-COM Scanner, then scan each product barcode.');
     }
   };
-
-  initialize();
 
   window.addEventListener('pagehide', () => {
-    postSession(false).catch(() => {});
+    if (serialReader) serialReader.cancel().catch(() => {});
+    if (serialPort?.readable || serialPort?.writable) serialPort.close().catch(() => {});
   });
+
+  initialize();
 });

@@ -1550,9 +1550,37 @@ button, input {
   font-size: clamp(1.6rem, 4vw, 3rem);
 }
 
-.admin-scanner-capture small,
-.admin-phone-scan-card small {
+.admin-scanner-capture small {
   color: var(--admin-muted);
+}
+
+.admin-scanner-status-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(34, 211, 238, 0.22);
+  border-radius: 16px;
+  background: rgba(34, 211, 238, 0.08);
+}
+
+.admin-scanner-status-card div {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-scanner-status-card strong,
+.admin-scanner-setup-card strong {
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+.admin-scanner-status-card span,
+.admin-scanner-setup-card span,
+.admin-scanner-setup-card small {
+  color: var(--admin-muted);
+  font-size: 0.86rem;
+  font-weight: 800;
 }
 
 .admin-label-option-grid {
@@ -1690,37 +1718,27 @@ button, input {
   text-transform: uppercase;
 }
 
-.admin-phone-scan-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 16px;
-  border: 1px solid rgba(34, 211, 238, 0.22);
-  border-radius: 20px;
-  background: rgba(34, 211, 238, 0.08);
-}
-
-.admin-phone-scan-card div {
+.admin-scanner-settings-grid {
   display: grid;
-  gap: 4px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
-.admin-phone-scan-card a {
-  color: var(--admin-accent-quaternary);
-  font-weight: 900;
-  overflow-wrap: anywhere;
-}
-
-.admin-profile-chip {
-  min-height: 38px;
+.admin-scanner-toggle {
+  min-height: 52px;
   padding: 0 14px;
-  border: 1px solid rgba(157, 255, 0, 0.24);
-  border-radius: 999px;
-  background: rgba(157, 255, 0, 0.1);
-  color: var(--admin-accent-primary);
-  font: inherit;
-  font-weight: 900;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-surface-soft);
+}
+
+.admin-scanner-setup-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid rgba(34, 211, 238, 0.22);
+  border-radius: 16px;
+  background: rgba(34, 211, 238, 0.08);
 }
 
 .admin-store-login-shell {
@@ -1751,7 +1769,7 @@ button, input {
   line-height: 1.05;
 }
 
-.admin-profile-input {
+.admin-settings-input {
   min-height: 52px;
   width: 100%;
   padding: 0 14px;
@@ -1764,39 +1782,14 @@ button, input {
   font-weight: 800;
 }
 
-.admin-profile-input option {
+.admin-settings-input option {
   background: #101827;
   color: #f8fafc;
 }
 
-.admin-profile-input:focus {
+.admin-settings-input:focus {
   border-color: rgba(157, 255, 0, 0.56);
   outline: none;
-}
-
-.admin-profile-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  min-height: 38px;
-}
-
-.admin-profile-list span,
-.admin-profile-list small {
-  display: inline-flex;
-  align-items: center;
-  min-height: 34px;
-  padding: 0 12px;
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.82);
-  color: #f8fafc;
-  font-size: 0.84rem;
-  font-weight: 900;
-}
-
-.admin-profile-list small {
-  color: var(--admin-muted);
 }
 
 .admin-theme-grid {
@@ -1947,256 +1940,6 @@ button, input {
   box-shadow: inset 0 -10px 0 #e246b6, inset 0 -14px 0 #22b8cf;
 }
 
-.admin-body.is-phone-scanner {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100dvh;
-  overflow: hidden;
-  overscroll-behavior: none;
-}
-
-.admin-phone-scanner-page {
-  position: relative;
-  width: 100vw;
-  height: 100dvh;
-  min-height: 100dvh;
-  display: block;
-  overflow: hidden;
-  padding: 0;
-  background: #071018;
-  overscroll-behavior: none;
-  touch-action: manipulation;
-}
-
-.admin-phone-camera-card {
-  position: relative;
-  width: 100vw;
-  height: 100dvh;
-  overflow: hidden;
-  border: 0;
-  border-radius: 0;
-  background: #071018;
-  box-shadow: none;
-}
-
-.admin-phone-camera-head,
-.admin-phone-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.admin-phone-camera-head {
-  position: absolute;
-  top: calc(env(safe-area-inset-top, 0px) + 12px);
-  left: 12px;
-  z-index: 6;
-  max-width: min(360px, calc(100vw - 24px));
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 2px;
-  padding: 9px 11px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 12px;
-  background: rgba(7, 16, 24, 0.62);
-  backdrop-filter: blur(10px);
-}
-
-.admin-phone-camera-head strong {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: clamp(1.05rem, 3.4vw, 1.45rem);
-  line-height: 1.05;
-  overflow-wrap: anywhere;
-}
-
-.admin-phone-orientation-note {
-  position: absolute;
-  right: 12px;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
-  left: 12px;
-  z-index: 6;
-  margin: 0;
-  color: #ef4444;
-  font-size: 0.82rem;
-  font-weight: 900;
-  text-align: center;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.64);
-}
-
-.admin-phone-camera-frame {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  border-radius: 0;
-  background:
-    radial-gradient(circle at 50% 48%, rgba(157, 255, 0, 0.16), transparent 34%),
-    #071018;
-}
-
-.admin-phone-camera-frame video {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  object-fit: cover;
-}
-
-.admin-phone-reticle {
-  position: absolute;
-  inset: 32% 12%;
-  border: 3px solid rgba(157, 255, 0, 0.84);
-  border-radius: 14px;
-  box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.24);
-}
-
-.admin-phone-camera-card > .admin-form-error {
-  position: absolute;
-  right: 12px;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 46px);
-  left: 12px;
-  z-index: 7;
-  margin: 0;
-}
-
-.admin-phone-actions button {
-  flex: 1;
-  min-height: 58px;
-}
-
-.admin-phone-top-controls {
-  position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 12px);
-  right: 12px;
-  z-index: 70;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.admin-phone-top-controls[hidden] {
-  display: none;
-}
-
-.admin-phone-top-controls .admin-ghost-btn {
-  min-height: 38px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.86);
-  backdrop-filter: blur(10px);
-}
-
-.admin-phone-profile-badge {
-  display: inline-flex;
-  align-items: center;
-  max-width: min(42vw, 220px);
-  min-height: 38px;
-  padding: 0 12px;
-  overflow: hidden;
-  border: 1px solid rgba(157, 255, 0, 0.38);
-  border-radius: 999px;
-  background: rgba(25, 64, 31, 0.86);
-  color: #b9ff66;
-  font-size: 0.82rem;
-  font-weight: 950;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  backdrop-filter: blur(10px);
-}
-
-.admin-phone-standby-shell {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: grid;
-  place-items: center;
-  padding: 18px;
-  background: rgba(7, 16, 24, 0.72);
-  backdrop-filter: blur(10px);
-  pointer-events: none;
-}
-
-.admin-phone-standby-shell[hidden] {
-  display: none;
-}
-
-.admin-phone-standby-card {
-  display: grid;
-  gap: 8px;
-  width: min(460px, 100%);
-  padding: 18px;
-  border: 1px solid var(--admin-border);
-  border-radius: 16px;
-  background: rgba(15, 23, 42, 0.92);
-  text-align: center;
-  box-shadow: var(--admin-shadow);
-}
-
-.admin-phone-standby-card strong {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: clamp(1.4rem, 4vw, 2.2rem);
-  line-height: 1.05;
-}
-
-.admin-phone-standby-card small {
-  color: var(--admin-muted);
-  line-height: 1.35;
-  font-weight: 800;
-}
-
-.admin-phone-confirm-shell {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: grid;
-  place-items: center;
-  padding: 18px;
-  background: rgba(11, 18, 32, 0.72);
-  backdrop-filter: blur(12px);
-}
-
-.admin-phone-confirm-shell[hidden] {
-  display: none;
-}
-
-.admin-phone-confirm-card {
-  display: grid;
-  gap: 14px;
-  width: min(520px, 100%);
-  padding: 20px;
-  border: 1px solid var(--admin-border);
-  border-radius: 18px;
-  background: var(--admin-surface);
-  box-shadow: var(--admin-shadow);
-}
-
-.admin-phone-confirm-card strong {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: clamp(1.6rem, 4vw, 2.7rem);
-  line-height: 1.02;
-  overflow-wrap: anywhere;
-}
-
-.admin-phone-confirm-card small {
-  color: var(--admin-muted);
-  font-size: 1rem;
-  font-weight: 900;
-  letter-spacing: 0;
-}
-
-@media (orientation: portrait) {
-  .admin-phone-reticle {
-    inset: 32% 8%;
-  }
-}
-
-@media (orientation: landscape) {
-  .admin-phone-orientation-note {
-    color: var(--admin-muted);
-  }
-}
-
 @media (max-width: 900px) {
   .admin-store-command {
     flex-wrap: wrap;
@@ -2250,11 +1993,13 @@ button, input {
     max-height: none;
   }
 
-  .admin-phone-scan-card,
-  .admin-phone-camera-head,
-  .admin-phone-actions {
+  .admin-scanner-status-card {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .admin-scanner-settings-grid {
+    grid-template-columns: 1fr;
   }
 
   .admin-board-columns,
@@ -2843,7 +2588,7 @@ button, input {
 :root[data-admin-theme='light'] .admin-sku-preview,
 :root[data-admin-theme='light'] .admin-sku-master-card,
 :root[data-admin-theme='light'] .admin-sheet-wrap,
-:root[data-admin-theme='light'] .admin-profile-input,
+:root[data-admin-theme='light'] .admin-settings-input,
 :root[data-admin-theme='ivory'] .admin-chart-surface,
 :root[data-admin-theme='ivory'] .admin-legend-item,
 :root[data-admin-theme='ivory'] .admin-note-card,
@@ -2851,7 +2596,7 @@ button, input {
 :root[data-admin-theme='ivory'] .admin-sku-preview,
 :root[data-admin-theme='ivory'] .admin-sku-master-card,
 :root[data-admin-theme='ivory'] .admin-sheet-wrap,
-:root[data-admin-theme='ivory'] .admin-profile-input {
+:root[data-admin-theme='ivory'] .admin-settings-input {
   background: rgba(255, 255, 255, 0.64);
 }
 
@@ -2862,7 +2607,7 @@ button, input {
 :root[data-admin-theme='graphite'] .admin-sku-preview,
 :root[data-admin-theme='graphite'] .admin-sku-master-card,
 :root[data-admin-theme='graphite'] .admin-sheet-wrap,
-:root[data-admin-theme='graphite'] .admin-profile-input,
+:root[data-admin-theme='graphite'] .admin-settings-input,
 :root[data-admin-theme='glass'] .admin-chart-surface,
 :root[data-admin-theme='glass'] .admin-legend-item,
 :root[data-admin-theme='glass'] .admin-note-card,
@@ -2870,7 +2615,7 @@ button, input {
 :root[data-admin-theme='glass'] .admin-sku-preview,
 :root[data-admin-theme='glass'] .admin-sku-master-card,
 :root[data-admin-theme='glass'] .admin-sheet-wrap,
-:root[data-admin-theme='glass'] .admin-profile-input,
+:root[data-admin-theme='glass'] .admin-settings-input,
 :root[data-admin-theme='prism'] .admin-chart-surface,
 :root[data-admin-theme='prism'] .admin-legend-item,
 :root[data-admin-theme='prism'] .admin-note-card,
@@ -2878,7 +2623,7 @@ button, input {
 :root[data-admin-theme='prism'] .admin-sku-preview,
 :root[data-admin-theme='prism'] .admin-sku-master-card,
 :root[data-admin-theme='prism'] .admin-sheet-wrap,
-:root[data-admin-theme='prism'] .admin-profile-input {
+:root[data-admin-theme='prism'] .admin-settings-input {
   background: rgba(255, 255, 255, 0.065);
 }
 
@@ -2976,11 +2721,11 @@ button, input {
   background: var(--admin-surface-soft);
 }
 
-:root[data-admin-theme='light'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell, .admin-phone-top-controls .admin-ghost-btn, .admin-phone-profile-badge, .admin-phone-standby-shell, .admin-phone-confirm-shell, .admin-phone-confirm-card),
-:root[data-admin-theme='graphite'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell, .admin-phone-top-controls .admin-ghost-btn, .admin-phone-profile-badge, .admin-phone-standby-shell, .admin-phone-confirm-shell, .admin-phone-confirm-card),
-:root[data-admin-theme='glass'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell, .admin-phone-top-controls .admin-ghost-btn, .admin-phone-profile-badge, .admin-phone-standby-shell, .admin-phone-confirm-shell, .admin-phone-confirm-card),
-:root[data-admin-theme='ivory'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell, .admin-phone-top-controls .admin-ghost-btn, .admin-phone-profile-badge, .admin-phone-standby-shell, .admin-phone-confirm-shell, .admin-phone-confirm-card),
-:root[data-admin-theme='prism'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell, .admin-phone-top-controls .admin-ghost-btn, .admin-phone-profile-badge, .admin-phone-standby-shell, .admin-phone-confirm-shell, .admin-phone-confirm-card) {
+:root[data-admin-theme='light'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell),
+:root[data-admin-theme='graphite'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell),
+:root[data-admin-theme='glass'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell),
+:root[data-admin-theme='ivory'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell),
+:root[data-admin-theme='prism'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell) {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }

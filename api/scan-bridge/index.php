@@ -12,6 +12,18 @@ function jg_scan_bridge_fail(string $message, int $status = 422): void
     exit;
 }
 
+function jg_scan_bridge_default_settings(): array
+{
+    return [
+        'interface' => 'USB-COM',
+        'volume' => 'MEDIUM',
+        'scan_mode' => 'BUTTON_TRIGGER',
+        'auto_induction' => false,
+        'baud_rate' => 9600,
+        'updated_at' => null,
+    ];
+}
+
 function jg_scan_bridge_store_path(): string
 {
     return dirname(__DIR__, 2) . '/data/scan-bridge.json';
@@ -19,139 +31,60 @@ function jg_scan_bridge_store_path(): string
 
 function jg_scan_bridge_read_store(): array
 {
+    $defaults = ['settings' => jg_scan_bridge_default_settings()];
     $path = jg_scan_bridge_store_path();
     if (!is_file($path)) {
-        return ['events' => [], 'profiles' => [], 'sessions' => []];
+        return $defaults;
     }
 
     $raw = @file_get_contents($path);
     if (!is_string($raw) || trim($raw) === '') {
-        return ['events' => [], 'profiles' => [], 'sessions' => []];
+        return $defaults;
     }
 
     $decoded = json_decode($raw, true);
     if (!is_array($decoded)) {
-        return ['events' => [], 'profiles' => [], 'sessions' => []];
+        return $defaults;
     }
 
-    if (isset($decoded['events']) && is_array($decoded['events'])) {
-        return [
-            'events' => $decoded['events'],
-            'profiles' => isset($decoded['profiles']) && is_array($decoded['profiles']) ? $decoded['profiles'] : [],
-            'sessions' => isset($decoded['sessions']) && is_array($decoded['sessions']) ? $decoded['sessions'] : [],
-        ];
-    }
-
-    return [
-        'events' => array_values($decoded) === $decoded ? $decoded : [],
-        'profiles' => [],
-        'sessions' => [],
-    ];
-}
-
-function jg_scan_bridge_read(): array
-{
-    return jg_scan_bridge_read_store()['events'];
+    $settings = is_array($decoded['settings'] ?? null) ? $decoded['settings'] : [];
+    return ['settings' => array_replace(jg_scan_bridge_default_settings(), $settings)];
 }
 
 function jg_scan_bridge_write_store(array $store): void
 {
     $path = jg_scan_bridge_store_path();
     $encoded = json_encode([
-        'events' => array_values($store['events'] ?? []),
-        'profiles' => array_values($store['profiles'] ?? []),
-        'sessions' => $store['sessions'] ?? [],
+        'settings' => array_replace(jg_scan_bridge_default_settings(), is_array($store['settings'] ?? null) ? $store['settings'] : []),
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if (!is_string($encoded) || @file_put_contents($path, $encoded . PHP_EOL, LOCK_EX) === false) {
-        jg_scan_bridge_fail('Unable to save scan event.', 500);
+        jg_scan_bridge_fail('Unable to save scanner settings.', 500);
     }
 }
 
-function jg_scan_bridge_write(array $events): void
+function jg_scan_bridge_setting_choice(string $value, array $allowed, string $fallback): string
 {
-    $store = jg_scan_bridge_read_store();
-    $store['events'] = $events;
-    jg_scan_bridge_write_store($store);
+    $normalized = strtoupper(trim($value));
+    return in_array($normalized, $allowed, true) ? $normalized : $fallback;
 }
 
-function jg_scan_bridge_profile(string $value): string
+function jg_scan_bridge_normalize_settings(array $payload, array $current): array
 {
-    $profile = strtolower(trim($value));
-    $profile = preg_replace('/[^a-z0-9._-]+/', '-', $profile) ?? '';
-    $profile = trim($profile, '.-_');
-    if ($profile === '' || strlen($profile) > 40) {
-        jg_scan_bridge_fail('Invalid profile.');
+    $volume = jg_scan_bridge_setting_choice((string) ($payload['volume'] ?? $current['volume'] ?? ''), ['LOW', 'MEDIUM', 'HIGH'], 'MEDIUM');
+    $scanMode = jg_scan_bridge_setting_choice((string) ($payload['scan_mode'] ?? $current['scan_mode'] ?? ''), ['BUTTON_TRIGGER', 'CONTINUOUS'], 'BUTTON_TRIGGER');
+    $baudRate = (int) ($payload['baud_rate'] ?? $current['baud_rate'] ?? 9600);
+    if (!in_array($baudRate, [9600, 19200, 38400, 57600, 115200], true)) {
+        $baudRate = 9600;
     }
 
-    return $profile;
-}
-
-function jg_scan_bridge_order_id(string $value): string
-{
-    $orderId = strtoupper(trim($value));
-    if ($orderId === '') {
-        return '';
-    }
-    if (!preg_match('/^[A-Z0-9._-]{3,80}$/', $orderId)) {
-        jg_scan_bridge_fail('Invalid order.');
-    }
-
-    return $orderId;
-}
-
-function jg_scan_bridge_save_profile(array &$store, string $profile): void
-{
-    $profiles = [];
-    foreach (($store['profiles'] ?? []) as $row) {
-        if (!is_array($row)) {
-            continue;
-        }
-        $username = (string) ($row['username'] ?? '');
-        if ($username !== '') {
-            $profiles[$username] = $row;
-        }
-    }
-
-    if (!isset($profiles[$profile])) {
-        $profiles[$profile] = [
-            'username' => $profile,
-            'created_at' => gmdate(DATE_ATOM),
-        ];
-    }
-
-    $profiles[$profile]['updated_at'] = gmdate(DATE_ATOM);
-    ksort($profiles);
-    $store['profiles'] = array_values($profiles);
-}
-
-function jg_scan_bridge_active_session(array $session): bool
-{
-    $updatedAt = DateTimeImmutable::createFromFormat(DATE_ATOM, (string) ($session['updated_at'] ?? ''));
-    if (!$updatedAt instanceof DateTimeImmutable) {
-        return false;
-    }
-
-    return time() - $updatedAt->getTimestamp() <= 15;
-}
-
-function jg_scan_bridge_next_id(array $events): int
-{
-    $max = count($events);
-    foreach ($events as $event) {
-        $max = max($max, (int) ($event['id'] ?? 0));
-    }
-
-    return $max + 1;
-}
-
-function jg_scan_bridge_cursor(array $events): int
-{
-    $max = count($events);
-    foreach ($events as $event) {
-        $max = max($max, (int) ($event['id'] ?? 0));
-    }
-
-    return $max;
+    return [
+        'interface' => 'USB-COM',
+        'volume' => $volume,
+        'scan_mode' => $scanMode,
+        'auto_induction' => filter_var($payload['auto_induction'] ?? $current['auto_induction'] ?? false, FILTER_VALIDATE_BOOLEAN),
+        'baud_rate' => $baudRate,
+        'updated_at' => gmdate(DATE_ATOM),
+    ];
 }
 
 function jg_scan_bridge_sku_product(string $sku): array
@@ -208,89 +141,26 @@ function jg_scan_bridge_sku_product(string $sku): array
 }
 
 $store = jg_scan_bridge_read_store();
-$events = $store['events'];
-
 $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+
 if ($method === 'POST') {
     $raw = file_get_contents('php://input');
     $payload = is_string($raw) && trim($raw) !== '' ? json_decode($raw, true) : $_POST;
     $payload = is_array($payload) ? $payload : [];
-    $action = strtolower(trim((string) ($payload['action'] ?? 'scan')));
+    $action = strtolower(trim((string) ($payload['action'] ?? 'settings')));
 
-    if ($action === 'profile') {
-        $profile = jg_scan_bridge_profile((string) ($payload['profile'] ?? ''));
-        jg_scan_bridge_save_profile($store, $profile);
-        jg_scan_bridge_write_store($store);
-        echo json_encode(['ok' => true, 'profile' => $profile], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        exit;
+    if ($action !== 'settings') {
+        jg_scan_bridge_fail('Unsupported scan bridge action.', 410);
     }
 
-    if ($action === 'session') {
-        $profile = jg_scan_bridge_profile((string) ($payload['profile'] ?? ''));
-        jg_scan_bridge_save_profile($store, $profile);
-        $active = (bool) ($payload['active'] ?? false);
-        if ($active) {
-            $orderId = jg_scan_bridge_order_id((string) ($payload['order_id'] ?? ''));
-            if ($orderId === '') {
-                jg_scan_bridge_fail('Invalid order.');
-            }
-            $store['sessions'][$profile] = [
-                'profile' => $profile,
-                'order_id' => $orderId,
-                'active' => true,
-                'updated_at' => gmdate(DATE_ATOM),
-            ];
-        } else {
-            unset($store['sessions'][$profile]);
-        }
-        jg_scan_bridge_write_store($store);
-        echo json_encode(['ok' => true], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        exit;
-    }
-
-    $barcode = strtoupper(trim((string) ($payload['barcode'] ?? '')));
-    if (!preg_match('/^[A-Z0-9._-]{4,80}$/', $barcode)) {
-        jg_scan_bridge_fail('Invalid barcode.');
-    }
-    $profile = jg_scan_bridge_profile((string) ($payload['profile'] ?? ''));
-    $orderId = jg_scan_bridge_order_id((string) ($payload['order_id'] ?? ''));
-
-    $events[] = [
-        'id' => jg_scan_bridge_next_id($events),
-        'barcode' => $barcode,
-        'profile' => $profile,
-        'order_id' => $orderId,
-        'created_at' => gmdate(DATE_ATOM),
-    ];
-    $events = array_slice($events, -80);
-    $store['events'] = $events;
+    $store['settings'] = jg_scan_bridge_normalize_settings($payload, $store['settings']);
     jg_scan_bridge_write_store($store);
-    echo json_encode(['ok' => true], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    echo json_encode(['ok' => true, 'settings' => $store['settings']], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
 if ($method !== 'GET') {
     jg_scan_bridge_fail('Method not allowed.', 405);
-}
-
-if (isset($_GET['profiles'])) {
-    echo json_encode([
-        'profiles' => array_values($store['profiles'] ?? []),
-    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    exit;
-}
-
-$statusProfile = trim((string) ($_GET['status_profile'] ?? ''));
-if ($statusProfile !== '') {
-    $profile = jg_scan_bridge_profile($statusProfile);
-    $session = is_array($store['sessions'][$profile] ?? null) ? $store['sessions'][$profile] : [];
-    $active = $session !== [] && jg_scan_bridge_active_session($session);
-    echo json_encode([
-        'active' => $active,
-        'profile' => $profile,
-        'order_id' => $active ? (string) ($session['order_id'] ?? '') : '',
-    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    exit;
 }
 
 $lookupSku = strtoupper(trim((string) ($_GET['sku'] ?? '')));
@@ -303,19 +173,6 @@ if ($lookupSku !== '') {
     exit;
 }
 
-$after = max(0, (int) ($_GET['after'] ?? 0));
-$profileFilter = trim((string) ($_GET['profile'] ?? ''));
-$orderFilter = trim((string) ($_GET['order_id'] ?? ''));
-$profileFilter = $profileFilter !== '' ? jg_scan_bridge_profile($profileFilter) : '';
-$orderFilter = $orderFilter !== '' ? jg_scan_bridge_order_id($orderFilter) : '';
-$nextEvents = array_values(array_filter(
-    $events,
-    static fn (array $event): bool =>
-        (int) ($event['id'] ?? 0) > $after
-        && ($profileFilter === '' || (string) ($event['profile'] ?? '') === $profileFilter)
-        && ($orderFilter === '' || (string) ($event['order_id'] ?? '') === $orderFilter)
-));
 echo json_encode([
-    'events' => $nextEvents,
-    'cursor' => jg_scan_bridge_cursor($events),
+    'settings' => $store['settings'],
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
