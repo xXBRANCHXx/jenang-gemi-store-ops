@@ -2,7 +2,7 @@
 set -euo pipefail
 
 RULE_PATH="/etc/udev/rules.d/70-iware-scanner.rules"
-RULE='SUBSYSTEM=="tty", ATTRS{idVendor}=="0c2e", ATTRS{idProduct}=="0901", GROUP="dialout", MODE="0666", SYMLINK+="iware-scanner"'
+RULE='SUBSYSTEM=="tty", ATTRS{idVendor}=="0c2e", ATTRS{idProduct}=="0900", GROUP="dialout", MODE="0666", SYMLINK+="iware-scanner"'
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Run with sudo: sudo $0" >&2
