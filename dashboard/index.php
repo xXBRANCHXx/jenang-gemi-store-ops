@@ -124,14 +124,6 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
                         <span>AUTO-INDUCTION</span>
                     </label>
                 </div>
-                <div class="admin-scanner-setup-card">
-                    <strong>IWARE X-Series 101 setup</strong>
-                    <span>Saving records the intended Store Ops scanner config. To change the scanner hardware, scan the matching setup barcodes from the V6.2-1D manual.</span>
-                    <span>For this manual, BUTTON TRIGGER uses the Auto-induction -OFF setup barcode.</span>
-                    <button type="button" class="admin-ghost-btn admin-scanner-print-btn" data-scanner-print-setup>Print setup barcodes</button>
-                    <small data-scanner-settings-summary>USB-COM / MEDIUM / BUTTON TRIGGER / AUTO-INDUCTION OFF</small>
-                    <div class="admin-scanner-code-list" data-scanner-code-list></div>
-                </div>
                 <div class="admin-scanner-health-card" data-scanner-health>
                     <i aria-hidden="true"></i>
                     <div>

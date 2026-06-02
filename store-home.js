@@ -33,10 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const settingsForm = document.querySelector('[data-store-settings-form]');
   const settingsError = document.querySelector('[data-store-settings-error]');
   const sourceColorList = document.querySelector('[data-source-color-list]');
-  const scannerSettingsSummary = document.querySelector('[data-scanner-settings-summary]');
-  const scannerCodeList = document.querySelector('[data-scanner-code-list]');
   const scannerTestScanButton = document.querySelector('[data-scanner-test-scan]');
-  const scannerPrintSetupButton = document.querySelector('[data-scanner-print-setup]');
   const ordersStorageKey = 'jg-store-live-orders';
   const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
@@ -251,41 +248,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (volumeSelect instanceof HTMLSelectElement) volumeSelect.value = scannerSettings.volume;
     if (modeSelect instanceof HTMLSelectElement) modeSelect.value = scannerSettings.scan_mode;
     if (autoInductionInput instanceof HTMLInputElement) autoInductionInput.checked = scannerSettings.auto_induction;
-    if (scannerSettingsSummary) {
-      scannerSettingsSummary.textContent = [
-        scannerSettings.interface,
-        scannerSettings.volume,
-        scannerSettings.scan_mode.replace('_', ' '),
-        `AUTO-INDUCTION ${scannerSettings.auto_induction ? 'ON' : 'OFF'}`
-      ].join(' / ');
-    }
-    if (scannerCodeList) {
-      const codeDefinitions = {
-        usb_virtual_com: { label: 'USB virtual COM', image: '../assets/scanner-setup/usb-virtual-com.png' },
-        low_volume: { label: 'Low volume', image: '../assets/scanner-setup/low-volume.png' },
-        medium_volume: { label: 'Medium volume', image: '../assets/scanner-setup/medium-volume.png' },
-        high_volume: { label: 'High volume', image: '../assets/scanner-setup/high-volume.png' },
-        continuous_mode: { label: 'Continuous Mode', image: '../assets/scanner-setup/continuous-mode.png' },
-        auto_induction_on: { label: 'Auto-induction -ON', image: '../assets/scanner-setup/auto-induction-on.png' },
-        auto_induction_off: { label: 'Auto-induction -OFF', image: '../assets/scanner-setup/auto-induction-off.png' }
-      };
-      const volumeKey = `${scannerSettings.volume.toLowerCase()}_volume`;
-      const triggerKey = scannerSettings.scan_mode === 'CONTINUOUS'
-        ? 'continuous_mode'
-        : (scannerSettings.auto_induction ? 'auto_induction_on' : 'auto_induction_off');
-      const setupCodeKeys = ['usb_virtual_com', volumeKey, triggerKey];
-      const setupCodes = [...new Set(setupCodeKeys)]
-        .map((key) => codeDefinitions[key])
-        .filter(Boolean);
-      scannerCodeList.innerHTML = setupCodes
-        .map((code) => `
-          <article class="admin-scanner-code-card">
-            <strong>${escapeHtml(code.label)}</strong>
-            <img src="${escapeHtml(code.image)}" alt="${escapeHtml(code.label)} setup barcode">
-          </article>
-        `)
-        .join('');
-    }
   };
 
   const readScannerSettingsForm = () => {
@@ -1003,14 +965,6 @@ document.addEventListener('DOMContentLoaded', () => {
   scannerTestScanButton?.addEventListener('click', () => {
     testScannerScan().catch(() => {});
   });
-  scannerPrintSetupButton?.addEventListener('click', () => {
-    document.body.classList.add('is-printing-scanner-setup');
-    window.setTimeout(() => window.print(), 40);
-  });
-  window.addEventListener('afterprint', () => {
-    document.body.classList.remove('is-printing-scanner-setup');
-  });
-
   document.querySelectorAll('[data-theme-option]').forEach((button) => {
     button.addEventListener('click', () => {
       applyTheme(button.dataset.themeOption || 'dark');
