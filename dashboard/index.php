@@ -127,6 +127,7 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
                 <div class="admin-scanner-setup-card">
                     <strong>IWARE X-Series 101 setup</strong>
                     <span>Saving records the intended Store Ops scanner config. To change the scanner hardware, scan the matching setup barcodes from the V6.2-1D manual.</span>
+                    <span>For this manual, BUTTON TRIGGER uses the Auto-induction -OFF setup barcode.</span>
                     <small data-scanner-settings-summary>USB-COM / MEDIUM / BUTTON TRIGGER / AUTO-INDUCTION OFF</small>
                     <div class="admin-scanner-code-list" data-scanner-code-list></div>
                 </div>
@@ -136,7 +137,10 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
                         <strong data-scanner-health-title>Scanner not checked</strong>
                         <span data-scanner-health-detail>Open Settings or save scanner settings to run a USB-COM health check.</span>
                     </div>
-                    <button type="button" class="admin-ghost-btn" data-scanner-health-check>Recheck</button>
+                    <div class="admin-scanner-health-actions">
+                        <button type="button" class="admin-ghost-btn" data-scanner-health-check>Recheck</button>
+                        <button type="button" class="admin-primary-btn" data-scanner-test-scan>Test Scan</button>
+                    </div>
                 </div>
                 <div class="admin-reprint-field">
                     <span>Theme <small data-theme-label>Default</small></span>

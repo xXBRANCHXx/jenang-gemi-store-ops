@@ -15,6 +15,7 @@ function jg_scan_serial_candidates(): array
     $configured = trim((string) getenv('JG_STORE_OPS_SCANNER_DEVICE'));
     return array_values(array_unique(array_filter([
         $configured,
+        '/dev/iware-scanner',
         '/dev/serial/by-id/usb-SCANNER_cs_SCANNER_YUNEW-if00',
         '/dev/ttyACM0',
         '/dev/ttyUSB0',
@@ -98,6 +99,25 @@ function jg_scan_serial_codes(string $buffer): array
     ), static fn (string $code): bool => $code !== ''));
 }
 
+function jg_scan_serial_read_codes($handle, float $timeoutSeconds): array
+{
+    stream_set_blocking($handle, false);
+    $buffer = '';
+    $deadline = microtime(true) + $timeoutSeconds;
+    do {
+        $chunk = fread($handle, 4096);
+        if (is_string($chunk) && $chunk !== '') {
+            $buffer .= $chunk;
+            if (preg_match('/[\r\n\t]/', $buffer)) {
+                break;
+            }
+        }
+        usleep(10000);
+    } while (microtime(true) < $deadline);
+
+    return jg_scan_serial_codes($buffer);
+}
+
 if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'GET') {
     jg_scan_serial_fail('Method not allowed.', 405);
 }
@@ -107,7 +127,11 @@ $baudRate = jg_scan_serial_baud_rate();
 if (isset($_GET['status'])) {
     $candidates = jg_scan_serial_candidate_rows();
     $device = '';
+    $detectedDevice = '';
     foreach ($candidates as $candidate) {
+        if ($detectedDevice === '' && !empty($candidate['exists'])) {
+            $detectedDevice = (string) $candidate['path'];
+        }
         if (!empty($candidate['readable'])) {
             $device = (string) $candidate['path'];
             break;
@@ -115,7 +139,8 @@ if (isset($_GET['status'])) {
     }
 
     $checks = [
-        'device_found' => $device !== '',
+        'device_exists' => $detectedDevice !== '',
+        'device_readable' => $device !== '',
         'stty_available' => is_executable('/usr/bin/stty'),
         'configured' => false,
         'opened' => false,
@@ -123,7 +148,9 @@ if (isset($_GET['status'])) {
     $messages = [];
 
     if ($device === '') {
-        $messages[] = 'No configured scanner serial device is readable by the web server.';
+        $messages[] = $detectedDevice !== ''
+            ? 'Scanner serial device exists but is not readable by the web server.'
+            : 'No configured scanner serial device was found.';
     } else {
         $configure = jg_scan_serial_configure_result($device, $baudRate);
         $checks['configured'] = (bool) ($configure['ok'] ?? false);
@@ -140,11 +167,11 @@ if (isset($_GET['status'])) {
         }
     }
 
-    $ok = $checks['device_found'] && $checks['configured'] && $checks['opened'];
+    $ok = $checks['device_exists'] && $checks['device_readable'] && $checks['configured'] && $checks['opened'];
     echo json_encode([
         'ok' => $ok,
         'error' => $ok ? '' : implode(' ', array_filter($messages)),
-        'device' => $device,
+        'device' => $device !== '' ? $device : $detectedDevice,
         'baud_rate' => $baudRate,
         'checks' => $checks,
         'candidates' => $candidates,
@@ -161,24 +188,20 @@ if (!$handle) {
     jg_scan_serial_fail('Unable to open USB-COM scanner device.', 503, ['device' => $device]);
 }
 
-stream_set_blocking($handle, false);
-$buffer = '';
-$deadline = microtime(true) + 0.18;
-do {
-    $chunk = fread($handle, 4096);
-    if (is_string($chunk) && $chunk !== '') {
-        $buffer .= $chunk;
-        if (preg_match('/[\r\n\t]/', $buffer)) {
-            break;
-        }
-    }
-    usleep(10000);
-} while (microtime(true) < $deadline);
+$isTest = isset($_GET['test']);
+$codes = jg_scan_serial_read_codes($handle, $isTest ? 6.0 : 0.18);
 fclose($handle);
+
+if ($isTest && $codes === []) {
+    jg_scan_serial_fail('No barcode was received from the USB-COM scanner within 6 seconds.', 408, [
+        'device' => $device,
+        'baud_rate' => $baudRate,
+    ]);
+}
 
 echo json_encode([
     'ok' => true,
     'device' => $device,
     'baud_rate' => $baudRate,
-    'codes' => jg_scan_serial_codes($buffer),
+    'codes' => $codes,
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);

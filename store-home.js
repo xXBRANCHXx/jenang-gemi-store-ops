@@ -35,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const sourceColorList = document.querySelector('[data-source-color-list]');
   const scannerSettingsSummary = document.querySelector('[data-scanner-settings-summary]');
   const scannerCodeList = document.querySelector('[data-scanner-code-list]');
+  const scannerTestScanButton = document.querySelector('[data-scanner-test-scan]');
   const ordersStorageKey = 'jg-store-live-orders';
   const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
@@ -245,17 +246,30 @@ document.addEventListener('DOMContentLoaded', () => {
       ].join(' / ');
     }
     if (scannerCodeList) {
-      const triggerCode = scannerSettings.scan_mode === 'CONTINUOUS'
-        ? 'Continuous Mode'
-        : 'Auto-induction -OFF';
-      const inductionCode = scannerSettings.auto_induction
-        ? 'Auto-induction -ON'
-        : 'Auto-induction -OFF';
-      const volumeCode = `${scannerSettings.volume[0]}${scannerSettings.volume.slice(1).toLowerCase()} volume`;
-      const setupCodes = ['USB virtual COM', volumeCode, triggerCode];
-      if (!setupCodes.includes(inductionCode)) setupCodes.push(inductionCode);
+      const codeDefinitions = {
+        usb_virtual_com: { label: 'USB virtual COM', image: '../assets/scanner-setup/usb-virtual-com.png' },
+        low_volume: { label: 'Low volume', image: '../assets/scanner-setup/low-volume.png' },
+        medium_volume: { label: 'Medium volume', image: '../assets/scanner-setup/medium-volume.png' },
+        high_volume: { label: 'High volume', image: '../assets/scanner-setup/high-volume.png' },
+        continuous_mode: { label: 'Continuous Mode', image: '../assets/scanner-setup/continuous-mode.png' },
+        auto_induction_on: { label: 'Auto-induction -ON', image: '../assets/scanner-setup/auto-induction-on.png' },
+        auto_induction_off: { label: 'Auto-induction -OFF', image: '../assets/scanner-setup/auto-induction-off.png' }
+      };
+      const volumeKey = `${scannerSettings.volume.toLowerCase()}_volume`;
+      const triggerKey = scannerSettings.scan_mode === 'CONTINUOUS'
+        ? 'continuous_mode'
+        : (scannerSettings.auto_induction ? 'auto_induction_on' : 'auto_induction_off');
+      const setupCodeKeys = ['usb_virtual_com', volumeKey, triggerKey];
+      const setupCodes = [...new Set(setupCodeKeys)]
+        .map((key) => codeDefinitions[key])
+        .filter(Boolean);
       scannerCodeList.innerHTML = setupCodes
-        .map((code) => `<span>${escapeHtml(code)}</span>`)
+        .map((code) => `
+          <article class="admin-scanner-code-card">
+            <strong>${escapeHtml(code.label)}</strong>
+            <img src="${escapeHtml(code.image)}" alt="${escapeHtml(code.label)} setup barcode">
+          </article>
+        `)
         .join('');
     }
   };
@@ -292,16 +306,24 @@ document.addEventListener('DOMContentLoaded', () => {
     card.classList.toggle('is-ok', stateName === 'ok');
     card.classList.toggle('is-error', stateName === 'error');
     card.classList.toggle('is-checking', stateName === 'checking');
+    card.classList.toggle('is-ready', stateName === 'ready');
     if (titleNode) titleNode.textContent = title;
     if (detailNode) detailNode.textContent = detail;
   };
 
   const scannerHealthDetail = (payload) => {
     const candidates = Array.isArray(payload.candidates) ? payload.candidates : [];
-    const firstExisting = candidates.find((candidate) => candidate.exists) || candidates[0] || {};
+    const firstExisting = candidates.find((candidate) => candidate.path === payload.device)
+      || candidates.find((candidate) => candidate.exists)
+      || candidates[0]
+      || {};
     const checks = payload.checks || {};
-    if (!checks.device_found) {
-      return `No readable scanner serial device. Checked: ${candidates.map((candidate) => candidate.path).filter(Boolean).join(', ') || 'no paths'}.`;
+    if (!checks.device_exists) {
+      return `No scanner serial device was found. Checked: ${candidates.map((candidate) => candidate.path).filter(Boolean).join(', ') || 'no paths'}.`;
+    }
+    if (!checks.device_readable) {
+      const user = payload.web_user ? ` User: ${payload.web_user}.` : '';
+      return `Found ${payload.device}, but it is not readable. Permissions: ${firstExisting.permissions || 'unknown'}.${user} Add the web-server user to dialout or install a udev rule for the scanner.`;
     }
     if (!checks.configured) {
       return `Found ${payload.device}, but stty configuration failed: ${payload.error || 'no command output'}`;
@@ -310,7 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const user = payload.web_user ? ` User: ${payload.web_user}.` : '';
       return `Found ${payload.device}, but PHP could not open it. Permissions: ${firstExisting.permissions || 'unknown'}.${user} Add the web-server user to dialout or configure a udev rule.`;
     }
-    return `Reading ${payload.device} at ${payload.baud_rate || scannerSettings.baud_rate} baud. Scan a product barcode on the scan page to confirm data.`;
+    return `Serial path is open on ${payload.device} at ${payload.baud_rate || scannerSettings.baud_rate} baud. Click Test Scan and scan any barcode to prove data is arriving.`;
   };
 
   const checkScannerHealth = async () => {
@@ -330,11 +352,40 @@ document.addEventListener('DOMContentLoaded', () => {
         setScannerHealth('error', 'Scanner command path failed', scannerHealthDetail(payload));
         return false;
       }
-      setScannerHealth('ok', 'Scanner command path ready', scannerHealthDetail(payload));
+      setScannerHealth('ready', 'Scanner path ready', scannerHealthDetail(payload));
       return true;
     } catch (error) {
       setScannerHealth('error', 'Scanner health check failed', error instanceof Error ? error.message : 'Unable to run USB-COM health check.');
       return false;
+    }
+  };
+
+  const testScannerScan = async () => {
+    setScannerHealth('checking', 'Waiting for test scan', 'Scan any product barcode now. Store Ops will turn green only after it receives barcode data from USB-COM.');
+    if (scannerTestScanButton instanceof HTMLButtonElement) scannerTestScanButton.disabled = true;
+    try {
+      const query = new URLSearchParams({
+        test: '1',
+        baud_rate: String(scannerSettings.baud_rate || 9600)
+      });
+      const response = await fetch(`${scanSerialEndpoint}?${query.toString()}`, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await response.json();
+      const code = Array.isArray(payload.codes) ? String(payload.codes[0] || '') : '';
+      if (!response.ok || !payload.ok || !code) {
+        setScannerHealth('error', 'Scanner test failed', payload.error || 'No barcode data was received from USB-COM.');
+        return false;
+      }
+      setScannerHealth('ok', 'Scanner working', `Received ${code} from ${payload.device || 'USB-COM scanner'} at ${payload.baud_rate || scannerSettings.baud_rate} baud.`);
+      return true;
+    } catch (error) {
+      setScannerHealth('error', 'Scanner test failed', error instanceof Error ? error.message : 'Unable to run scanner test.');
+      return false;
+    } finally {
+      if (scannerTestScanButton instanceof HTMLButtonElement) scannerTestScanButton.disabled = false;
     }
   };
 
@@ -934,6 +985,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelector('[data-open-store-settings]')?.addEventListener('click', openSettingsModal);
   document.querySelector('[data-scanner-health-check]')?.addEventListener('click', () => {
     checkScannerHealth().catch(() => {});
+  });
+  scannerTestScanButton?.addEventListener('click', () => {
+    testScannerScan().catch(() => {});
   });
 
   document.querySelectorAll('[data-theme-option]').forEach((button) => {

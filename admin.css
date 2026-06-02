@@ -1742,22 +1742,34 @@ button, input {
 }
 
 .admin-scanner-code-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
-.admin-scanner-code-list span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  padding: 0 10px;
+.admin-scanner-code-card {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px;
   border: 1px solid rgba(34, 211, 238, 0.26);
-  border-radius: 999px;
+  border-radius: 12px;
   background: rgba(15, 23, 42, 0.46);
+}
+
+.admin-scanner-code-card strong {
   color: var(--admin-text);
   font-size: 0.82rem;
   font-weight: 900;
+}
+
+.admin-scanner-code-card img {
+  display: block;
+  width: 100%;
+  min-height: 42px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #fff;
 }
 
 .admin-scanner-health-card {
@@ -1820,6 +1832,29 @@ button, input {
 .admin-scanner-health-card.is-checking i {
   background: #f59e0b;
   box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.18), 0 0 18px rgba(245, 158, 11, 0.34);
+}
+
+.admin-scanner-health-card.is-ready {
+  border-color: rgba(245, 158, 11, 0.42);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.admin-scanner-health-card.is-ready i {
+  background: #f59e0b;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.18), 0 0 18px rgba(245, 158, 11, 0.34);
+}
+
+.admin-scanner-health-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.admin-scanner-health-actions button {
+  min-height: 36px;
+  padding: 0 12px;
 }
 
 .admin-store-login-shell {
@@ -2083,12 +2118,21 @@ button, input {
     grid-template-columns: 1fr;
   }
 
+  .admin-scanner-code-list {
+    grid-template-columns: 1fr;
+  }
+
   .admin-scanner-health-card {
     grid-template-columns: auto 1fr;
   }
 
-  .admin-scanner-health-card button {
+  .admin-scanner-health-actions {
     grid-column: 1 / -1;
+    justify-content: stretch;
+  }
+
+  .admin-scanner-health-actions button {
+    flex: 1;
   }
 
   .admin-board-columns,
