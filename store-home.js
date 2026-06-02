@@ -43,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const skuDbEndpoint = '../api/sku-db/';
   const ordersEndpoint = '../api/orders/';
   const scanBridgeEndpoint = '../api/scan-bridge/';
+  const scanSerialEndpoint = '../api/scan-serial/';
   const boardVisibleRows = 10;
   const boardVisibleColumns = 7;
   const boardVisibleCapacity = boardVisibleRows * boardVisibleColumns;
@@ -281,6 +282,60 @@ document.addEventListener('DOMContentLoaded', () => {
     scannerSettings = normalizeScannerSettings(payload.settings || normalized);
     renderScannerSettings();
     return scannerSettings;
+  };
+
+  const setScannerHealth = (stateName, title, detail) => {
+    const card = document.querySelector('[data-scanner-health]');
+    const titleNode = document.querySelector('[data-scanner-health-title]');
+    const detailNode = document.querySelector('[data-scanner-health-detail]');
+    if (!card) return;
+    card.classList.toggle('is-ok', stateName === 'ok');
+    card.classList.toggle('is-error', stateName === 'error');
+    card.classList.toggle('is-checking', stateName === 'checking');
+    if (titleNode) titleNode.textContent = title;
+    if (detailNode) detailNode.textContent = detail;
+  };
+
+  const scannerHealthDetail = (payload) => {
+    const candidates = Array.isArray(payload.candidates) ? payload.candidates : [];
+    const firstExisting = candidates.find((candidate) => candidate.exists) || candidates[0] || {};
+    const checks = payload.checks || {};
+    if (!checks.device_found) {
+      return `No readable scanner serial device. Checked: ${candidates.map((candidate) => candidate.path).filter(Boolean).join(', ') || 'no paths'}.`;
+    }
+    if (!checks.configured) {
+      return `Found ${payload.device}, but stty configuration failed: ${payload.error || 'no command output'}`;
+    }
+    if (!checks.opened) {
+      const user = payload.web_user ? ` User: ${payload.web_user}.` : '';
+      return `Found ${payload.device}, but PHP could not open it. Permissions: ${firstExisting.permissions || 'unknown'}.${user} Add the web-server user to dialout or configure a udev rule.`;
+    }
+    return `Reading ${payload.device} at ${payload.baud_rate || scannerSettings.baud_rate} baud. Scan a product barcode on the scan page to confirm data.`;
+  };
+
+  const checkScannerHealth = async () => {
+    setScannerHealth('checking', 'Checking scanner', 'Testing USB-COM device path, permissions, serial configuration, and open/read access.');
+    try {
+      const query = new URLSearchParams({
+        status: '1',
+        baud_rate: String(scannerSettings.baud_rate || 9600)
+      });
+      const response = await fetch(`${scanSerialEndpoint}?${query.toString()}`, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        setScannerHealth('error', 'Scanner command path failed', scannerHealthDetail(payload));
+        return false;
+      }
+      setScannerHealth('ok', 'Scanner command path ready', scannerHealthDetail(payload));
+      return true;
+    } catch (error) {
+      setScannerHealth('error', 'Scanner health check failed', error instanceof Error ? error.message : 'Unable to run USB-COM health check.');
+      return false;
+    }
   };
 
   const loadScannerSettings = async () => {
@@ -625,6 +680,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderScannerSettings();
     renderSourceColorList();
     settingsModal.hidden = false;
+    checkScannerHealth().catch(() => {});
     const input = settingsModal.querySelector('[data-scanner-setting="volume"]');
     if (input instanceof HTMLSelectElement) {
       window.setTimeout(() => input.focus(), 40);
@@ -876,6 +932,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelector('[data-open-reprint]')?.addEventListener('click', openReprintModal);
 
   document.querySelector('[data-open-store-settings]')?.addEventListener('click', openSettingsModal);
+  document.querySelector('[data-scanner-health-check]')?.addEventListener('click', () => {
+    checkScannerHealth().catch(() => {});
+  });
 
   document.querySelectorAll('[data-theme-option]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -904,12 +963,12 @@ document.addEventListener('DOMContentLoaded', () => {
     event.preventDefault();
     try {
       await saveScannerSettings(readScannerSettingsForm());
-      if (settingsError) {
-        settingsError.textContent = 'Scanner settings saved.';
-        settingsError.hidden = false;
-      }
+      const scannerOk = await checkScannerHealth();
+      if (settingsError) settingsError.hidden = true;
+      if (!scannerOk) showSettingsError('Scanner settings were saved, but the USB-COM command path is not ready. See the red scanner status for the exact failing step.');
     } catch (error) {
       showSettingsError(error instanceof Error ? error.message : 'Unable to save scanner settings.');
+      setScannerHealth('error', 'Settings command failed', error instanceof Error ? error.message : 'Unable to save scanner settings.');
     }
   });
 
