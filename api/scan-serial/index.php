@@ -175,7 +175,7 @@ if (isset($_GET['status'])) {
         'baud_rate' => $baudRate,
         'checks' => $checks,
         'candidates' => $candidates,
-        'web_user' => is_executable('/usr/bin/whoami') ? trim((string) @shell_exec('/usr/bin/whoami')) : '',
+        'web_user' => function_exists('shell_exec') && is_executable('/usr/bin/whoami') ? trim((string) @shell_exec('/usr/bin/whoami')) : '',
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     exit;
 }

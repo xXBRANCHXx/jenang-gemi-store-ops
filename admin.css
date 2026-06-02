@@ -1741,6 +1741,10 @@ button, input {
   background: rgba(34, 211, 238, 0.08);
 }
 
+.admin-scanner-print-btn {
+  justify-self: start;
+}
+
 .admin-scanner-code-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2143,6 +2147,58 @@ button, input {
 
 .admin-primary-btn:hover {
   box-shadow: 0 10px 24px rgba(157, 255, 0, 0.2);
+}
+
+@media print {
+  body.is-printing-scanner-setup * {
+    visibility: hidden !important;
+  }
+
+  body.is-printing-scanner-setup .admin-scanner-setup-card,
+  body.is-printing-scanner-setup .admin-scanner-setup-card * {
+    visibility: visible !important;
+  }
+
+  body.is-printing-scanner-setup .admin-scanner-setup-card {
+    position: fixed;
+    inset: 0;
+    gap: 7mm;
+    margin: 0;
+    padding: 16mm;
+    border: 0;
+    border-radius: 0;
+    background: #fff;
+    color: #111;
+  }
+
+  body.is-printing-scanner-setup .admin-scanner-print-btn {
+    display: none !important;
+  }
+
+  body.is-printing-scanner-setup .admin-scanner-setup-card :is(strong, span, small) {
+    color: #111;
+  }
+
+  body.is-printing-scanner-setup .admin-scanner-code-list {
+    grid-template-columns: 1fr;
+    gap: 9mm;
+  }
+
+  body.is-printing-scanner-setup .admin-scanner-code-card {
+    gap: 4mm;
+    padding: 6mm;
+    border: 1px solid #111;
+    border-radius: 0;
+    background: #fff;
+    break-inside: avoid;
+  }
+
+  body.is-printing-scanner-setup .admin-scanner-code-card img {
+    width: 100%;
+    max-height: 28mm;
+    object-fit: contain;
+    filter: none;
+  }
 }
 
 :root[data-admin-theme='light'] .admin-primary-btn:hover,

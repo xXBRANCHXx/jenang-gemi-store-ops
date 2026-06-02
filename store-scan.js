@@ -62,6 +62,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const skipScanFor = (item) => Boolean(item.skipScan || item.skip_scan);
   const skipQuantityFor = (item) => Number(item.skipQuantity || (skipScanFor(item) ? scanQuantityFor(item) : 0));
   const manualQuantityFor = (item) => Math.max(0, scanQuantityFor(item) - skipQuantityFor(item));
+  const readJsonResponse = async (response, fallbackMessage) => {
+    const text = await response.text();
+    if (text.trim() === '') {
+      throw new Error(`${fallbackMessage} Empty response from ${response.url || 'server'}. HTTP ${response.status}.`);
+    }
+    try {
+      return JSON.parse(text);
+    } catch (_error) {
+      const preview = text.replace(/\s+/g, ' ').trim().slice(0, 220);
+      throw new Error(`${fallbackMessage} Expected JSON but got HTTP ${response.status}: ${preview || 'no response body'}`);
+    }
+  };
   const sourceSkusFor = (item) => {
     if (Array.isArray(item.sourceSkus)) return item.sourceSkus;
     const sku = String(item.sku || '').trim();
@@ -329,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
         credentials: 'same-origin',
         headers: { Accept: 'application/json' }
       });
-      const payload = await response.json();
+      const payload = await readJsonResponse(response, 'Unable to read server USB-COM scanner.');
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error || 'Unable to read server USB-COM scanner.');
       }
@@ -377,7 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
         credentials: 'same-origin',
         headers: { Accept: 'application/json' }
       });
-      const payload = await response.json();
+      const payload = await readJsonResponse(response, 'Unable to load scanner settings.');
       scannerSettings = payload.settings || scannerSettings;
     } catch (_error) {
       scannerSettings = { baud_rate: 9600 };

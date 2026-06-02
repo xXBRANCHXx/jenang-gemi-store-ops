@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const scannerSettingsSummary = document.querySelector('[data-scanner-settings-summary]');
   const scannerCodeList = document.querySelector('[data-scanner-code-list]');
   const scannerTestScanButton = document.querySelector('[data-scanner-test-scan]');
+  const scannerPrintSetupButton = document.querySelector('[data-scanner-print-setup]');
   const ordersStorageKey = 'jg-store-live-orders';
   const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
@@ -229,6 +230,19 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   };
 
+  const readJsonResponse = async (response, fallbackMessage) => {
+    const text = await response.text();
+    if (text.trim() === '') {
+      throw new Error(`${fallbackMessage} Empty response from ${response.url || 'server'}. HTTP ${response.status}.`);
+    }
+    try {
+      return JSON.parse(text);
+    } catch (_error) {
+      const preview = text.replace(/\s+/g, ' ').trim().slice(0, 220);
+      throw new Error(`${fallbackMessage} Expected JSON but got HTTP ${response.status}: ${preview || 'no response body'}`);
+    }
+  };
+
   const renderScannerSettings = () => {
     scannerSettings = normalizeScannerSettings(scannerSettings);
     const volumeSelect = settingsForm?.querySelector('[data-scanner-setting="volume"]');
@@ -291,7 +305,7 @@ document.addEventListener('DOMContentLoaded', () => {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ action: 'settings', ...normalized })
     });
-    const payload = await response.json();
+    const payload = await readJsonResponse(response, 'Unable to save scanner settings.');
     if (!response.ok) throw new Error(payload.error || 'Unable to save scanner settings.');
     scannerSettings = normalizeScannerSettings(payload.settings || normalized);
     renderScannerSettings();
@@ -347,7 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
         credentials: 'same-origin',
         headers: { Accept: 'application/json' }
       });
-      const payload = await response.json();
+      const payload = await readJsonResponse(response, 'Unable to run USB-COM health check.');
       if (!response.ok || !payload.ok) {
         setScannerHealth('error', 'Scanner command path failed', scannerHealthDetail(payload));
         return false;
@@ -373,7 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
         credentials: 'same-origin',
         headers: { Accept: 'application/json' }
       });
-      const payload = await response.json();
+      const payload = await readJsonResponse(response, 'Unable to run scanner test.');
       const code = Array.isArray(payload.codes) ? String(payload.codes[0] || '') : '';
       if (!response.ok || !payload.ok || !code) {
         setScannerHealth('error', 'Scanner test failed', payload.error || 'No barcode data was received from USB-COM.');
@@ -396,7 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
         credentials: 'same-origin',
         headers: { Accept: 'application/json' }
       });
-      const payload = await response.json();
+      const payload = await readJsonResponse(response, 'Unable to load scanner settings.');
       scannerSettings = normalizeScannerSettings(payload.settings || scannerSettings);
     } catch (_error) {
       scannerSettings = normalizeScannerSettings(scannerSettings);
@@ -988,6 +1002,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   scannerTestScanButton?.addEventListener('click', () => {
     testScannerScan().catch(() => {});
+  });
+  scannerPrintSetupButton?.addEventListener('click', () => {
+    document.body.classList.add('is-printing-scanner-setup');
+    window.setTimeout(() => window.print(), 40);
+  });
+  window.addEventListener('afterprint', () => {
+    document.body.classList.remove('is-printing-scanner-setup');
   });
 
   document.querySelectorAll('[data-theme-option]').forEach((button) => {
