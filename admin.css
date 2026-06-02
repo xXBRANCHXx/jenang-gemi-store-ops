@@ -1741,6 +1741,25 @@ button, input {
   background: rgba(34, 211, 238, 0.08);
 }
 
+.admin-scanner-code-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-scanner-code-list span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(34, 211, 238, 0.26);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.46);
+  color: var(--admin-text);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
 .admin-store-login-shell {
   position: fixed;
   inset: 0;

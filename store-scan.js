@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ordersStorageKey = 'jg-store-live-orders';
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const scanBridgeEndpoint = '../../api/scan-bridge/';
+  const scanSerialEndpoint = '../../api/scan-serial/';
   const orderIdNode = document.querySelector('[data-scan-order-id]');
   const scanError = document.querySelector('[data-scan-error]');
   const scanList = document.querySelector('[data-scan-list]');
@@ -48,6 +49,10 @@ document.addEventListener('DOMContentLoaded', () => {
   let serialPort = null;
   let serialReader = null;
   let serialReadBuffer = '';
+  let serverSerialTimer = 0;
+  let serverSerialErrorShown = false;
+  let lastScanKey = '';
+  let lastScanAt = 0;
 
   if (orderIdNode) orderIdNode.textContent = order?.id || 'Order missing';
 
@@ -189,6 +194,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const handleScan = (value) => {
     if (!order || !value) return false;
     const scannedCode = normalizeScanCode(value);
+    const now = Date.now();
+    if (lastScanKey === scannedCode && now - lastScanAt < 450) return false;
+    lastScanKey = scannedCode;
+    lastScanAt = now;
     setScanStatus(`Received ${scannedCode}`, 'Checking this scan against the active order.');
     const items = scanItems();
     const match = items.find((item) => {
@@ -287,6 +296,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const openSerialPort = async (port) => {
     serialPort = port;
+    window.clearInterval(serverSerialTimer);
+    serverSerialTimer = 0;
     if (!serialPort.readable && !serialPort.writable) {
       await serialPort.open({ baudRate: Number(scannerSettings.baud_rate || 9600) });
     }
@@ -307,6 +318,38 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (_error) {
       setScanStatus('Scanner not connected', 'Use the Connect USB-COM Scanner button when the scanner is plugged in.');
     }
+  };
+
+  const pollServerSerialScanner = async () => {
+    if (serialPort?.readable || serialPort?.writable) return;
+    try {
+      const query = new URLSearchParams({ baud_rate: String(scannerSettings.baud_rate || 9600) });
+      const response = await fetch(`${scanSerialEndpoint}?${query.toString()}`, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || 'Unable to read server USB-COM scanner.');
+      }
+      serverSerialErrorShown = false;
+      const codes = Array.isArray(payload.codes) ? payload.codes : [];
+      codes.forEach((code) => handleScan(code));
+      if (codes.length && scannerConnect) scannerConnect.textContent = 'USB-COM Active';
+      if (codes.length) setScanStatus('USB-COM scanner ready', `Reading ${payload.device || 'serial device'}.`);
+    } catch (error) {
+      if (serverSerialErrorShown) return;
+      serverSerialErrorShown = true;
+      const message = error instanceof Error ? error.message : 'Unable to read server USB-COM scanner.';
+      setScanStatus('USB-COM scanner not readable', `${message} Web Serial is still available from Chrome or Edge.`);
+    }
+  };
+
+  const startServerSerialPolling = () => {
+    if (serverSerialTimer) return;
+    pollServerSerialScanner();
+    serverSerialTimer = window.setInterval(pollServerSerialScanner, 280);
   };
 
   document.addEventListener('keydown', (event) => {
@@ -342,7 +385,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     render();
     if (!navigator.serial) {
-      setScanStatus('Hardware scanner input ready', 'USB-COM needs Chrome or Edge Web Serial access. Keyboard-style scanner input also works here.');
+      setScanStatus('Checking USB-COM scanner', 'Reading the local serial device if the server can access it.');
+      startServerSerialPolling();
       return;
     }
 
@@ -351,14 +395,17 @@ document.addEventListener('DOMContentLoaded', () => {
       if (ports.length) {
         await openSerialPort(ports[0]);
       } else {
-        setScanStatus('USB-COM scanner waiting', 'Click Connect USB-COM Scanner, then scan each product barcode.');
+        setScanStatus('USB-COM scanner waiting', 'Click Connect USB-COM Scanner, or use the local serial fallback if this POS can read the device.');
+        startServerSerialPolling();
       }
     } catch (_error) {
-      setScanStatus('USB-COM scanner waiting', 'Click Connect USB-COM Scanner, then scan each product barcode.');
+      setScanStatus('USB-COM scanner waiting', 'Click Connect USB-COM Scanner, or use the local serial fallback if this POS can read the device.');
+      startServerSerialPolling();
     }
   };
 
   window.addEventListener('pagehide', () => {
+    window.clearInterval(serverSerialTimer);
     if (serialReader) serialReader.cancel().catch(() => {});
     if (serialPort?.readable || serialPort?.writable) serialPort.close().catch(() => {});
   });

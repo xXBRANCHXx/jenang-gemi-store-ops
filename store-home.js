@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const settingsError = document.querySelector('[data-store-settings-error]');
   const sourceColorList = document.querySelector('[data-source-color-list]');
   const scannerSettingsSummary = document.querySelector('[data-scanner-settings-summary]');
+  const scannerCodeList = document.querySelector('[data-scanner-code-list]');
   const ordersStorageKey = 'jg-store-live-orders';
   const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
@@ -241,6 +242,20 @@ document.addEventListener('DOMContentLoaded', () => {
         scannerSettings.scan_mode.replace('_', ' '),
         `AUTO-INDUCTION ${scannerSettings.auto_induction ? 'ON' : 'OFF'}`
       ].join(' / ');
+    }
+    if (scannerCodeList) {
+      const triggerCode = scannerSettings.scan_mode === 'CONTINUOUS'
+        ? 'Continuous Mode'
+        : 'Auto-induction -OFF';
+      const inductionCode = scannerSettings.auto_induction
+        ? 'Auto-induction -ON'
+        : 'Auto-induction -OFF';
+      const volumeCode = `${scannerSettings.volume[0]}${scannerSettings.volume.slice(1).toLowerCase()} volume`;
+      const setupCodes = ['USB virtual COM', volumeCode, triggerCode];
+      if (!setupCodes.includes(inductionCode)) setupCodes.push(inductionCode);
+      scannerCodeList.innerHTML = setupCodes
+        .map((code) => `<span>${escapeHtml(code)}</span>`)
+        .join('');
     }
   };
 
