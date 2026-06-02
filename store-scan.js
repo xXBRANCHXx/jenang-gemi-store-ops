@@ -74,6 +74,16 @@ document.addEventListener('DOMContentLoaded', () => {
       throw new Error(`${fallbackMessage} Expected JSON but got HTTP ${response.status}: ${preview || 'no response body'}`);
     }
   };
+  const serverCanSeeLocalUsb = () => {
+    const host = window.location.hostname;
+    return host === ''
+      || host === 'localhost'
+      || host === '127.0.0.1'
+      || host === '::1'
+      || /^10\./.test(host)
+      || /^192\.168\./.test(host)
+      || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+  };
   const sourceSkusFor = (item) => {
     if (Array.isArray(item.sourceSkus)) return item.sourceSkus;
     const sku = String(item.sku || '').trim();
@@ -334,6 +344,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const pollServerSerialScanner = async () => {
     if (serialPort?.readable || serialPort?.writable) return;
+    if (!serverCanSeeLocalUsb()) {
+      window.clearInterval(serverSerialTimer);
+      serverSerialTimer = 0;
+      if (!serverSerialErrorShown) {
+        serverSerialErrorShown = true;
+        setScanStatus('USB-COM scanner needs browser access', 'Hostinger cannot see USB devices plugged into this laptop. Click Connect USB-COM Scanner in Chrome or Edge.');
+      }
+      return;
+    }
     try {
       const query = new URLSearchParams({ baud_rate: String(scannerSettings.baud_rate || 9600) });
       const response = await fetch(`${scanSerialEndpoint}?${query.toString()}`, {
@@ -407,12 +426,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (ports.length) {
         await openSerialPort(ports[0]);
       } else {
-        setScanStatus('USB-COM scanner waiting', 'Click Connect USB-COM Scanner, or use the local serial fallback if this POS can read the device.');
-        startServerSerialPolling();
+        setScanStatus('USB-COM scanner waiting', 'Click Connect USB-COM Scanner and choose the IWARE scanner. Hostinger cannot read laptop USB devices directly.');
+        if (serverCanSeeLocalUsb()) startServerSerialPolling();
       }
     } catch (_error) {
-      setScanStatus('USB-COM scanner waiting', 'Click Connect USB-COM Scanner, or use the local serial fallback if this POS can read the device.');
-      startServerSerialPolling();
+      setScanStatus('USB-COM scanner waiting', 'Click Connect USB-COM Scanner and choose the IWARE scanner. Hostinger cannot read laptop USB devices directly.');
+      if (serverCanSeeLocalUsb()) startServerSerialPolling();
     }
   };
 

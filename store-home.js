@@ -240,6 +240,89 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  const serverCanSeeLocalUsb = () => {
+    const host = window.location.hostname;
+    return host === ''
+      || host === 'localhost'
+      || host === '127.0.0.1'
+      || host === '::1'
+      || /^10\./.test(host)
+      || /^192\.168\./.test(host)
+      || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+  };
+
+  const parseScannerCodes = (buffer) => {
+    const codes = String(buffer || '').split(/\r\n|\r|\n|\t/)
+      .map((code) => code.trim().toUpperCase())
+      .filter(Boolean);
+    return [...new Set(codes)];
+  };
+
+  const readBrowserSerialCodes = async (port, timeoutMs = 6000) => {
+    if (!port?.readable) return [];
+    const reader = port.readable.getReader();
+    const decoder = new TextDecoder();
+    const deadline = Date.now() + timeoutMs;
+    let buffer = '';
+    try {
+      while (Date.now() < deadline) {
+        const remaining = Math.max(1, deadline - Date.now());
+        const result = await Promise.race([
+          reader.read(),
+          new Promise((resolve) => window.setTimeout(() => resolve({ timeout: true }), remaining))
+        ]);
+        if (result.timeout || result.done) break;
+        if (result.value) {
+          buffer += decoder.decode(result.value, { stream: true });
+          if (/[\r\n\t]/.test(buffer)) {
+            const codes = parseScannerCodes(buffer);
+            if (codes.length) return codes;
+          }
+        }
+      }
+      return parseScannerCodes(buffer);
+    } finally {
+      await reader.cancel().catch(() => {});
+      reader.releaseLock();
+    }
+  };
+
+  const openBrowserSerialPort = async (port) => {
+    if (!port.readable && !port.writable) {
+      await port.open({ baudRate: Number(scannerSettings.baud_rate || 9600) });
+      return true;
+    }
+    return false;
+  };
+
+  const checkBrowserScannerHealth = async () => {
+    if (!navigator.serial) {
+      setScannerHealth(
+        'error',
+        'Browser cannot access USB-COM',
+        'Hostinger cannot see a scanner plugged into this laptop. Open Store Ops in Chrome or Edge and use Test Scan so the browser can talk to the local USB-COM scanner.'
+      );
+      return false;
+    }
+
+    const ports = await navigator.serial.getPorts();
+    if (!ports.length) {
+      setScannerHealth(
+        'error',
+        'Local scanner not approved',
+        'Hostinger cannot see laptop USB devices. Click Test Scan, choose the IWARE USB-COM scanner in the browser prompt, then scan a real product barcode.'
+      );
+      return false;
+    }
+
+    setScannerHealth(
+      'ready',
+      'Browser scanner permission ready',
+      'The browser has a local USB-COM port approved. Click Test Scan and scan a real barcode to confirm data is arriving.'
+    );
+    return true;
+  };
+
   const renderScannerSettings = () => {
     scannerSettings = normalizeScannerSettings(scannerSettings);
     const volumeSelect = settingsForm?.querySelector('[data-scanner-setting="volume"]');
@@ -312,8 +395,12 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const checkScannerHealth = async () => {
-    setScannerHealth('checking', 'Checking scanner', 'Testing USB-COM device path, permissions, serial configuration, and open/read access.');
+    setScannerHealth('checking', 'Checking scanner', 'Checking whether this browser can reach the local USB-COM scanner.');
     try {
+      if (!serverCanSeeLocalUsb()) {
+        return await checkBrowserScannerHealth();
+      }
+
       const query = new URLSearchParams({
         status: '1',
         baud_rate: String(scannerSettings.baud_rate || 9600)
@@ -337,9 +424,30 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const testScannerScan = async () => {
-    setScannerHealth('checking', 'Waiting for test scan', 'Scan any product barcode now. Store Ops will turn green only after it receives barcode data from USB-COM.');
+    setScannerHealth('checking', 'Waiting for test scan', 'Scan any product barcode now. Store Ops will turn green only after this browser receives barcode data from USB-COM.');
     if (scannerTestScanButton instanceof HTMLButtonElement) scannerTestScanButton.disabled = true;
     try {
+      if (!serverCanSeeLocalUsb()) {
+        if (!navigator.serial) {
+          throw new Error('This browser cannot access USB-COM scanners from a hosted Store Ops site. Use Chrome or Edge, or run a local scanner bridge on this laptop.');
+        }
+        const approvedPorts = await navigator.serial.getPorts();
+        const port = approvedPorts[0] || await navigator.serial.requestPort();
+        const openedHere = await openBrowserSerialPort(port);
+        try {
+          const codes = await readBrowserSerialCodes(port, 6000);
+          const code = String(codes[0] || '');
+          if (!code) {
+            setScannerHealth('error', 'Scanner test failed', 'The browser opened the local USB-COM port, but no barcode data arrived within 6 seconds.');
+            return false;
+          }
+          setScannerHealth('ok', 'Scanner working', `Received ${code} from the local USB-COM scanner through this browser.`);
+          return true;
+        } finally {
+          if (openedHere) await port.close().catch(() => {});
+        }
+      }
+
       const query = new URLSearchParams({
         test: '1',
         baud_rate: String(scannerSettings.baud_rate || 9600)
