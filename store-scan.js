@@ -140,6 +140,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }, 0);
 
   const normalizeScanCode = (value) => String(value || '').trim().toUpperCase();
+  const skuFromBarcode = (value) => {
+    const barcode = normalizeScanCode(value);
+    const sku = barcode.slice(0, -1);
+    return /^\d{11}$/.test(sku) ? `0${sku}` : sku;
+  };
 
   const setError = (message) => {
     if (!scanError) return;
@@ -215,7 +220,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const handleScan = (value) => {
     if (!order || !value) return false;
-    const scannedCode = normalizeScanCode(value);
+    const scannedCode = skuFromBarcode(value);
+    if (!scannedCode) return false;
     const now = Date.now();
     if (lastScanKey === scannedCode && now - lastScanAt < 450) return false;
     lastScanKey = scannedCode;
