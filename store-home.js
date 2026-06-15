@@ -638,8 +638,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const quantity = Math.max(1, Number(item.quantity || 1));
     const catalogItem = sourceTag ? catalogRows.get(sourceTag) : null;
     if (catalogItem) {
-      const orderedProductName = String(item.productName || '').trim();
-      const productName = orderedProductName || catalogItem.productName;
+      const productName = catalogItem.productName || String(item.productName || '').trim() || sourceTag;
       return {
         ...catalogItem,
         productName,
