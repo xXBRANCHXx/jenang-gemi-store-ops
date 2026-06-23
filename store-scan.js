@@ -326,7 +326,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     setScanStatus('Scan complete', 'Opening label choices.');
     window.setTimeout(() => {
-      window.location.href = `../print-label/?order=${encodeURIComponent(order.id)}`;
+      const account = String(order.sourceAccountKey || order.account_key || '');
+      const platform = String(order.platform || '').toLowerCase();
+      window.location.href = `../print-label/?order=${encodeURIComponent(order.id)}${account ? `&account=${encodeURIComponent(account)}` : ''}${platform ? `&platform=${encodeURIComponent(platform)}` : ''}`;
     }, 420);
   };
 

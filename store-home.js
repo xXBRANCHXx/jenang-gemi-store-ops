@@ -864,7 +864,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const order = state.orders.find((item) => normalizeOrderId(item.id) === orderId);
     const printableOrderId = order?.id || orderId;
     const account = order?.sourceAccountKey || '';
-    openStorePage(`./print-label/?order=${encodeURIComponent(printableOrderId)}${account ? `&account=${encodeURIComponent(account)}` : ''}${reprint ? '&reprint=1' : ''}`);
+    const platform = String(order?.platform || '').toLowerCase();
+    openStorePage(`./print-label/?order=${encodeURIComponent(printableOrderId)}${account ? `&account=${encodeURIComponent(account)}` : ''}${platform ? `&platform=${encodeURIComponent(platform)}` : ''}${reprint ? '&reprint=1' : ''}`);
   };
 
   const openSettingsModal = () => {

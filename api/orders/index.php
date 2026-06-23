@@ -102,6 +102,36 @@ function jg_store_ops_orders_configured_sources(): array
     return array_values($unique);
 }
 
+function jg_store_ops_orders_marketplace_status_callback(array $key, string $status): void
+{
+    if (!in_array((string) ($key['source_platform'] ?? ''), ['shopee', 'tiktok'], true)) {
+        return;
+    }
+    $baseUrl = rtrim(jg_store_ops_orders_config('JG_SHOPEE_INGEST_BASE_URL', 'shopee_ingest_base_url', 'https://api.jenanggemi.com'), '/');
+    $setupToken = jg_store_ops_orders_config('JG_SHOPEE_INGEST_SETUP_TOKEN', 'shopee_ingest_setup_token');
+    if ($baseUrl === '' || $setupToken === '') {
+        throw new RuntimeException('Marketplace fulfillment callback is not configured.');
+    }
+    $payload = json_encode([
+        'platform' => (string) $key['source_platform'],
+        'account_key' => (string) $key['source_account'],
+        'order_id' => (string) $key['order_id'],
+        'status' => $status,
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    $context = stream_context_create(['http' => [
+        'method' => 'POST',
+        'header' => "Accept: application/json\r\nContent-Type: application/json\r\n",
+        'content' => $payload,
+        'timeout' => 12,
+        'ignore_errors' => true,
+    ]]);
+    $raw = @file_get_contents($baseUrl . '/fulfillment/status?setup_token=' . rawurlencode($setupToken), false, $context);
+    $decoded = is_string($raw) ? json_decode($raw, true) : null;
+    if (!is_array($decoded) || empty($decoded['ok'])) {
+        throw new RuntimeException('API Ingest did not accept the marketplace fulfillment callback.');
+    }
+}
+
 function jg_store_ops_orders_fetch(string $url): array
 {
     $cached = jg_store_ops_orders_cache_read($url);
@@ -782,6 +812,13 @@ if ($method === 'POST') {
                     error_log('Website order fulfillment callback failed: ' . $callbackError->getMessage());
                 }
             }
+            if (in_array($key['source_platform'], ['shopee', 'tiktok'], true)) {
+                try {
+                    jg_store_ops_orders_marketplace_status_callback($key, 'LABEL_PRINTED');
+                } catch (Throwable $callbackError) {
+                    error_log('Marketplace label-printed callback failed: ' . $callbackError->getMessage());
+                }
+            }
             jg_store_ops_orders_fulfillment_response($pdo, $row);
         }
 
@@ -802,6 +839,13 @@ if ($method === 'POST') {
                     error_log('Website order fulfilled callback failed: ' . $callbackError->getMessage());
                 }
             }
+            if (in_array($key['source_platform'], ['shopee', 'tiktok'], true)) {
+                try {
+                    jg_store_ops_orders_marketplace_status_callback($key, 'IS_PROCESSED');
+                } catch (Throwable $callbackError) {
+                    error_log('Marketplace processed callback failed: ' . $callbackError->getMessage());
+                }
+            }
             jg_store_ops_orders_fulfillment_response($pdo, $row);
         }
     } catch (RuntimeException $exception) {
@@ -819,7 +863,6 @@ if ($method !== 'GET') {
 
 $baseUrl = rtrim(jg_store_ops_orders_config('JG_SHOPEE_INGEST_BASE_URL', 'shopee_ingest_base_url', 'https://api.jenanggemi.com'), '/');
 $setupToken = jg_store_ops_orders_config('JG_SHOPEE_INGEST_SETUP_TOKEN', 'shopee_ingest_setup_token');
-$accounts = jg_store_ops_orders_configured_accounts();
 $sources = jg_store_ops_orders_configured_sources();
 
 if (isset($_GET['shipping_label'])) {
@@ -860,22 +903,30 @@ if (isset($_GET['shipping_label'])) {
         jg_store_ops_orders_proxy_file($labelUrl, $filename);
     }
 
-    if ($baseUrl === '' || $setupToken === '' || $accounts === []) {
-        jg_store_ops_orders_fail('Shopee order source is not configured.', 500);
+    if ($baseUrl === '' || $setupToken === '' || $sources === []) {
+        jg_store_ops_orders_fail('Marketplace order source is not configured.', 500);
     }
 
     $requestedAccount = jg_store_ops_orders_normalize_account((string) ($_GET['account'] ?? $_GET['source_account'] ?? ''));
-    $account = $requestedAccount !== '' && in_array($requestedAccount, $accounts, true)
-        ? $requestedAccount
-        : $accounts[0];
+    $requestedPlatform = jg_store_ops_orders_normalize_account((string) ($_GET['platform'] ?? $_GET['source_platform'] ?? ''));
+    $selectedSource = null;
+    foreach ($sources as $source) {
+        if ($requestedAccount !== '' && $source['account'] !== $requestedAccount) continue;
+        if ($requestedPlatform !== '' && $source['platform'] !== $requestedPlatform) continue;
+        $selectedSource = $source;
+        break;
+    }
+    $selectedSource ??= $sources[0];
+    $account = (string) $selectedSource['account'];
+    $platform = (string) $selectedSource['platform'];
 
     $query = http_build_query([
         'account' => $account,
         'setup_token' => $setupToken,
         'order' => $orderSn,
     ]);
-    $url = $baseUrl . '/shopee/orders/shipping-label?' . $query;
-    jg_store_ops_orders_proxy_file($url, 'shopee-label-' . preg_replace('/[^A-Za-z0-9_-]+/', '-', $orderSn) . '.pdf');
+    $url = $baseUrl . '/' . rawurlencode($platform) . '/orders/shipping-label?' . $query;
+    jg_store_ops_orders_proxy_file($url, $platform . '-label-' . preg_replace('/[^A-Za-z0-9_-]+/', '-', $orderSn) . '.pdf');
 }
 
 if ($baseUrl === '' || $setupToken === '' || $sources === []) {
@@ -920,6 +971,14 @@ foreach ($sources as $source) {
 
     jg_store_ops_orders_cache_write($url, $raw);
     $accountOrders = is_array($accountPayload['orders'] ?? null) ? $accountPayload['orders'] : [];
+    // Defense in depth against stale pre-cutover API/cache responses: a
+    // marketplace order is never an active Store Ops task without a stored label.
+    $accountOrders = array_values(array_filter($accountOrders, static function (mixed $order): bool {
+        return is_array($order)
+            && strtoupper(trim((string) ($order['status'] ?? ''))) === 'IS_LISTED'
+            && !empty($order['shipmentArranged'])
+            && !empty($order['labelReady']);
+    }));
     $successfulAccounts++;
     $decoded['orders'] = array_merge($decoded['orders'], $accountOrders);
     $decoded['meta']['accounts'][] = [

@@ -40,14 +40,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(window.location.search);
   const orderId = params.get('order') || window.sessionStorage.getItem(activeOrderStorageKey) || '';
   const requestedAccount = params.get('account') || '';
+  const requestedPlatform = params.get('platform') || '';
   const isReprint = params.get('reprint') === '1';
   const orders = readOrders();
   const storedOrder = orders.find((item) => String(item.id || '') === orderId) || null;
   const order = storedOrder || (orderId ? {
     id: orderId,
-    platform: orderId.toUpperCase().startsWith('PARTNER-')
+    platform: requestedPlatform || (orderId.toUpperCase().startsWith('PARTNER-')
       ? 'partner'
-      : (orderId.toUpperCase().startsWith('ZEROWEB-') ? 'zero_website' : (orderId.toUpperCase().startsWith('JGWEB-') ? 'jenang_gemi_website' : 'shopee'))
+      : (orderId.toUpperCase().startsWith('ZEROWEB-') ? 'zero_website' : (orderId.toUpperCase().startsWith('JGWEB-') ? 'jenang_gemi_website' : 'shopee')))
   } : null);
   const sourceAccount = requestedAccount || String(order?.sourceAccountKey || '');
   let returnTimer = 0;
@@ -229,6 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (platform === 'partner') return 'Partner';
     if (platform === 'zero_website') return 'ZERO Website';
     if (platform === 'jenang_gemi_website') return 'Jenang Gemi Website';
+    if (platform === 'tiktok') return 'TikTok Shop';
     return 'Shopee';
   };
 
@@ -257,7 +259,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!order) return;
     const platform = platformLabel(order.platform);
     if (statusNode) statusNode.textContent = `Fetching ${platform} label`;
-    const response = await fetch(`../../api/orders/?shipping_label=1&order=${encodeURIComponent(order.id)}${sourceAccount ? `&account=${encodeURIComponent(sourceAccount)}` : ''}`, {
+    const sourcePlatform = normalizeSourceKey(order?.platform || 'shopee');
+    const response = await fetch(`../../api/orders/?shipping_label=1&order=${encodeURIComponent(order.id)}&platform=${encodeURIComponent(sourcePlatform)}${sourceAccount ? `&account=${encodeURIComponent(sourceAccount)}` : ''}`, {
       cache: 'no-store',
       credentials: 'same-origin',
       headers: { Accept: 'application/pdf,application/octet-stream,*/*' }
