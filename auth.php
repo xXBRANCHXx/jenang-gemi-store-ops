@@ -26,7 +26,24 @@ function jg_admin_start_session(): void
 function jg_admin_is_authenticated(): bool
 {
     jg_admin_start_session();
-    return !empty($_SESSION['jg_admin_authenticated']);
+    if (empty($_SESSION['jg_admin_authenticated'])) {
+        return false;
+    }
+
+    $employeeId = trim((string) ($_SESSION['jg_admin_employee_id'] ?? ''));
+    $employeeProfiles = jg_admin_employee_profiles_for_login();
+    if ($employeeProfiles === []) {
+        return true;
+    }
+
+    foreach ($employeeProfiles as $employee) {
+        if (hash_equals((string) ($employee['id'] ?? ''), $employeeId)) {
+            return true;
+        }
+    }
+
+    jg_admin_clear_authenticated_session();
+    return false;
 }
 
 function jg_admin_password_matches(string $password, string $storedHash): bool
@@ -58,6 +75,16 @@ function jg_admin_set_authenticated_employee(string $employeeId, string $employe
     $_SESSION['jg_admin_login_at'] = gmdate(DATE_ATOM);
 }
 
+function jg_admin_clear_authenticated_session(): void
+{
+    unset(
+        $_SESSION['jg_admin_authenticated'],
+        $_SESSION['jg_admin_employee_id'],
+        $_SESSION['jg_admin_employee_name'],
+        $_SESSION['jg_admin_login_at']
+    );
+}
+
 function jg_admin_current_employee_id(): string
 {
     jg_admin_start_session();
@@ -82,17 +109,26 @@ function jg_admin_current_employee_is_admin(): bool
  */
 function jg_admin_employee_profiles_for_login(): array
 {
+    static $profiles = null;
+
+    if (is_array($profiles)) {
+        return $profiles;
+    }
+
     try {
         $pdo = jg_store_ops_fulfillment_db();
         $employees = jg_store_ops_fulfillment_active_employees($pdo);
         if ($employees !== []) {
-            return $employees;
+            $profiles = $employees;
+            return $profiles;
         }
     } catch (Throwable) {
-        return [];
+        $profiles = [];
+        return $profiles;
     }
 
-    return [];
+    $profiles = [];
+    return $profiles;
 }
 
 function jg_admin_attempt_employee_login(string $employeeId, string $pin): bool
@@ -101,7 +137,7 @@ function jg_admin_attempt_employee_login(string $employeeId, string $pin): bool
 
     $employeeId = trim($employeeId);
     if ($employeeId === '' || trim($pin) === '') {
-        $_SESSION['jg_admin_authenticated'] = false;
+        jg_admin_clear_authenticated_session();
         return false;
     }
 
@@ -121,7 +157,7 @@ function jg_admin_attempt_employee_login(string $employeeId, string $pin): bool
     }
 
     if (!is_array($employee) || !jg_admin_password_matches($pin, (string) ($employee['pin_hash'] ?? ''))) {
-        $_SESSION['jg_admin_authenticated'] = false;
+        jg_admin_clear_authenticated_session();
         return false;
     }
 
@@ -133,11 +169,17 @@ function jg_admin_attempt_employee_login(string $employeeId, string $pin): bool
 function jg_admin_attempt_login(string $code): bool
 {
     jg_admin_start_session();
+
+    if (jg_admin_employee_profiles_for_login() !== []) {
+        jg_admin_clear_authenticated_session();
+        return false;
+    }
+
     $normalized = trim($code);
     $candidateHash = hash('sha256', $normalized);
 
     if (!hash_equals(JG_ADMIN_CODE_HASH, $candidateHash)) {
-        $_SESSION['jg_admin_authenticated'] = false;
+        jg_admin_clear_authenticated_session();
         return false;
     }
 
