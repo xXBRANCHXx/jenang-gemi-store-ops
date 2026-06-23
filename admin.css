@@ -384,6 +384,56 @@ button, input {
   box-shadow: inset 0 0 0 1px rgba(157, 255, 0, 0.32);
 }
 
+.admin-employee-login-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+  gap: 10px;
+}
+
+.admin-employee-tile {
+  display: grid;
+  justify-items: start;
+  gap: 9px;
+  min-height: 104px;
+  padding: 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  background: var(--admin-surface-soft);
+  color: var(--admin-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.admin-employee-tile span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(157, 255, 0, 0.12);
+  color: var(--admin-accent-primary);
+  font-weight: 900;
+}
+
+.admin-employee-tile strong {
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.admin-employee-tile.is-active {
+  border-color: rgba(157, 255, 0, 0.48);
+  box-shadow: inset 0 0 0 1px rgba(157, 255, 0, 0.24);
+}
+
+.admin-login-username-proxy {
+  position: absolute;
+  left: -10000px;
+  width: 1px !important;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 :root[data-admin-theme='light'] .admin-login-form input:focus,
 :root[data-admin-theme='graphite'] .admin-login-form input:focus,
 :root[data-admin-theme='glass'] .admin-login-form input:focus,
@@ -1155,6 +1205,15 @@ button, input {
   border-color: rgba(255, 212, 0, 0.26);
 }
 
+.admin-order-card.is-locked {
+  opacity: 0.48;
+  filter: grayscale(0.7);
+}
+
+.admin-order-card.is-locked:hover {
+  transform: none;
+}
+
 .admin-order-card.is-critical {
   animation: admin-critical-pulse 0.86s ease-in-out infinite;
 }
@@ -1261,6 +1320,12 @@ button, input {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.admin-start-order-btn:disabled {
+  cursor: not-allowed;
+  background: rgba(148, 163, 184, 0.34);
+  color: rgba(255, 255, 255, 0.68);
 }
 
 .admin-queue-notes {
@@ -1578,6 +1643,22 @@ button, input {
   color: var(--admin-muted);
   font-size: 0.86rem;
   font-weight: 800;
+}
+
+.admin-sync-status {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(245, 158, 11, 0.34);
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--admin-text);
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.admin-sync-status.is-error {
+  border-color: rgba(255, 82, 82, 0.46);
+  background: rgba(255, 82, 82, 0.12);
 }
 
 .admin-label-option-grid {

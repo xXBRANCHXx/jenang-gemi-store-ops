@@ -5,6 +5,7 @@ require_once dirname(__DIR__, 2) . '/auth.php';
 require_once dirname(__DIR__, 2) . '/config.php';
 require_once dirname(__DIR__, 2) . '/sku-db-bootstrap.php';
 require_once dirname(__DIR__, 2) . '/partner-orders-bootstrap.php';
+require_once dirname(__DIR__, 2) . '/store-ops-fulfillment.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -677,6 +678,40 @@ function jg_store_ops_orders_map_item_skus(array $payload): array
     return $payload;
 }
 
+function jg_store_ops_orders_current_employee_id(): string
+{
+    return function_exists('jg_admin_current_employee_id') ? jg_admin_current_employee_id() : 'shared-admin';
+}
+
+function jg_store_ops_orders_current_employee_name(): string
+{
+    return function_exists('jg_admin_current_employee_name') ? jg_admin_current_employee_name() : 'Admin';
+}
+
+function jg_store_ops_orders_fulfillment_response(PDO $pdo, array $row): void
+{
+    $employeeMap = jg_store_ops_fulfillment_employee_map($pdo);
+    $state = jg_store_ops_fulfillment_state_from_row($row, jg_store_ops_orders_current_employee_id(), $employeeMap);
+    echo json_encode([
+        'ok' => true,
+        'order' => $state,
+        'fulfillment' => $state,
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+function jg_store_ops_orders_apply_default_fulfillment(array $orders): array
+{
+    foreach ($orders as &$order) {
+        if (!is_array($order)) {
+            continue;
+        }
+        $order = array_merge($order, jg_store_ops_fulfillment_state_from_row(null, jg_store_ops_orders_current_employee_id()));
+    }
+    unset($order);
+    return $orders;
+}
+
 jg_admin_require_auth_json();
 
 $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
@@ -685,21 +720,82 @@ if ($method === 'POST') {
     $payload = json_decode(is_string($raw) ? $raw : '', true);
     $payload = is_array($payload) ? $payload : [];
     $action = (string) ($payload['action'] ?? '');
-    if ($action !== 'partner_status') {
+    if ($action === 'partner_status') {
+        $orderId = trim((string) ($payload['order'] ?? $payload['order_id'] ?? ''));
+        $status = trim((string) ($payload['status'] ?? ''));
+        if (!str_starts_with(strtoupper($orderId), 'PARTNER-')) {
+            jg_store_ops_orders_fail('Partner order number is required.');
+        }
+        if (!jg_store_ops_orders_partner_update_status($orderId, $status)) {
+            jg_store_ops_orders_fail('Unable to update partner order status.', 422);
+        }
+
+        echo json_encode(['ok' => true], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $validActions = ['claim_order', 'release_order', 'record_scan', 'complete_scan', 'label_printed', 'fulfill_order', 'reprint_label'];
+    if (!in_array($action, $validActions, true)) {
         jg_store_ops_orders_fail('Unknown action.', 400);
     }
 
-    $orderId = trim((string) ($payload['order'] ?? $payload['order_id'] ?? ''));
-    $status = trim((string) ($payload['status'] ?? ''));
-    if (!str_starts_with(strtoupper($orderId), 'PARTNER-')) {
-        jg_store_ops_orders_fail('Partner order number is required.');
-    }
-    if (!jg_store_ops_orders_partner_update_status($orderId, $status)) {
-        jg_store_ops_orders_fail('Unable to update partner order status.', 422);
-    }
+    try {
+        $pdo = jg_store_ops_fulfillment_db();
+        $key = jg_store_ops_fulfillment_key_from_payload($payload);
+        jg_store_ops_fulfillment_validate_key($key);
+        $employeeId = jg_store_ops_orders_current_employee_id();
+        $employeeName = jg_store_ops_orders_current_employee_name();
 
-    echo json_encode(['ok' => true], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    exit;
+        if ($action === 'claim_order') {
+            $row = jg_store_ops_fulfillment_claim($pdo, $key, $employeeId, $employeeName);
+            jg_store_ops_orders_fulfillment_response($pdo, $row);
+        }
+
+        if ($action === 'release_order') {
+            $row = jg_store_ops_fulfillment_release($pdo, $key, $employeeId, $employeeName);
+            jg_store_ops_orders_fulfillment_response($pdo, $row);
+        }
+
+        if ($action === 'record_scan') {
+            $events = is_array($payload['events'] ?? null) ? $payload['events'] : [];
+            $progress = is_array($payload['progress'] ?? null) ? $payload['progress'] : [];
+            $row = jg_store_ops_fulfillment_record_scan_batch($pdo, $key, $employeeId, $employeeName, $events, $progress);
+            jg_store_ops_orders_fulfillment_response($pdo, $row);
+        }
+
+        if ($action === 'complete_scan') {
+            $progress = is_array($payload['progress'] ?? null) ? $payload['progress'] : [];
+            $row = jg_store_ops_fulfillment_complete_scan($pdo, $key, $employeeId, $employeeName, $progress);
+            jg_store_ops_orders_fulfillment_response($pdo, $row);
+        }
+
+        if ($action === 'label_printed') {
+            $row = jg_store_ops_fulfillment_mark_label_printed($pdo, $key, $employeeId, $employeeName, false);
+            if ($key['source_platform'] === 'partner') {
+                jg_store_ops_orders_partner_update_status($key['order_id'], 'IS_BEING_FULFILLED');
+            }
+            jg_store_ops_orders_fulfillment_response($pdo, $row);
+        }
+
+        if ($action === 'reprint_label') {
+            $row = jg_store_ops_fulfillment_mark_label_printed($pdo, $key, $employeeId, $employeeName, true);
+            jg_store_ops_orders_fulfillment_response($pdo, $row);
+        }
+
+        if ($action === 'fulfill_order') {
+            $row = jg_store_ops_fulfillment_mark_fulfilled($pdo, $key, $employeeId, $employeeName);
+            if ($key['source_platform'] === 'partner') {
+                jg_store_ops_orders_partner_update_status($key['order_id'], 'FULFILLED');
+            }
+            jg_store_ops_orders_fulfillment_response($pdo, $row);
+        }
+    } catch (RuntimeException $exception) {
+        $message = $exception->getMessage();
+        $status = str_contains(strtolower($message), 'claimed') || str_contains(strtolower($message), 'another employee') ? 409 : 422;
+        jg_store_ops_orders_fail($message, $status);
+    } catch (Throwable) {
+        jg_store_ops_orders_fail('Unable to update fulfillment state.', 500);
+    }
 }
 
 if ($method !== 'GET') {
@@ -814,5 +910,17 @@ $decoded['orders'] = array_values(array_merge(
 $decoded['meta']['partner_orders'] = $partnerOrders['meta'];
 $decoded['meta']['errors'] = $errors;
 $decoded['meta']['count'] = count($decoded['orders']);
+$decoded['meta']['current_employee'] = [
+    'id' => jg_store_ops_orders_current_employee_id(),
+    'display_name' => jg_store_ops_orders_current_employee_name(),
+];
+
+try {
+    $fulfillmentPdo = jg_store_ops_fulfillment_db();
+    $decoded['orders'] = jg_store_ops_fulfillment_merge_orders($fulfillmentPdo, $decoded['orders'], jg_store_ops_orders_current_employee_id());
+} catch (Throwable) {
+    $decoded['orders'] = jg_store_ops_orders_apply_default_fulfillment($decoded['orders']);
+    $decoded['meta']['fulfillment'] = 'unavailable';
+}
 
 echo json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);

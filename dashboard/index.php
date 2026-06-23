@@ -10,6 +10,8 @@ if (!jg_admin_is_authenticated()) {
 
 $adminCssVersion = (string) @filemtime(dirname(__DIR__) . '/admin.css');
 $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
+$currentEmployeeId = jg_admin_current_employee_id();
+$currentEmployeeName = jg_admin_current_employee_name();
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -27,7 +29,12 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
 </head>
 <body class="admin-body is-dashboard">
     <div class="admin-build-badge" aria-label="Store build version">Build 1.02.00-live</div>
-    <div class="admin-app admin-store-home" data-store-home>
+    <div
+        class="admin-app admin-store-home"
+        data-store-home
+        data-employee-id="<?php echo htmlspecialchars($currentEmployeeId, ENT_QUOTES, 'UTF-8'); ?>"
+        data-employee-name="<?php echo htmlspecialchars($currentEmployeeName, ENT_QUOTES, 'UTF-8'); ?>"
+    >
         <div class="admin-backdrop admin-backdrop-a"></div>
         <div class="admin-backdrop admin-backdrop-b"></div>
         <header class="admin-topbar admin-store-topbar">
@@ -41,7 +48,7 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
                     <strong data-critical-count>0</strong>
                 </article>
                 <article class="admin-store-stat">
-                    <span>Started</span>
+                    <span>Claimed</span>
                     <strong data-started-count>0</strong>
                 </article>
                 <article class="admin-store-stat">
@@ -50,6 +57,7 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
                 </article>
             </section>
             <div class="admin-topbar-actions">
+                <div class="admin-view-indicator" data-board-employee><?php echo htmlspecialchars($currentEmployeeName, ENT_QUOTES, 'UTF-8'); ?></div>
                 <div class="admin-view-indicator" data-board-clock>Live Queue</div>
                 <a class="admin-ghost-btn admin-link-btn" href="../inventory/" target="_blank" rel="noopener">Inventory</a>
                 <a class="admin-ghost-btn admin-link-btn" href="../transactions/" target="_blank" rel="noopener">Transactions</a>

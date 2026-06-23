@@ -143,7 +143,8 @@ try {
 
         $invoice = jg_store_ops_transactions_get_preview($token);
         $allowDuplicate = !empty($payload['allow_duplicate']);
-        $result = jg_store_ops_transactions_import_invoice($pdo, $invoice, $allowDuplicate, 'admin');
+        $createdBy = function_exists('jg_admin_current_employee_name') ? jg_admin_current_employee_name() : 'Admin';
+        $result = jg_store_ops_transactions_import_invoice($pdo, $invoice, $allowDuplicate, $createdBy);
         unset($_SESSION['jg_invoice_previews'][$token]);
 
         echo json_encode([

@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ordersStorageKey = 'jg-store-live-orders';
   const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
+  const ordersEndpoint = '../../api/orders/';
   const orderIdNode = document.querySelector('[data-print-order-id]');
   const statusNode = document.querySelector('[data-print-status]');
   const errorNode = document.querySelector('[data-print-error]');
@@ -39,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(window.location.search);
   const orderId = params.get('order') || window.sessionStorage.getItem(activeOrderStorageKey) || '';
   const requestedAccount = params.get('account') || '';
+  const isReprint = params.get('reprint') === '1';
   const orders = readOrders();
   const storedOrder = orders.find((item) => String(item.id || '') === orderId) || null;
   const order = storedOrder || (orderId ? {
@@ -50,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let printInProgress = false;
   let labelUrl = '';
   let labelLoaded = false;
-  let partnerOrderClaimed = false;
+  let returningToDashboard = false;
   const dashboardUrl = (() => {
     try {
       if (window.opener && !window.opener.closed && window.opener.location) {
@@ -62,29 +64,45 @@ document.addEventListener('DOMContentLoaded', () => {
     return '../';
   })();
 
-  const persistPartnerStatus = async (status) => {
-    if (!order || String(order.platform || '').toLowerCase() !== 'partner') return true;
-    const response = await fetch('../../api/orders/', {
+  const normalizeSourceKey = (value) => String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^[._-]+|[._-]+$/g, '')
+    .slice(0, 80);
+
+  const sourceKeyFromOrder = (targetOrder) => {
+    const platform = normalizeSourceKey(targetOrder?.platform || '');
+    const accountKey = normalizeSourceKey(targetOrder?.sourceAccountKey || targetOrder?.account_key || sourceAccount || '');
+    if (accountKey) return accountKey;
+    if (platform === 'partner') {
+      const partnerCode = normalizeSourceKey(targetOrder?.partnerCode || targetOrder?.partner_code || targetOrder?.account || '');
+      return `partner-${partnerCode || 'unknown'}`;
+    }
+    const account = normalizeSourceKey(targetOrder?.account || '');
+    return account || platform || 'default';
+  };
+
+  const orderActionPayload = (action, extra = {}) => ({
+    action,
+    order_id: String(order?.id || orderId || ''),
+    source_platform: normalizeSourceKey(order?.platform || ''),
+    source_account: sourceKeyFromOrder(order),
+    ...extra
+  });
+
+  const postOrderAction = async (action, extra = {}) => {
+    const response = await fetch(ordersEndpoint, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        action: 'partner_status',
-        order: order.id,
-        status
-      })
+      body: JSON.stringify(orderActionPayload(action, extra))
     });
-    if (!response.ok) {
-      let message = 'Unable to update partner order status.';
-      try {
-        const payload = await response.json();
-        message = payload.error || message;
-      } catch (_error) {
-        // Keep generic message.
-      }
-      throw new Error(message);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.error || 'Unable to update fulfillment state.');
     }
-    return true;
+    return payload;
   };
 
   const setError = (message) => {
@@ -101,14 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const markClaimedForFulfillment = () => {
-    if (!order) return;
-    updateStoredOrder((currentOrder) => {
-      currentOrder.status = 'IS_BEING_FULFILLED';
-      currentOrder.started = false;
-    });
-  };
-
   const markPrinted = () => {
     if (!order) return;
     const printedLabel = {
@@ -117,8 +127,6 @@ document.addEventListener('DOMContentLoaded', () => {
       printedAt: new Date().toISOString()
     };
     updateStoredOrder((currentOrder) => {
-      currentOrder.status = 'IS_BEING_FULFILLED';
-      currentOrder.started = false;
       currentOrder.printedLabel = printedLabel;
     });
     try {
@@ -131,15 +139,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const claimPartnerOrder = async () => {
-    if (!order || String(order.platform || '').toLowerCase() !== 'partner' || partnerOrderClaimed) return;
-    await persistPartnerStatus('IS_BEING_FULFILLED');
-    partnerOrderClaimed = true;
-    markClaimedForFulfillment();
+  const markPrintedOnServer = async () => {
+    if (!order) return;
+    await postOrderAction(isReprint ? 'reprint_label' : 'label_printed', {
+      printed_at: new Date().toISOString()
+    });
+    if (!isReprint) markPrinted();
   };
 
-  const returnToDashboard = () => {
-    if (!printInProgress) return;
+  const markFulfilledOnServer = async () => {
+    if (!order || isReprint) return;
+    await postOrderAction('fulfill_order', {
+      fulfilled_at: new Date().toISOString()
+    });
+  };
+
+  const returnToDashboard = async () => {
+    if (!printInProgress || returningToDashboard) return;
+    returningToDashboard = true;
+    if (statusNode) statusNode.textContent = isReprint ? 'Returning' : 'Finalizing';
+    try {
+      await markFulfilledOnServer();
+    } catch (error) {
+      returningToDashboard = false;
+      printInProgress = false;
+      if (statusNode) statusNode.textContent = 'Fulfillment pending';
+      setError(error instanceof Error ? error.message : 'Unable to finalize fulfillment.');
+      return;
+    }
     printInProgress = false;
     window.clearTimeout(returnTimer);
     try {
@@ -166,8 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
     printInProgress = true;
     window.clearTimeout(returnTimer);
     try {
-      await claimPartnerOrder();
-      markPrinted();
+      await markPrintedOnServer();
     } catch (error) {
       printInProgress = false;
       if (statusNode) statusNode.textContent = 'Ready';
@@ -184,7 +210,9 @@ document.addEventListener('DOMContentLoaded', () => {
           } else {
             window.print();
           }
-          returnTimer = window.setTimeout(returnToDashboard, 1500);
+          returnTimer = window.setTimeout(() => {
+            returnToDashboard();
+          }, 1500);
         } catch (_error) {
           printInProgress = false;
           if (statusNode) statusNode.textContent = 'Ready';
@@ -200,7 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
     optionsNode.innerHTML = `
       <button type="button" class="admin-label-option-card admin-label-print-card" data-print-shopee-label disabled>
         <span>
-          <strong>${platform} Label</strong>
+          <strong>${isReprint ? 'Reprint' : platform} Label</strong>
           <small>${escapeHtml(order?.id || orderId || 'Order')}</small>
         </span>
         <i aria-hidden="true"></i>
@@ -263,10 +291,6 @@ document.addEventListener('DOMContentLoaded', () => {
   renderOptions();
   if (order) {
     (async () => {
-      if (String(order.platform || '').toLowerCase() === 'partner') {
-        if (statusNode) statusNode.textContent = 'Marking order as processing';
-        await claimPartnerOrder();
-      }
       await loadLabel();
     })().catch((error) => {
       labelLoaded = false;

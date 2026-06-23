@@ -50,6 +50,7 @@ $storeScanJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/store-scan.js'
                     </div>
                     <button type="button" class="admin-ghost-btn" data-scanner-connect>Connect USB-COM Scanner</button>
                 </div>
+                <p class="admin-sync-status" data-sync-status hidden>Sync pending</p>
                 <p class="admin-form-error" data-scan-error hidden></p>
                 <div class="admin-scan-list" data-scan-list></div>
             </section>

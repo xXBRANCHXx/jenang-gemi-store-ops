@@ -6,11 +6,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const scanBridgeEndpoint = '../../api/scan-bridge/';
   const scanSerialEndpoint = '../../api/scan-serial/';
+  const ordersEndpoint = '../../api/orders/';
   const orderIdNode = document.querySelector('[data-scan-order-id]');
   const scanError = document.querySelector('[data-scan-error]');
   const scanList = document.querySelector('[data-scan-list]');
   const scanProgress = document.querySelector('[data-scan-progress]');
   const scanStatus = document.querySelector('[data-scan-status]');
+  const syncStatus = document.querySelector('[data-sync-status]');
   const scannerConnect = document.querySelector('[data-scanner-connect]');
 
   const escapeHtml = (value) => String(value ?? '')
@@ -53,6 +55,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let serverSerialErrorShown = false;
   let lastScanKey = '';
   let lastScanAt = 0;
+  let pendingScanEvents = [];
+  let flushTimer = 0;
+  let flushingScans = false;
+  let scanCompletedOnServer = false;
+  let completingScan = false;
 
   if (orderIdNode) orderIdNode.textContent = order?.id || 'Order missing';
 
@@ -93,6 +100,47 @@ document.addEventListener('DOMContentLoaded', () => {
     if (Array.isArray(item.sourceBarcodes)) return item.sourceBarcodes;
     const barcode = String(item.barcode || '').trim();
     return barcode ? [barcode] : [];
+  };
+
+  const normalizeSourceKey = (value) => String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^[._-]+|[._-]+$/g, '')
+    .slice(0, 80);
+
+  const sourceKeyFromOrder = (targetOrder) => {
+    const platform = normalizeSourceKey(targetOrder?.platform || '');
+    const accountKey = normalizeSourceKey(targetOrder?.sourceAccountKey || targetOrder?.account_key || '');
+    if (accountKey) return accountKey;
+    if (platform === 'partner') {
+      const partnerCode = normalizeSourceKey(targetOrder?.partnerCode || targetOrder?.partner_code || targetOrder?.account || '');
+      return `partner-${partnerCode || 'unknown'}`;
+    }
+    const account = normalizeSourceKey(targetOrder?.account || '');
+    return account || platform || 'default';
+  };
+
+  const orderActionPayload = (action, extra = {}) => ({
+    action,
+    order_id: String(order?.id || orderId || ''),
+    source_platform: normalizeSourceKey(order?.platform || ''),
+    source_account: sourceKeyFromOrder(order),
+    ...extra
+  });
+
+  const postOrderAction = async (action, extra = {}) => {
+    const response = await fetch(ordersEndpoint, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(orderActionPayload(action, extra))
+    });
+    const payload = await readJsonResponse(response, 'Unable to sync scan activity.');
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.error || 'Unable to sync scan activity.');
+    }
+    return payload;
   };
 
   const consolidateScanItems = (items) => {
@@ -138,6 +186,114 @@ document.addEventListener('DOMContentLoaded', () => {
     const required = scanQuantityFor(item);
     return sum + skipQuantityFor(item) + Math.min(scanCountFor(scanSkuFor(item)), manualQuantityFor(item), required);
   }, 0);
+
+  const currentProgress = () => ({
+    completed: totalScanned(),
+    required: totalRequired()
+  });
+
+  const updateSyncStatus = (stateName = '') => {
+    if (!syncStatus) return;
+    const pending = pendingScanEvents.length;
+    syncStatus.hidden = stateName === '' && pending === 0 && !flushingScans;
+    syncStatus.classList.toggle('is-error', stateName === 'error');
+    syncStatus.textContent = stateName === 'error'
+      ? `Sync pending (${pending || 'retry'})`
+      : (flushingScans ? 'Syncing scans' : `Sync pending (${pending})`);
+  };
+
+  const queueScanEvent = (event) => {
+    pendingScanEvents.push({
+      ...event,
+      client_created_at: new Date().toISOString(),
+      progress_scanned: totalScanned(),
+      progress_required: totalRequired()
+    });
+    updateSyncStatus();
+    window.clearTimeout(flushTimer);
+    flushTimer = window.setTimeout(() => {
+      flushScanEvents().catch(() => {});
+    }, 1500);
+  };
+
+  const flushScanEvents = async () => {
+    if (!order || flushingScans || pendingScanEvents.length === 0) {
+      updateSyncStatus();
+      return pendingScanEvents.length === 0;
+    }
+
+    flushingScans = true;
+    updateSyncStatus();
+    const batch = pendingScanEvents.splice(0, pendingScanEvents.length);
+    try {
+      await postOrderAction('record_scan', {
+        events: batch,
+        progress: currentProgress()
+      });
+      flushingScans = false;
+      updateSyncStatus();
+      return pendingScanEvents.length === 0;
+    } catch (error) {
+      pendingScanEvents = batch.concat(pendingScanEvents);
+      flushingScans = false;
+      updateSyncStatus('error');
+      setError(error instanceof Error ? error.message : 'Scan sync failed. Final fulfillment is blocked until sync completes.');
+      return false;
+    }
+  };
+
+  const flushScanEventsBeacon = () => {
+    if (!order || pendingScanEvents.length === 0) return;
+    const batch = pendingScanEvents.splice(0, pendingScanEvents.length);
+    const payload = JSON.stringify(orderActionPayload('record_scan', {
+      events: batch,
+      progress: currentProgress()
+    }));
+    if (navigator.sendBeacon) {
+      const queued = navigator.sendBeacon(ordersEndpoint, new Blob([payload], { type: 'application/json' }));
+      if (queued) return;
+    }
+    fetch(ordersEndpoint, {
+      method: 'POST',
+      credentials: 'same-origin',
+      keepalive: true,
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: payload
+    }).catch(() => {});
+  };
+
+  const completeScanOnServer = async () => {
+    if (!order || scanCompletedOnServer || completingScan) return false;
+    completingScan = true;
+    setScanStatus('Syncing scan results', 'Saving final scan progress before label choices open.');
+    const flushed = await flushScanEvents();
+    if (!flushed || pendingScanEvents.length > 0) {
+      completingScan = false;
+      setScanStatus('Sync pending', 'Final fulfillment is blocked until scan activity reaches the server.');
+      return false;
+    }
+
+    try {
+      await postOrderAction('complete_scan', { progress: currentProgress() });
+      scanCompletedOnServer = true;
+      completingScan = false;
+      return true;
+    } catch (error) {
+      completingScan = false;
+      updateSyncStatus('error');
+      setError(error instanceof Error ? error.message : 'Unable to complete scan on the server.');
+      setScanStatus('Sync pending', 'Final fulfillment is blocked until scan completion reaches the server.');
+      return false;
+    }
+  };
+
+  const maybeOpenPrintLabelPage = () => {
+    if (!order || printRedirecting || completingScan || scanCompletedOnServer) return;
+    if (totalRequired() <= 0 || totalScanned() < totalRequired()) return;
+    completeScanOnServer().then((complete) => {
+      if (complete) openPrintLabelPage();
+    });
+  };
 
   const normalizeScanCode = (value) => String(value || '').trim().toUpperCase();
   const skuFromBarcode = (value) => {
@@ -214,7 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (required > 0 && scanned >= required) {
-      window.setTimeout(openPrintLabelPage, 120);
+      window.setTimeout(maybeOpenPrintLabelPage, 120);
     }
   };
 
@@ -248,11 +404,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const message = `ASTRA requires ${requiredCount} scan${requiredCount === 1 ? '' : 's'} of ${requiredSku} for this order SKU.`;
         setError(message);
         setScanStatus('Scan is the order SKU', message);
+        queueScanEvent({
+          type: 'scan_error',
+          code: scannedCode,
+          sku: requiredSku,
+          message
+        });
         return false;
       }
 
       setError('Barcode not found in this order.');
       setScanStatus('Scan not found', `${scannedCode} is not required. Expected: ${expectedScanCodes() || 'No active SKU'}.`);
+      queueScanEvent({
+        type: 'scan_error',
+        code: scannedCode,
+        message: 'Barcode not found in this order.'
+      });
       return false;
     }
 
@@ -260,6 +427,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (matchManualRequired <= 0) {
       setError(`${match.scanProductName || match.productName} is set to Skip Scan.`);
       setScanStatus('Scan skipped', `${match.scanProductName || match.productName} is already counted as scanned.`);
+      queueScanEvent({
+        type: 'scan_error',
+        code: scannedCode,
+        sku: scanSkuFor(match),
+        message: 'Scanned item is configured as Skip Scan.'
+      });
       return false;
     }
 
@@ -268,15 +441,28 @@ document.addEventListener('DOMContentLoaded', () => {
     if (current >= matchManualRequired) {
       setError(`${match.scanProductName || match.productName} is already fully scanned.`);
       setScanStatus('Already complete', `${match.scanProductName || match.productName} does not need more scans.`);
+      queueScanEvent({
+        type: 'scan_error',
+        code: scannedCode,
+        sku: scanSkuFor(match),
+        message: 'Item already fully scanned.'
+      });
       return false;
     }
 
     scans.set(matchSku, current + 1);
     setError('');
+    queueScanEvent({
+      type: 'scan',
+      code: scannedCode,
+      sku: matchSku,
+      quantity: 1,
+      message: `${match.scanProductName || match.productName} accepted`
+    });
     render();
     setScanStatus('Scan accepted', `${match.scanProductName || match.productName} ${skipQuantityFor(match) + current + 1}/${scanQuantityFor(match)}`);
     if (totalRequired() > 0 && totalScanned() >= totalRequired()) {
-      openPrintLabelPage();
+      maybeOpenPrintLabelPage();
     }
     return true;
   };
@@ -442,6 +628,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   window.addEventListener('pagehide', () => {
+    window.clearTimeout(flushTimer);
+    flushScanEventsBeacon();
     window.clearInterval(serverSerialTimer);
     if (serialReader) serialReader.cancel().catch(() => {});
     if (serialPort?.readable || serialPort?.writable) serialPort.close().catch(() => {});

@@ -46,6 +46,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const boardVisibleRows = 10;
   const boardVisibleColumns = 7;
   const boardVisibleCapacity = boardVisibleRows * boardVisibleColumns;
+  const currentEmployee = {
+    id: String(root.dataset.employeeId || 'shared-admin'),
+    name: String(root.dataset.employeeName || 'Admin')
+  };
 
   let skuCatalog = [];
   let partnerOrderSources = [];
@@ -678,8 +682,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!stored) return order;
     return {
       ...order,
-      status: stored.status && stored.status !== 'IS_LISTED' ? stored.status : order.status,
-      started: Boolean(stored.started),
       printedLabel: stored.printedLabel || order.printedLabel || null
     };
   };
@@ -699,7 +701,17 @@ document.addEventListener('DOMContentLoaded', () => {
       packageNumber: String(order.packageNumber || ''),
       instant: Boolean(order.instant),
       deadlineAt: Number.isFinite(deadlineAt) && deadlineAt > 0 ? deadlineAt : Date.now() + 86400000,
-      started: Boolean(order.started),
+      fulfillmentStatus: String(order.fulfillmentStatus || 'UNCLAIMED'),
+      claimedBy: order.claimedBy || null,
+      claimedByName: String(order.claimedByName || ''),
+      claimedAt: order.claimedAt || null,
+      locked: Boolean(order.locked),
+      currentEmployeeCanWork: order.currentEmployeeCanWork !== false,
+      claimStale: Boolean(order.claimStale),
+      scanProgress: order.scanProgress && typeof order.scanProgress === 'object'
+        ? order.scanProgress
+        : { completed: 0, required: 0, percent: 0 },
+      started: Boolean(order.claimedBy && order.currentEmployeeCanWork !== false && String(order.fulfillmentStatus || '') !== 'FULFILLED'),
       items: (Array.isArray(order.items) ? order.items : [])
         .map((item) => normalizeOrderItem(item, catalogRows))
         .filter((item) => item.sku || item.productName)
@@ -734,7 +746,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const saveOrders = () => {
     try {
-      window.localStorage.setItem(ordersStorageKey, JSON.stringify(state.orders));
+      const cacheOrders = state.orders.map((order) => {
+        const cached = { ...order };
+        delete cached.started;
+        return cached;
+      });
+      window.localStorage.setItem(ordersStorageKey, JSON.stringify(cacheOrders));
     } catch (_error) {
       // Keep the visible queue working even when local persistence is unavailable.
     }
@@ -759,7 +776,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .replaceAll("'", '&#039;');
 
   const listedOrders = () => state.orders
-    .filter((order) => order.status === 'IS_LISTED')
+    .filter((order) => order.status !== 'FULFILLED' && order.fulfillmentStatus !== 'FULFILLED')
     .sort((a, b) => a.deadlineAt - b.deadlineAt);
 
   const activeOrder = () => state.orders.find((order) => order.id === state.activeOrderId) || null;
@@ -798,11 +815,46 @@ document.addEventListener('DOMContentLoaded', () => {
     window.location.href = url;
   };
 
-  const openPrintLabelPage = (orderId) => {
+  const orderActionPayload = (action, order, extra = {}) => ({
+    action,
+    order_id: String(order?.id || extra.order_id || ''),
+    source_platform: normalizeSourceKey(order?.platform || extra.source_platform || ''),
+    source_account: sourceKeyFromOrder(order || extra),
+    ...extra
+  });
+
+  const postOrderAction = async (action, order, extra = {}) => {
+    const response = await fetch(ordersEndpoint, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(orderActionPayload(action, order, extra))
+    });
+    const payload = await readJsonResponse(response, 'Unable to update order.');
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.error || 'Unable to update order.');
+    }
+    return payload;
+  };
+
+  const applyFulfillmentState = (order, fulfillment) => {
+    if (!order || !fulfillment || typeof fulfillment !== 'object') return;
+    order.fulfillmentStatus = String(fulfillment.fulfillmentStatus || order.fulfillmentStatus || 'UNCLAIMED');
+    order.claimedBy = fulfillment.claimedBy || null;
+    order.claimedByName = String(fulfillment.claimedByName || '');
+    order.claimedAt = fulfillment.claimedAt || null;
+    order.locked = Boolean(fulfillment.locked);
+    order.currentEmployeeCanWork = fulfillment.currentEmployeeCanWork !== false;
+    order.claimStale = Boolean(fulfillment.claimStale);
+    order.scanProgress = fulfillment.scanProgress || order.scanProgress || { completed: 0, required: 0, percent: 0 };
+    order.started = Boolean(order.claimedBy && order.currentEmployeeCanWork && order.fulfillmentStatus !== 'FULFILLED');
+  };
+
+  const openPrintLabelPage = (orderId, { reprint = false } = {}) => {
     const order = state.orders.find((item) => normalizeOrderId(item.id) === orderId);
     const printableOrderId = order?.id || orderId;
     const account = order?.sourceAccountKey || '';
-    openStorePage(`./print-label/?order=${encodeURIComponent(printableOrderId)}${account ? `&account=${encodeURIComponent(account)}` : ''}`);
+    openStorePage(`./print-label/?order=${encodeURIComponent(printableOrderId)}${account ? `&account=${encodeURIComponent(account)}` : ''}${reprint ? '&reprint=1' : ''}`);
   };
 
   const openSettingsModal = () => {
@@ -926,8 +978,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const listed = listedOrders();
     if (listedCount) listedCount.textContent = String(listed.length);
     if (criticalCount) criticalCount.textContent = String(listed.filter((order) => isCriticalOrder(order)).length);
-    if (startedCount) startedCount.textContent = String(state.orders.filter((order) => order.status === 'IS_LISTED' && order.started).length);
-    if (fulfillingCount) fulfillingCount.textContent = String(state.orders.filter((order) => order.status === 'IS_BEING_FULFILLED').length);
+    if (startedCount) startedCount.textContent = String(state.orders.filter((order) => order.claimedBy && order.fulfillmentStatus !== 'FULFILLED').length);
+    if (fulfillingCount) fulfillingCount.textContent = String(state.orders.filter((order) => !['UNCLAIMED', 'FULFILLED'].includes(order.fulfillmentStatus)).length);
   };
 
   const renderBoard = () => {
@@ -935,7 +987,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const ordersChanged = syncOrdersFromStorage();
     if (ordersChanged) saveOrders();
     const currentActiveOrder = activeOrder();
-    if (state.activeOrderId && (!currentActiveOrder || currentActiveOrder.status !== 'IS_LISTED')) {
+    if (state.activeOrderId && (!currentActiveOrder || currentActiveOrder.fulfillmentStatus === 'FULFILLED' || currentActiveOrder.currentEmployeeCanWork === false)) {
       closeFulfillment();
     }
     const orders = listedOrders();
@@ -960,10 +1012,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const sourceKey = sourceKeyFromOrder(order);
       const sourceLabel = sourceLabelFromOrder(order);
       const sourceColor = colorForSource(sourceKey);
-      const buttonLabel = index === 0 ? 'Start Next' : 'Start';
+      const isLocked = order.locked && !order.currentEmployeeCanWork;
+      const claimedBySelf = order.claimedBy && order.claimedBy === currentEmployee.id;
+      const claimLabel = order.claimedByName ? `${order.claimStale ? 'Stale' : 'Claimed'} by ${order.claimedByName}` : order.marketplaceStatus;
+      const buttonLabel = order.claimStale ? 'Reclaim' : (claimedBySelf ? 'Resume' : (index === 0 ? 'Start Next' : 'Start'));
       return `
         <article
-          class="admin-order-card ${isCritical ? 'is-critical' : ''} ${order.started ? 'is-started' : ''}"
+          class="admin-order-card ${isCritical && !isLocked ? 'is-critical' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''}"
           data-source-key="${escapeHtml(sourceKey)}"
           ${sourceColor ? `data-source-color="${escapeHtml(sourceColor)}"` : ''}
         >
@@ -974,10 +1029,10 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="admin-order-deadline">${escapeHtml(formatDeadline(order))}</div>
           <div class="admin-order-meta">
             <span>${escapeHtml(sourceLabel)}</span>
-            <span>${escapeHtml(order.marketplaceStatus)}</span>
+            <span>${escapeHtml(claimLabel)}</span>
             <span>${itemCount} item${itemCount === 1 ? '' : 's'}</span>
           </div>
-          <button type="button" class="admin-start-order-btn" data-start-order="${escapeHtml(order.id)}">${escapeHtml(buttonLabel)}</button>
+          <button type="button" class="admin-start-order-btn" data-start-order="${escapeHtml(order.id)}" ${isLocked ? 'disabled' : ''}>${escapeHtml(isLocked ? 'Locked' : buttonLabel)}</button>
         </article>
       `;
     }).join('');
@@ -1022,6 +1077,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const openFulfillment = async (orderId) => {
     const order = state.orders.find((item) => item.id === orderId);
     if (!order) return;
+    if (order.locked && !order.currentEmployeeCanWork) return;
+    try {
+      const payload = await postOrderAction('claim_order', order);
+      applyFulfillmentState(order, payload.fulfillment || payload.order);
+    } catch (error) {
+      if (board) {
+        const message = error instanceof Error ? error.message : 'Unable to claim this order.';
+        board.insertAdjacentHTML('afterbegin', `<div class="admin-board-empty admin-board-alert">${escapeHtml(message)}</div>`);
+      }
+      refreshOrders(false).catch(() => {});
+      return;
+    }
     order.started = true;
     state.activeOrderId = order.id;
     state.scans = new Map();
@@ -1033,10 +1100,20 @@ document.addEventListener('DOMContentLoaded', () => {
     renderBoard();
   };
 
-  const closeFulfillment = () => {
+  const closeFulfillment = (releaseClaim = false) => {
+    const order = activeOrder();
     if (modal) modal.hidden = true;
     state.activeOrderId = '';
     state.scans = new Map();
+    if (releaseClaim && order && order.claimedBy === currentEmployee.id && order.fulfillmentStatus === 'CLAIMED') {
+      postOrderAction('release_order', order)
+        .then((payload) => {
+          applyFulfillmentState(order, payload.fulfillment || payload.order);
+          saveOrders();
+          renderBoard();
+        })
+        .catch(() => refreshOrders(false).catch(() => {}));
+    }
   };
 
   board?.addEventListener('click', (event) => {
@@ -1044,6 +1121,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const target = event.target instanceof Element ? event.target : null;
     const button = target?.closest('[data-start-order]');
     if (!(button instanceof HTMLButtonElement)) return;
+    if (button.disabled) return;
     openFulfillment(button.dataset.startOrder || '');
   });
 
@@ -1060,7 +1138,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.querySelectorAll('[data-close-fulfillment-modal]').forEach((button) => {
-    button.addEventListener('click', closeFulfillment);
+    button.addEventListener('click', () => closeFulfillment(true));
   });
 
   document.querySelector('[data-open-reprint]')?.addEventListener('click', openReprintModal);
@@ -1120,7 +1198,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showReprintError('Enter an order ID.');
       return;
     }
-    openPrintLabelPage(orderId);
+    openPrintLabelPage(orderId, { reprint: true });
   });
 
   document.addEventListener('pointerdown', unlockAudio, { once: true });
@@ -1128,6 +1206,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('storage', (event) => {
     if (event.key === printedOrderStorageKey) {
       closeFulfillment();
+      refreshOrders(false).catch(() => {});
       renderBoard();
       return;
     }
