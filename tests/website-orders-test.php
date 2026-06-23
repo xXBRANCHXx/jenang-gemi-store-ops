@@ -17,5 +17,11 @@ $after = jg_store_ops_website_parse_utc('2026-06-23T01:00:00.000001Z');
 website_ops_expect(true, $after > $before, 'Store Ops must preserve the precise UTC cutover ordering.');
 website_ops_expect('2026-06-23 01:00:00.000001', $after->format('Y-m-d H:i:s.u'), 'Store Ops must not truncate the executive cutover boundary.');
 website_ops_expect(['zero_website', 'jenang_gemi_website'], JG_STORE_OPS_WEBSITE_PLATFORMS, 'Store Ops website sources must remain independent.');
+website_ops_expect(
+    hash_hmac('sha256', 'jenang-gemi-website-orders-v1', 'shared-seed'),
+    jg_store_ops_website_derive_token('shared-seed'),
+    'The deployed Executive Dashboard token fallback must be deterministic.'
+);
+website_ops_expect('', jg_store_ops_website_derive_token(''), 'An empty shared seed must not create a bearer token.');
 
 echo "website-orders-test: ok\n";

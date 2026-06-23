@@ -15,6 +15,22 @@ function jg_store_ops_website_config(string $envKey, string $configKey, string $
     return is_string($value) && trim($value) !== '' ? trim($value) : $default;
 }
 
+function jg_store_ops_website_derive_token(string $seed): string
+{
+    $seed = trim($seed);
+    return $seed === '' ? '' : hash_hmac('sha256', 'jenang-gemi-website-orders-v1', $seed);
+}
+
+function jg_store_ops_website_token(): string
+{
+    $configured = jg_store_ops_website_config('JG_STORE_OPS_WEBSITE_TOKEN', 'store_ops_website_token');
+    if ($configured !== '') {
+        return $configured;
+    }
+    $seed = jg_store_ops_website_config('JG_SHOPEE_INGEST_SETUP_TOKEN', 'shopee_ingest_setup_token');
+    return jg_store_ops_website_derive_token($seed);
+}
+
 function jg_store_ops_website_now(): string
 {
     return gmdate('Y-m-d H:i:s');
@@ -70,7 +86,7 @@ function jg_store_ops_website_state(PDO $pdo, bool $forUpdate = false): array
 
 function jg_store_ops_website_token_matches(): bool
 {
-    $expected = jg_store_ops_website_config('JG_STORE_OPS_WEBSITE_TOKEN', 'store_ops_website_token');
+    $expected = jg_store_ops_website_token();
     if ($expected === '') return false;
     $authorization = trim((string) ($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? ''));
     $provided = str_starts_with($authorization, 'Bearer ') ? trim(substr($authorization, 7)) : '';
@@ -118,7 +134,7 @@ function jg_store_ops_website_activate(PDO $pdo, array $payload): array
 
 function jg_store_ops_website_request(string $method, string $url, ?array $payload = null): array
 {
-    $token = jg_store_ops_website_config('JG_STORE_OPS_WEBSITE_TOKEN', 'store_ops_website_token');
+    $token = jg_store_ops_website_token();
     $headers = "Accept: application/json\r\nAuthorization: Bearer {$token}\r\n";
     $options = ['method' => $method, 'header' => $headers, 'timeout' => 15, 'ignore_errors' => true];
     if ($payload !== null) {
@@ -253,7 +269,7 @@ function jg_store_ops_website_proxy_label(array $order): never
 {
     $url = trim((string) ($order['label_url'] ?? ''));
     if ($url === '') throw new RuntimeException('Website order label URL is missing.');
-    $token = jg_store_ops_website_config('JG_STORE_OPS_WEBSITE_TOKEN', 'store_ops_website_token');
+    $token = jg_store_ops_website_token();
     $context = stream_context_create(['http' => [
         'method' => 'GET',
         'header' => "Accept: application/pdf\r\nAuthorization: Bearer {$token}\r\n",
