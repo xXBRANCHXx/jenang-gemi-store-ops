@@ -1517,6 +1517,21 @@ button, input {
   font-size: 10px;
 }
 
+.admin-icon-text-btn {
+  gap: 6px;
+}
+
+.admin-icon-text-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: 0 0 auto;
+}
+
 .admin-fulfillment-card,
 .admin-scan-page-card {
   width: min(1180px, calc(100vw - 28px));
@@ -1921,6 +1936,92 @@ button, input {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 1.7rem;
   line-height: 1.05;
+}
+
+.admin-employee-profiles-card {
+  width: min(860px, 100%);
+  max-height: min(92vh, 860px);
+  overflow: auto;
+  display: grid;
+  gap: 18px;
+}
+
+.admin-employee-profile-form {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: end;
+  padding: 16px;
+  border: 1px solid var(--admin-border);
+  border-radius: 18px;
+  background: var(--admin-surface-soft);
+}
+
+.admin-employee-active-toggle {
+  min-height: 52px;
+  align-self: end;
+}
+
+.admin-employee-profile-form .admin-form-error,
+.admin-employee-profile-form .admin-modal-actions {
+  grid-column: 1 / -1;
+}
+
+.admin-employee-profile-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-employee-profile-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  background: var(--admin-surface-soft);
+}
+
+.admin-employee-profile-avatar {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--admin-accent-primary) 20%, transparent);
+  color: var(--admin-text);
+}
+
+.admin-employee-profile-avatar svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.admin-employee-profile-main {
+  min-width: 0;
+}
+
+.admin-employee-profile-main strong,
+.admin-employee-profile-main span {
+  display: block;
+}
+
+.admin-employee-profile-main span {
+  margin-top: 3px;
+  color: var(--admin-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-employee-profile-row .admin-ghost-btn {
+  min-height: 36px;
+  padding: 0 12px;
 }
 
 .admin-settings-input {
@@ -3251,8 +3352,19 @@ button, input {
   }
 
   .admin-settings-grid,
-  .admin-settings-form {
+  .admin-settings-form,
+  .admin-employee-profile-form {
     grid-template-columns: 1fr;
+  }
+
+  .admin-employee-profile-row {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .admin-employee-profile-row .admin-status-badge,
+  .admin-employee-profile-row .admin-ghost-btn {
+    grid-column: 2;
+    justify-self: start;
   }
 }
 

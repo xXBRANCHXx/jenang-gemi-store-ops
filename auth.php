@@ -104,6 +104,31 @@ function jg_admin_current_employee_is_admin(): bool
     return jg_store_ops_fulfillment_is_admin_employee(jg_admin_current_employee_id());
 }
 
+function jg_admin_has_active_admin_employee(): bool
+{
+    try {
+        $pdo = jg_store_ops_fulfillment_db();
+        $stmt = $pdo->query(
+            "SELECT COUNT(*)
+             FROM store_ops_employees
+             WHERE active = 1
+               AND LOWER(id) IN ('admin', 'shared-admin')"
+        );
+        return (int) $stmt->fetchColumn() > 0;
+    } catch (Throwable) {
+        return false;
+    }
+}
+
+function jg_admin_can_manage_employee_profiles(): bool
+{
+    if (jg_admin_current_employee_is_admin()) {
+        return true;
+    }
+
+    return !jg_admin_has_active_admin_employee();
+}
+
 /**
  * @return array<int, array{id:string,display_name:string,active:int}>
  */
