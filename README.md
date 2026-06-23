@@ -1,5 +1,11 @@
 # Jenang Gemi Store Ops
 
+Website order ingestion starts disabled. The Executive Dashboard Hard Set activation webhook enables `zero_website` and `jenang_gemi_website` together. Configure `JG_STORE_OPS_WEBSITE_TOKEN` / `store_ops_website_token` to the same high-entropy value on both applications and set `JG_EXECUTIVE_DASHBOARD_URL` / `executive_dashboard_url` when the dashboard is not at `https://admin.jenanggemi.com`.
+Keep deployment credentials outside Git by placing them in the ignored `.env`
+or `config.runtime.php`; `/public_html/config.runtime.php` is also loaded.
+
+Store Ops persists website orders idempotently, re-verifies every order against the token-authenticated executive feed and cutover timestamp, resolves item SKUs through the existing SKU DB, and proxies the executive-uploaded PDF through authenticated endpoints.
+
 Operational backend for `store.jenanggemi.com`.
 
 ## Scope

@@ -26,7 +26,7 @@ $skuDbJsVersion = (string) @filemtime(dirname(__DIR__) . '/sku-db.js');
     <link rel="stylesheet" href="../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
 <body class="admin-body is-dashboard">
-    <div class="admin-build-badge" aria-label="Dashboard build version">Build 1.01.00</div>
+    <div class="admin-build-badge" aria-label="Dashboard build version">Build 1.03.00</div>
     <div class="admin-app" data-sku-db data-sku-db-endpoint="../api/sku-db/">
         <div class="admin-backdrop admin-backdrop-a"></div>
         <div class="admin-backdrop admin-backdrop-b"></div>

@@ -29,7 +29,7 @@ $currentEmployeeCanManageProfiles = jg_admin_can_manage_employee_profiles();
     <link rel="stylesheet" href="../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
 <body class="admin-body is-dashboard">
-    <div class="admin-build-badge" aria-label="Store build version">Build 1.02.00-live</div>
+    <div class="admin-build-badge" aria-label="Store build version">Build 1.03.00</div>
     <div
         class="admin-app admin-store-home"
         data-store-home

@@ -45,7 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const storedOrder = orders.find((item) => String(item.id || '') === orderId) || null;
   const order = storedOrder || (orderId ? {
     id: orderId,
-    platform: orderId.toUpperCase().startsWith('PARTNER-') ? 'Partner' : 'Shopee'
+    platform: orderId.toUpperCase().startsWith('PARTNER-')
+      ? 'partner'
+      : (orderId.toUpperCase().startsWith('ZEROWEB-') ? 'zero_website' : (orderId.toUpperCase().startsWith('JGWEB-') ? 'jenang_gemi_website' : 'shopee'))
   } : null);
   const sourceAccount = requestedAccount || String(order?.sourceAccountKey || '');
   let returnTimer = 0;
@@ -122,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const markPrinted = () => {
     if (!order) return;
     const printedLabel = {
-      source: String(order.platform || '').toLowerCase() === 'partner' ? 'partner' : 'shopee',
+      source: String(order.platform || 'shopee').toLowerCase(),
       orderId: order.id,
       printedAt: new Date().toISOString()
     };
@@ -222,9 +224,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
+  const platformLabel = (value) => {
+    const platform = String(value || '').toLowerCase();
+    if (platform === 'partner') return 'Partner';
+    if (platform === 'zero_website') return 'ZERO Website';
+    if (platform === 'jenang_gemi_website') return 'Jenang Gemi Website';
+    return 'Shopee';
+  };
+
   const renderOptions = () => {
     if (!optionsNode) return;
-    const platform = String(order?.platform || '').toLowerCase() === 'partner' ? 'Partner' : 'Shopee';
+    const platform = platformLabel(order?.platform);
     optionsNode.innerHTML = `
       <button type="button" class="admin-label-option-card admin-label-print-card" data-print-shopee-label disabled>
         <span>
@@ -245,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const loadLabel = async () => {
     if (!order) return;
-    const platform = String(order.platform || '').toLowerCase() === 'partner' ? 'Partner' : 'Shopee';
+    const platform = platformLabel(order.platform);
     if (statusNode) statusNode.textContent = `Fetching ${platform} label`;
     const response = await fetch(`../../api/orders/?shipping_label=1&order=${encodeURIComponent(order.id)}${sourceAccount ? `&account=${encodeURIComponent(sourceAccount)}` : ''}`, {
       cache: 'no-store',

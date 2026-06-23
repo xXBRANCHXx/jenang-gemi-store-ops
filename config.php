@@ -57,6 +57,8 @@ function jg_store_ops_load_local_config(): array
     $configFiles = [
         __DIR__ . '/config.local.php',
         '/public_html/config.local.php',
+        __DIR__ . '/config.runtime.php',
+        '/public_html/config.runtime.php',
     ];
 
     foreach ($configFiles as $configFile) {

@@ -6,6 +6,7 @@ require_once dirname(__DIR__, 2) . '/config.php';
 require_once dirname(__DIR__, 2) . '/sku-db-bootstrap.php';
 require_once dirname(__DIR__, 2) . '/partner-orders-bootstrap.php';
 require_once dirname(__DIR__, 2) . '/store-ops-fulfillment.php';
+require_once dirname(__DIR__, 2) . '/website-orders-bootstrap.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -774,6 +775,13 @@ if ($method === 'POST') {
             if ($key['source_platform'] === 'partner') {
                 jg_store_ops_orders_partner_update_status($key['order_id'], 'IS_BEING_FULFILLED');
             }
+            if (in_array($key['source_platform'], JG_STORE_OPS_WEBSITE_PLATFORMS, true)) {
+                try {
+                    jg_store_ops_website_callback($pdo, $key['source_platform'], $key['order_id'], 'IS_BEING_FULFILLED');
+                } catch (Throwable $callbackError) {
+                    error_log('Website order fulfillment callback failed: ' . $callbackError->getMessage());
+                }
+            }
             jg_store_ops_orders_fulfillment_response($pdo, $row);
         }
 
@@ -786,6 +794,13 @@ if ($method === 'POST') {
             $row = jg_store_ops_fulfillment_mark_fulfilled($pdo, $key, $employeeId, $employeeName);
             if ($key['source_platform'] === 'partner') {
                 jg_store_ops_orders_partner_update_status($key['order_id'], 'FULFILLED');
+            }
+            if (in_array($key['source_platform'], JG_STORE_OPS_WEBSITE_PLATFORMS, true)) {
+                try {
+                    jg_store_ops_website_callback($pdo, $key['source_platform'], $key['order_id'], 'FULFILLED');
+                } catch (Throwable $callbackError) {
+                    error_log('Website order fulfilled callback failed: ' . $callbackError->getMessage());
+                }
             }
             jg_store_ops_orders_fulfillment_response($pdo, $row);
         }
@@ -811,6 +826,20 @@ if (isset($_GET['shipping_label'])) {
     $orderSn = trim((string) ($_GET['order'] ?? $_GET['order_sn'] ?? ''));
     if ($orderSn === '') {
         jg_store_ops_orders_fail('Order number is required.');
+    }
+
+    if (str_starts_with(strtoupper($orderSn), 'ZEROWEB-') || str_starts_with(strtoupper($orderSn), 'JGWEB-')) {
+        $platform = str_starts_with(strtoupper($orderSn), 'ZEROWEB-') ? 'zero_website' : 'jenang_gemi_website';
+        $websitePdo = jg_store_ops_fulfillment_db();
+        $websiteOrder = jg_store_ops_website_find($websitePdo, $platform, $orderSn);
+        if (!is_array($websiteOrder)) {
+            jg_store_ops_orders_fail('Website shipping label is not available for this order.', 404);
+        }
+        try {
+            jg_store_ops_website_proxy_label($websiteOrder);
+        } catch (Throwable $labelError) {
+            jg_store_ops_orders_fail($labelError->getMessage(), 502);
+        }
     }
 
     if (str_starts_with(strtoupper($orderSn), 'PARTNER-')) {
@@ -903,11 +932,27 @@ foreach ($sources as $source) {
 
 $decoded = jg_store_ops_orders_map_item_skus($decoded);
 $partnerOrders = jg_store_ops_orders_refresh_partner_orders(jg_store_ops_partner_orders_list());
+$websiteOrders = [];
+$websiteIngestionState = ['enabled' => false];
+try {
+    $websitePdo = jg_store_ops_fulfillment_db();
+    $websiteIngestionState = jg_store_ops_website_state($websitePdo);
+    $websiteOrders = jg_store_ops_website_orders($websitePdo);
+} catch (Throwable $websiteOrdersError) {
+    $decoded['meta']['website_orders_error'] = $websiteOrdersError->getMessage();
+}
 $decoded['orders'] = array_values(array_merge(
     is_array($decoded['orders'] ?? null) ? $decoded['orders'] : [],
-    $partnerOrders['orders']
+    $partnerOrders['orders'],
+    $websiteOrders
 ));
+$decoded = jg_store_ops_orders_map_item_skus($decoded);
 $decoded['meta']['partner_orders'] = $partnerOrders['meta'];
+$decoded['meta']['website_orders'] = [
+    'enabled' => !empty($websiteIngestionState['enabled']),
+    'count' => count($websiteOrders),
+    'sources' => JG_STORE_OPS_WEBSITE_PLATFORMS,
+];
 $decoded['meta']['errors'] = $errors;
 $decoded['meta']['count'] = count($decoded['orders']);
 $decoded['meta']['current_employee'] = [

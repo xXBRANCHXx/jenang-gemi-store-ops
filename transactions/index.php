@@ -26,7 +26,7 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
     <link rel="stylesheet" href="../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
 <body class="admin-body is-dashboard">
-    <div class="admin-build-badge" aria-label="Store build version">Build 1.02.00</div>
+    <div class="admin-build-badge" aria-label="Store build version">Build 1.03.00</div>
     <div class="admin-app" data-transactions data-transactions-endpoint="../api/transactions/">
         <div class="admin-backdrop admin-backdrop-a"></div>
         <div class="admin-backdrop admin-backdrop-b"></div>

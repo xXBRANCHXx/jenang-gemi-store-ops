@@ -121,6 +121,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const partnerCode = normalizeSourceKey(order?.partnerCode || order?.partner_code || order?.account || '');
       return `partner-${partnerCode || 'unknown'}`;
     }
+    if (platform === 'zero_website') return 'ZERO Website';
+    if (platform === 'jenang_gemi_website') return 'Jenang Gemi Website';
     const account = normalizeSourceKey(order?.account || '');
     return account || platform || 'unknown';
   };
@@ -164,6 +166,8 @@ document.addEventListener('DOMContentLoaded', () => {
       ['jenang-gemi-tiktok', 'JG TikTok'],
       ['zero-tiktok', 'ZERO TikTok'],
       ['zfit-tiktok', 'ZFIT TikTok']
+      ,['zero_website', 'ZERO Website']
+      ,['jenang_gemi_website', 'Jenang Gemi Website']
     ]);
     partnerOrderSources.forEach((source) => {
       const sourceKey = normalizeSourceKey(source.key || source.sourceKey || '');
@@ -660,7 +664,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sourceTags: sourceTag && sourceTag !== String(catalogItem.sku || '').trim().toUpperCase() ? [sourceTag] : [],
         sourceBarcodes: [String(catalogItem.barcode || catalogItem.sku || '').trim()].filter(Boolean),
         skuMatchStatus: item.sku_match_status || 'matched',
-        sourcePlatform: item.sourcePlatform || 'Shopee'
+        sourcePlatform: item.sourcePlatform || item.platform || 'Website'
       };
     }
 
@@ -668,17 +672,17 @@ document.addEventListener('DOMContentLoaded', () => {
       tag: sourceTag,
       sku: sourceTag,
       barcode: String(item.barcode || sourceTag).trim(),
-      productName: String(item.productName || sourceTag || 'Shopee item').trim(),
+      productName: String(item.productName || item.product_name || sourceTag || 'Order item').trim(),
       scanSku: sourceTag,
       scanBarcode: String(item.barcode || sourceTag).trim(),
-      scanProductName: String(item.productName || sourceTag || 'Shopee item').trim(),
+      scanProductName: String(item.productName || item.product_name || sourceTag || 'Order item').trim(),
       scanMultiplier: 1,
       skipScan: Boolean(item.skip_scan || item.skipScan),
       quantity,
       scanQuantity: quantity,
       sourceSkus: sourceTag ? [sourceTag] : [],
       sourceBarcodes: [String(item.barcode || sourceTag).trim()].filter(Boolean),
-      sourcePlatform: item.sourcePlatform || 'Shopee',
+      sourcePlatform: item.sourcePlatform || item.platform || 'Order',
       missingSku: sourceTag === ''
     };
   };
@@ -732,7 +736,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     const payload = await response.json();
     if (!response.ok || !payload.ok) {
-      throw new Error(payload.error || 'Unable to load Shopee orders.');
+      throw new Error(payload.error || 'Unable to load orders.');
     }
 
     partnerOrderSources = (Array.isArray(payload.meta?.partner_orders?.sources) ? payload.meta.partner_orders.sources : [])
@@ -1208,7 +1212,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modalStepLabel) modalStepLabel.textContent = 'Pick List';
     if (orderSummary) {
       orderSummary.innerHTML = `
-        <span><strong>${escapeHtml(order.platform)}</strong> ${escapeHtml(order.marketplaceStatus)}</span>
+        <span><strong>${escapeHtml(sourceLabelFromOrder(order))}</strong> ${escapeHtml(order.marketplaceStatus)}</span>
         <span><strong>Status</strong> ${escapeHtml(order.status)}</span>
         <span><strong>Deadline</strong> ${escapeHtml(formatDeadline(order))}</span>
       `;
@@ -1430,7 +1434,7 @@ document.addEventListener('DOMContentLoaded', () => {
       renderSourceColorList();
     } catch (error) {
       if (!showError) return;
-      const message = error instanceof Error ? error.message : 'Unable to load Shopee orders.';
+      const message = error instanceof Error ? error.message : 'Unable to load orders.';
       if (board) board.innerHTML = `<div class="admin-board-empty">${escapeHtml(message)}</div>`;
     }
   };
