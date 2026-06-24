@@ -1373,7 +1373,7 @@ document.addEventListener('DOMContentLoaded', () => {
         >
           <div class="admin-order-card-top">
             <span class="admin-order-id">${escapeHtml(order.id)}</span>
-            ${order.instant ? '<span class="admin-instant-badge" title="Instant order">Instant</span>' : ''}
+            ${order.instant ? '<span class="admin-instant-badge" role="img" aria-label="Instant order" title="Instant order"><svg viewBox="0 0 72 22" aria-hidden="true" focusable="false"><rect x="1" y="1" width="70" height="20" rx="10"/><path d="m13 4-2 6h5l-6 8 2-6H7z"/><text x="22" y="14.8">Instant</text></svg></span>' : ''}
           </div>
           <div class="admin-order-deadline">${escapeHtml(formatDeadline(order))}</div>
           <div class="admin-order-meta">
