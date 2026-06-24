@@ -44,11 +44,8 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
         <aside class="admin-store-sidebar" data-store-sidebar id="store-navigation">
             <header class="admin-store-sidebar-head">
                 <button type="button" class="admin-store-sidebar-toggle" data-store-sidebar-toggle aria-controls="store-navigation" aria-expanded="true" title="Collapse navigation">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 4v16"/></svg>
                 </button>
-                <span class="admin-store-sidebar-brand-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5z"/><path d="M8 10.5h8M8 14h8"/></svg>
-                </span>
                 <span class="admin-store-sidebar-brand-copy">
                     <strong>Store Ops</strong>
                     <small>Processing only</small>
@@ -115,7 +112,7 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
         <div class="admin-store-workspace">
             <header class="admin-topbar admin-store-topbar">
                 <button type="button" class="admin-store-mobile-menu" data-store-sidebar-toggle aria-controls="store-navigation" aria-expanded="true" aria-label="Open navigation">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 4v16"/></svg>
                 </button>
                 <section class="admin-store-command">
                     <article class="admin-store-stat">

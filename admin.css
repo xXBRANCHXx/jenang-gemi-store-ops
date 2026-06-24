@@ -4439,7 +4439,7 @@ button, input {
 
 .admin-store-sidebar-head {
   display: grid;
-  grid-template-columns: 42px 36px minmax(0, 1fr);
+  grid-template-columns: 42px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   min-height: 44px;
@@ -4467,7 +4467,6 @@ button, input {
 
 .admin-store-sidebar-toggle svg,
 .admin-store-mobile-menu svg,
-.admin-store-sidebar-brand-icon svg,
 .admin-store-nav-item svg,
 .admin-store-settings-launch svg {
   width: 20px;
@@ -4477,18 +4476,6 @@ button, input {
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.admin-store-sidebar-brand-icon {
-  display: grid;
-  place-items: center;
-  align-self: center;
-  justify-self: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #fff;
-  color: #09090b;
 }
 
 .admin-store-sidebar-brand-copy,
@@ -4654,7 +4641,6 @@ button.admin-store-sidebar-profile:hover {
 }
 
 .admin-store-home:not(.is-sidebar-expanded) :is(
-  .admin-store-sidebar-brand-icon,
   .admin-store-sidebar-brand-copy,
   .admin-store-nav-item span,
   .admin-store-settings-launch span
@@ -4973,11 +4959,10 @@ button.admin-store-sidebar-profile:hover {
 
   .admin-store-home:not(.is-sidebar-expanded) .admin-store-sidebar-head,
   .admin-store-home.is-sidebar-expanded .admin-store-sidebar-head {
-    grid-template-columns: 42px 36px minmax(0, 1fr);
+    grid-template-columns: 42px minmax(0, 1fr);
   }
 
   .admin-store-home:not(.is-sidebar-expanded) :is(
-    .admin-store-sidebar-brand-icon,
     .admin-store-sidebar-brand-copy,
     .admin-store-nav-item span,
     .admin-store-settings-launch span
@@ -5216,11 +5201,6 @@ button.admin-store-sidebar-profile:hover {
 
 :root[data-admin-theme='light'] .admin-store-sidebar-toggle:hover {
   background: #e5e7ea;
-}
-
-:root[data-admin-theme='light'] .admin-store-sidebar-brand-icon {
-  background: #17191c;
-  color: #ffffff;
 }
 
 :root[data-admin-theme='light'] .admin-store-sidebar-brand-copy strong,
