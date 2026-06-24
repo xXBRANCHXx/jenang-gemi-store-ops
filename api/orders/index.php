@@ -852,7 +852,8 @@ if ($method === 'POST') {
         $message = $exception->getMessage();
         $status = str_contains(strtolower($message), 'claimed') || str_contains(strtolower($message), 'another employee') ? 409 : 422;
         jg_store_ops_orders_fail($message, $status);
-    } catch (Throwable) {
+    } catch (Throwable $error) {
+        error_log('Store Ops order action failed: ' . $error->getMessage());
         jg_store_ops_orders_fail('Unable to update fulfillment state.', 500);
     }
 }

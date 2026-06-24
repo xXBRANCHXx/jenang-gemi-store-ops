@@ -69,6 +69,53 @@ function jg_store_ops_fulfillment_ensure_schema(PDO $pdo): void
             KEY idx_store_ops_events_order (source_platform, source_account, order_id, created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
+
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_employees', 'pin_hash', 'VARCHAR(255) NOT NULL DEFAULT "" AFTER display_name');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_employees', 'active', 'TINYINT(1) NOT NULL DEFAULT 1 AFTER pin_hash');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_employees', 'created_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER active');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_employees', 'updated_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER created_at');
+
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment', 'source_account', 'VARCHAR(96) NOT NULL DEFAULT "" AFTER source_platform');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment', 'claimed_by', 'VARCHAR(64) NULL DEFAULT NULL AFTER status');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment', 'claimed_at', 'DATETIME NULL DEFAULT NULL AFTER claimed_by');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment', 'last_activity_at', 'DATETIME NULL DEFAULT NULL AFTER claimed_at');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment', 'scan_completed_at', 'DATETIME NULL DEFAULT NULL AFTER last_activity_at');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment', 'label_printed_at', 'DATETIME NULL DEFAULT NULL AFTER scan_completed_at');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment', 'fulfilled_at', 'DATETIME NULL DEFAULT NULL AFTER label_printed_at');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment', 'scan_required', 'INT UNSIGNED NOT NULL DEFAULT 0 AFTER fulfilled_at');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment', 'scan_completed', 'INT UNSIGNED NOT NULL DEFAULT 0 AFTER scan_required');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment', 'created_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER scan_completed');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment', 'updated_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER created_at');
+
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_events', 'source_account', 'VARCHAR(96) NOT NULL DEFAULT "" AFTER source_platform');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_events', 'employee_id', 'VARCHAR(64) NULL DEFAULT NULL AFTER event_type');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_events', 'employee_name', 'VARCHAR(120) NOT NULL DEFAULT "" AFTER employee_id');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_events', 'sku', 'VARCHAR(64) NOT NULL DEFAULT "" AFTER employee_name');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_events', 'quantity', 'DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER sku');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_events', 'progress_scanned', 'INT UNSIGNED NOT NULL DEFAULT 0 AFTER quantity');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_events', 'progress_required', 'INT UNSIGNED NOT NULL DEFAULT 0 AFTER progress_scanned');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_events', 'message', 'VARCHAR(255) NOT NULL DEFAULT "" AFTER progress_required');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_events', 'payload_json', 'LONGTEXT NULL DEFAULT NULL AFTER message');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_events', 'created_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER payload_json');
+}
+
+function jg_store_ops_fulfillment_ensure_column(PDO $pdo, string $tableName, string $columnName, string $definition): void
+{
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*)
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = :table_name
+           AND COLUMN_NAME = :column_name'
+    );
+    $stmt->execute([
+        ':table_name' => $tableName,
+        ':column_name' => $columnName,
+    ]);
+
+    if ((int) $stmt->fetchColumn() === 0) {
+        $pdo->exec(sprintf('ALTER TABLE `%s` ADD COLUMN `%s` %s', $tableName, $columnName, $definition));
+    }
 }
 
 function jg_store_ops_fulfillment_db(): PDO
@@ -264,7 +311,9 @@ function jg_store_ops_fulfillment_insert_order_if_missing(PDO $pdo, array $key):
         ) VALUES (
             :source_platform, :source_account, :order_id, "UNCLAIMED", :created_at, :updated_at
         )
-        ON DUPLICATE KEY UPDATE order_id = order_id'
+        ON DUPLICATE KEY UPDATE
+            source_account = IF(source_account = "", VALUES(source_account), source_account),
+            updated_at = updated_at'
     );
     $stmt->execute([
         ':source_platform' => $key['source_platform'],

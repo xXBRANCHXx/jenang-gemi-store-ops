@@ -6,7 +6,7 @@ require_once dirname(__DIR__, 2) . '/auth.php';
 jg_admin_require_auth_json();
 header('Content-Type: application/json; charset=utf-8');
 
-function jg_store_ops_employees_fail(string $message, int $status = 422): void
+function jg_store_ops_employees_fail(string $message, int $status = 400): void
 {
     http_response_code($status);
     echo json_encode(['error' => $message], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
@@ -70,7 +70,8 @@ if (!jg_admin_can_manage_employee_profiles()) {
 
 try {
     $pdo = jg_store_ops_fulfillment_db();
-} catch (Throwable) {
+} catch (Throwable $error) {
+    error_log('Store Ops employee profile database unavailable: ' . $error->getMessage());
     jg_store_ops_employees_fail('Unable to connect to the SKU database.', 500);
 }
 
@@ -177,6 +178,7 @@ try {
     ]);
 } catch (RuntimeException $exception) {
     jg_store_ops_employees_fail($exception->getMessage());
-} catch (Throwable) {
+} catch (Throwable $error) {
+    error_log('Store Ops employee profile save failed: ' . $error->getMessage());
     jg_store_ops_employees_fail('Unable to save employee profile.', 500);
 }
