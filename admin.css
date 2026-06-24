@@ -5021,6 +5021,121 @@ button.admin-store-sidebar-profile:hover {
   }
 }
 
+/* Minimal rounded Store Ops polish */
+.admin-store-sidebar {
+  border-color: rgba(255, 255, 255, 0.075);
+  border-radius: 20px;
+  box-shadow: none;
+}
+
+.admin-store-nav-item {
+  border-radius: 14px;
+}
+
+.admin-store-sidebar-profile {
+  border-color: rgba(255, 255, 255, 0.075);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.admin-store-lock {
+  border-radius: 999px;
+}
+
+.admin-store-home .admin-store-topbar {
+  border-color: color-mix(in srgb, var(--admin-border) 72%, transparent);
+  border-radius: 18px;
+}
+
+.admin-store-workspace .admin-store-stat,
+.admin-store-workspace .admin-store-topbar .admin-view-indicator,
+.admin-store-header-profile {
+  border-radius: 999px;
+}
+
+.admin-store-header-profile {
+  border-color: color-mix(in srgb, var(--admin-border) 72%, transparent);
+}
+
+.admin-store-home .admin-fulfillment-panel {
+  border-color: color-mix(in srgb, var(--admin-border) 60%, transparent);
+  border-radius: 18px;
+}
+
+.admin-store-home .admin-order-card {
+  border-radius: 16px;
+}
+
+.admin-store-home .admin-order-meta span {
+  padding-inline: 1px;
+  background: transparent;
+}
+
+.admin-store-home .admin-start-order-btn {
+  border-radius: 999px;
+}
+
+.admin-store-home .admin-board-empty {
+  border-radius: 20px;
+}
+
+.admin-store-settings-card {
+  border-radius: 36px;
+}
+
+.admin-store-settings-card :is(.admin-settings-tab, .admin-settings-panel) {
+  border-radius: 26px;
+}
+
+.admin-store-settings-card :is(
+  .admin-settings-scanner-summary,
+  .admin-scanner-select,
+  .admin-scanner-health-card,
+  .admin-theme-option,
+  .admin-source-color-row
+) {
+  border-radius: 22px;
+}
+
+.admin-store-settings-card :is(
+  .admin-settings-save,
+  .admin-scanner-select-action,
+  .admin-scanner-health-actions button
+) {
+  border-radius: 999px;
+}
+
+.admin-store-home .admin-modal-card:not(.admin-store-settings-card) {
+  border-radius: 28px;
+}
+
+.admin-store-home .admin-modal-card :is(.admin-primary-btn, .admin-ghost-btn) {
+  border-radius: 999px;
+}
+
+.admin-store-home :is(.admin-pick-item, .admin-employee-profile-row) {
+  border-radius: 18px;
+}
+
+.admin-store-home .admin-order-summary span,
+.admin-store-home .admin-settings-input {
+  border-radius: 999px;
+}
+
+@media (max-width: 760px) {
+  .admin-store-sidebar {
+    border-radius: 22px;
+  }
+
+  .admin-store-settings-card {
+    border-radius: 26px;
+  }
+
+  .admin-store-settings-card :is(.admin-settings-tab, .admin-settings-panel) {
+    border-radius: 20px;
+  }
+}
+
 @media print {
   body.admin-body {
     background: #fff;
