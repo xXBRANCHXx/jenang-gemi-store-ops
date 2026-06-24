@@ -4372,6 +4372,16 @@ button, input {
   }
 }
 
+.admin-store-settings-card :is(
+  .admin-settings-brand-icon,
+  .admin-settings-tab-icon,
+  .admin-settings-section-icon,
+  .admin-scanner-select-icon,
+  .admin-theme-option-icon
+) {
+  border-radius: 50%;
+}
+
 /* Compact Store Ops workspace */
 .admin-app.admin-store-home {
   --store-sidebar-width: 62px;
@@ -4425,7 +4435,7 @@ button, input {
   height: 42px;
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 7px;
+  border-radius: 50%;
   background: rgba(255, 255, 255, 0.055);
   color: #f5f5f5;
   cursor: pointer;
@@ -4455,7 +4465,7 @@ button, input {
   place-items: center;
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: 50%;
   background: #fff;
   color: #09090b;
 }
@@ -4581,7 +4591,7 @@ button.admin-store-sidebar-profile:hover {
   place-items: center;
   width: 36px;
   height: 36px;
-  border-radius: 7px;
+  border-radius: 50%;
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
   font-size: 13px;
@@ -4627,7 +4637,12 @@ button.admin-store-sidebar-profile:hover {
 
 .admin-store-home:not(.is-sidebar-expanded) :is(.admin-store-nav-item, .admin-store-sidebar-profile, .admin-store-lock) {
   grid-template-columns: 36px;
-  padding-inline: 3px;
+  justify-self: center;
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 3px;
+  border-radius: 50%;
 }
 
 .admin-store-workspace {

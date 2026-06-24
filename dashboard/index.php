@@ -44,7 +44,7 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
         <aside class="admin-store-sidebar" data-store-sidebar id="store-navigation">
             <header class="admin-store-sidebar-head">
                 <button type="button" class="admin-store-sidebar-toggle" data-store-sidebar-toggle aria-controls="store-navigation" aria-expanded="true" title="Collapse navigation">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M14 9l-3 3 3 3"/></svg>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
                 </button>
                 <span class="admin-store-sidebar-brand-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5z"/><path d="M8 10.5h8M8 14h8"/></svg>
