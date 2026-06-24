@@ -4482,6 +4482,8 @@ button, input {
 .admin-store-sidebar-brand-icon {
   display: grid;
   place-items: center;
+  align-self: center;
+  justify-self: center;
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -4553,6 +4555,8 @@ button, input {
 }
 
 .admin-store-nav-item svg {
+  display: block;
+  align-self: center;
   justify-self: center;
   width: 18px;
   height: 18px;
@@ -4608,6 +4612,8 @@ button.admin-store-sidebar-profile:hover {
 .admin-store-profile-avatar {
   display: grid;
   place-items: center;
+  align-self: center;
+  justify-self: center;
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -4618,34 +4624,29 @@ button.admin-store-sidebar-profile:hover {
 }
 
 .admin-store-settings-launch {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  padding: 3px 7px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 7px;
-  background: #050505;
-  color: #fff;
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 850;
-  text-align: left;
-  text-transform: uppercase;
-  white-space: nowrap;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 750;
+  text-transform: none;
 }
 
 .admin-store-settings-launch:hover {
-  background: #202124;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.055);
+  color: #fff;
 }
 
 .admin-store-settings-launch svg {
+  box-sizing: content-box;
+  display: block;
+  align-self: center;
   justify-self: center;
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
+  padding: 9px;
+  border-radius: 50%;
+  background: #050505;
+  color: #fff;
 }
 
 .admin-store-home:not(.is-sidebar-expanded) .admin-store-sidebar-head {
@@ -4667,6 +4668,8 @@ button.admin-store-sidebar-profile:hover {
 
 .admin-store-home:not(.is-sidebar-expanded) :is(.admin-store-nav-item, .admin-store-sidebar-profile, .admin-store-settings-launch) {
   grid-template-columns: 36px;
+  place-items: center;
+  gap: 0;
   justify-self: center;
   width: 42px;
   height: 42px;
@@ -5080,7 +5083,7 @@ button.admin-store-sidebar-profile:hover {
 }
 
 .admin-store-settings-launch {
-  border-radius: 999px;
+  border-radius: 14px;
 }
 
 .admin-store-home .admin-store-topbar {
@@ -5264,6 +5267,11 @@ button.admin-store-sidebar-profile:hover {
 }
 
 :root[data-admin-theme='light'] .admin-store-settings-launch {
+  background: transparent;
+  color: rgba(55, 62, 72, 0.72);
+}
+
+:root[data-admin-theme='light'] .admin-store-settings-launch svg {
   background: #17191c;
   color: #ffffff;
 }
