@@ -1492,7 +1492,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.querySelector('[data-open-reprint]')?.addEventListener('click', openReprintModal);
 
-  document.querySelector('[data-open-store-settings]')?.addEventListener('click', openSettingsModal);
+  document.querySelector('[data-open-store-settings]')?.addEventListener('click', () => {
+    if (compactSidebarQuery.matches) setSidebarExpanded(false, { persist: false });
+    openSettingsModal();
+  });
   document.querySelectorAll('[data-open-employee-profiles]').forEach((button) => {
     button.addEventListener('click', openEmployeeProfilesModal);
   });

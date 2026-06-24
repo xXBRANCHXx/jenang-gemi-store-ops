@@ -3902,12 +3902,14 @@ button, input {
 }
 
 .admin-settings-save svg,
+.admin-settings-lock svg,
 .admin-settings-close svg,
 .admin-scanner-health-actions svg {
   width: 17px;
   height: 17px;
 }
 
+.admin-settings-lock,
 .admin-settings-close {
   display: grid;
   width: 46px;
@@ -3919,6 +3921,23 @@ button, input {
   color: var(--admin-text);
   cursor: pointer;
   place-items: center;
+}
+
+.admin-settings-lock {
+  background: #050505;
+  color: #fff;
+}
+
+.admin-settings-lock svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.admin-settings-lock:hover {
+  background: #202124;
 }
 
 .admin-settings-panels {
@@ -4450,7 +4469,7 @@ button, input {
 .admin-store-mobile-menu svg,
 .admin-store-sidebar-brand-icon svg,
 .admin-store-nav-item svg,
-.admin-store-lock svg {
+.admin-store-settings-launch svg {
   width: 20px;
   height: 20px;
   fill: none;
@@ -4598,7 +4617,7 @@ button.admin-store-sidebar-profile:hover {
   font-weight: 850;
 }
 
-.admin-store-lock {
+.admin-store-settings-launch {
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr);
   align-items: center;
@@ -4606,16 +4625,24 @@ button.admin-store-sidebar-profile:hover {
   min-height: 42px;
   padding: 3px 7px;
   overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 7px;
-  background: #fff;
-  color: #09090b;
+  background: #050505;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
   font-size: 12px;
   font-weight: 850;
+  text-align: left;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
-.admin-store-lock svg {
+.admin-store-settings-launch:hover {
+  background: #202124;
+}
+
+.admin-store-settings-launch svg {
   justify-self: center;
   width: 17px;
   height: 17px;
@@ -4629,13 +4656,16 @@ button.admin-store-sidebar-profile:hover {
   .admin-store-sidebar-brand-icon,
   .admin-store-sidebar-brand-copy,
   .admin-store-nav-item span,
-  .admin-store-profile-copy,
-  .admin-store-lock span
+  .admin-store-settings-launch span
 ) {
   display: none;
 }
 
-.admin-store-home:not(.is-sidebar-expanded) :is(.admin-store-nav-item, .admin-store-sidebar-profile, .admin-store-lock) {
+.admin-store-home:not(.is-sidebar-expanded) .admin-store-sidebar .admin-store-profile-copy {
+  display: none;
+}
+
+.admin-store-home:not(.is-sidebar-expanded) :is(.admin-store-nav-item, .admin-store-sidebar-profile, .admin-store-settings-launch) {
   grid-template-columns: 36px;
   justify-self: center;
   width: 42px;
@@ -4947,13 +4977,16 @@ button.admin-store-sidebar-profile:hover {
     .admin-store-sidebar-brand-icon,
     .admin-store-sidebar-brand-copy,
     .admin-store-nav-item span,
-    .admin-store-profile-copy,
-    .admin-store-lock span
+    .admin-store-settings-launch span
   ) {
     display: grid;
   }
 
-  .admin-store-home:not(.is-sidebar-expanded) :is(.admin-store-nav-item, .admin-store-sidebar-profile, .admin-store-lock) {
+  .admin-store-home:not(.is-sidebar-expanded) .admin-store-sidebar .admin-store-profile-copy {
+    display: grid;
+  }
+
+  .admin-store-home:not(.is-sidebar-expanded) :is(.admin-store-nav-item, .admin-store-sidebar-profile, .admin-store-settings-launch) {
     grid-template-columns: 36px minmax(0, 1fr);
     padding-inline: 7px;
   }
@@ -4970,8 +5003,16 @@ button.admin-store-sidebar-profile:hover {
   }
 
   .admin-store-home .admin-store-topbar {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    align-items: center;
     min-height: 50px;
     gap: 5px;
+  }
+
+  .admin-store-workspace .admin-topbar-actions {
+    width: auto;
+    min-width: 0;
   }
 
   .admin-store-workspace .admin-store-command {
@@ -4990,15 +5031,15 @@ button.admin-store-sidebar-profile:hover {
     display: none;
   }
 
-  .admin-store-workspace .admin-store-topbar .admin-view-indicator,
-  .admin-store-header-profile .admin-store-profile-copy {
+  .admin-store-workspace .admin-store-topbar .admin-view-indicator {
     display: none;
   }
 
   .admin-store-header-profile {
-    grid-template-columns: 32px;
-    width: 38px;
-    padding: 2px;
+    grid-template-columns: 32px minmax(0, 1fr);
+    width: auto;
+    max-width: 140px;
+    padding: 3px 8px 3px 3px;
   }
 
   .admin-store-home .admin-order-board {
@@ -5038,7 +5079,7 @@ button.admin-store-sidebar-profile:hover {
   background: rgba(255, 255, 255, 0.035);
 }
 
-.admin-store-lock {
+.admin-store-settings-launch {
   border-radius: 999px;
 }
 
@@ -5222,7 +5263,7 @@ button.admin-store-sidebar-profile:hover {
   color: #ffffff;
 }
 
-:root[data-admin-theme='light'] .admin-store-lock {
+:root[data-admin-theme='light'] .admin-store-settings-launch {
   background: #17191c;
   color: #ffffff;
 }
