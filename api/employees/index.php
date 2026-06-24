@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require_once dirname(__DIR__, 2) . '/auth.php';
+require_once dirname(__DIR__, 2) . '/auth-runtime.php';
 
 jg_admin_require_auth_json();
 header('Content-Type: application/json; charset=utf-8');

@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
 
-require_once dirname(__DIR__, 2) . '/auth.php';
+require_once dirname(__DIR__, 2) . '/auth-runtime.php';
 require_once dirname(__DIR__, 2) . '/config.php';
 require_once dirname(__DIR__, 2) . '/sku-db-bootstrap.php';
 require_once dirname(__DIR__, 2) . '/partner-orders-bootstrap.php';
-require_once dirname(__DIR__, 2) . '/store-ops-fulfillment.php';
+require_once dirname(__DIR__, 2) . '/store-ops-fulfillment-runtime.php';
 require_once dirname(__DIR__, 2) . '/website-orders-bootstrap.php';
 
 header('Content-Type: application/json; charset=utf-8');

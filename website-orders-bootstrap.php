@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/store-ops-fulfillment.php';
+require_once __DIR__ . '/store-ops-fulfillment-runtime.php';
 
 const JG_STORE_OPS_WEBSITE_PLATFORMS = ['zero_website', 'jenang_gemi_website'];
 

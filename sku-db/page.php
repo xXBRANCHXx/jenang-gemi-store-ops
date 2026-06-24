@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require dirname(__DIR__) . '/auth.php';
+require dirname(__DIR__) . '/auth-runtime.php';
 
 if (!jg_admin_is_authenticated()) {
     header('Location: ../dashboard/');

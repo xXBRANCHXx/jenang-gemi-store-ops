@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require __DIR__ . '/auth.php';
+require __DIR__ . '/auth-runtime.php';
 
 $hasError = false;
 $employeeProfiles = jg_admin_employee_profiles_for_login();
