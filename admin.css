@@ -1,34 +1,34 @@
 :root {
-  --admin-bg: #0b0f14;
-  --admin-surface: #121821;
-  --admin-surface-strong: #171f2b;
-  --admin-surface-soft: #1a2431;
-  --admin-border: rgba(255, 255, 255, 0.08);
-  --admin-text: #eef4f7;
-  --admin-muted: rgba(219, 230, 238, 0.62);
-  --admin-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
-  --admin-accent-primary: #9dff00;
-  --admin-accent-secondary: #ffd400;
+  --admin-bg: #000000;
+  --admin-surface: #080808;
+  --admin-surface-strong: #111111;
+  --admin-surface-soft: #171717;
+  --admin-border: rgba(255, 255, 255, 0.12);
+  --admin-text: #f5f5f5;
+  --admin-muted: rgba(180, 180, 180, 0.76);
+  --admin-shadow: none;
+  --admin-accent-primary: #ffffff;
+  --admin-accent-secondary: #d9d9d9;
   --admin-accent-tertiary: #ff5252;
-  --admin-accent-quaternary: #22d3ee;
+  --admin-accent-quaternary: #ffffff;
 }
 
 :root[data-admin-theme='light'] {
-  --admin-bg: #f8faf8;
+  --admin-bg: #f3f4f6;
   --admin-surface: #ffffff;
-  --admin-surface-strong: #ffffff;
-  --admin-surface-soft: #f0f3f0;
-  --admin-border: rgba(15, 23, 42, 0.11);
-  --admin-text: #111827;
-  --admin-muted: rgba(55, 65, 81, 0.68);
-  --admin-shadow: none;
-  --admin-accent-primary: #217a3c;
-  --admin-accent-secondary: #0f766e;
+  --admin-surface-strong: #f8f9fa;
+  --admin-surface-soft: #f0f1f3;
+  --admin-border: rgba(17, 24, 39, 0.13);
+  --admin-text: #17191c;
+  --admin-muted: rgba(55, 62, 72, 0.7);
+  --admin-shadow: 0 18px 44px rgba(24, 28, 36, 0.1);
+  --admin-accent-primary: #17191c;
+  --admin-accent-secondary: #4b5563;
   --admin-accent-tertiary: #b42318;
-  --admin-accent-quaternary: #2563eb;
+  --admin-accent-quaternary: #1d4ed8;
 }
 
-:root[data-admin-theme='graphite'] {
+:root[data-admin-theme='dark'] {
   --admin-bg: #000000;
   --admin-surface: #080808;
   --admin-surface-strong: #111111;
@@ -110,10 +110,10 @@ body {
 }
 
 :root[data-admin-theme='light'] body {
-  background: #f8faf8;
+  background: #f3f4f6;
 }
 
-:root[data-admin-theme='graphite'] body {
+:root[data-admin-theme='dark'] body {
   background: #000000;
 }
 
@@ -229,12 +229,12 @@ button, input {
   box-shadow: var(--admin-shadow);
 }
 
-:root[data-admin-theme='graphite'] .admin-loader-panel,
-:root[data-admin-theme='graphite'] .admin-login-card,
-:root[data-admin-theme='graphite'] .admin-hero-panel,
-:root[data-admin-theme='graphite'] .admin-metric-card,
-:root[data-admin-theme='graphite'] .admin-panel,
-:root[data-admin-theme='graphite'] .admin-control-strip {
+:root[data-admin-theme='dark'] .admin-loader-panel,
+:root[data-admin-theme='dark'] .admin-login-card,
+:root[data-admin-theme='dark'] .admin-hero-panel,
+:root[data-admin-theme='dark'] .admin-metric-card,
+:root[data-admin-theme='dark'] .admin-panel,
+:root[data-admin-theme='dark'] .admin-control-strip {
   background: var(--admin-surface);
   box-shadow: none;
 }
@@ -346,7 +346,7 @@ button, input {
 }
 
 :root[data-admin-theme='light'] .admin-chip-accent,
-:root[data-admin-theme='graphite'] .admin-chip-accent,
+:root[data-admin-theme='dark'] .admin-chip-accent,
 :root[data-admin-theme='glass'] .admin-chip-accent,
 :root[data-admin-theme='ivory'] .admin-chip-accent,
 :root[data-admin-theme='prism'] .admin-chip-accent {
@@ -435,7 +435,7 @@ button, input {
 }
 
 :root[data-admin-theme='light'] .admin-login-form input:focus,
-:root[data-admin-theme='graphite'] .admin-login-form input:focus,
+:root[data-admin-theme='dark'] .admin-login-form input:focus,
 :root[data-admin-theme='glass'] .admin-login-form input:focus,
 :root[data-admin-theme='ivory'] .admin-login-form input:focus,
 :root[data-admin-theme='prism'] .admin-login-form input:focus {
@@ -506,12 +506,12 @@ button, input {
   background: rgba(255, 255, 255, 0.72);
 }
 
-:root[data-admin-theme='graphite'] .admin-ghost-btn,
-:root[data-admin-theme='graphite'] .admin-soft-btn,
-:root[data-admin-theme='graphite'] .admin-toggle-pill,
-:root[data-admin-theme='graphite'] .admin-select,
-:root[data-admin-theme='graphite'] .admin-login-form input,
-:root[data-admin-theme='graphite'] .admin-affiliate-form input[type='text'],
+:root[data-admin-theme='dark'] .admin-ghost-btn,
+:root[data-admin-theme='dark'] .admin-soft-btn,
+:root[data-admin-theme='dark'] .admin-toggle-pill,
+:root[data-admin-theme='dark'] .admin-select,
+:root[data-admin-theme='dark'] .admin-login-form input,
+:root[data-admin-theme='dark'] .admin-affiliate-form input[type='text'],
 :root[data-admin-theme='prism'] .admin-ghost-btn,
 :root[data-admin-theme='prism'] .admin-soft-btn,
 :root[data-admin-theme='prism'] .admin-toggle-pill,
@@ -2282,7 +2282,7 @@ button, input {
 
 
 :root[data-admin-theme='light'] .admin-primary-btn:hover,
-:root[data-admin-theme='graphite'] .admin-primary-btn:hover,
+:root[data-admin-theme='dark'] .admin-primary-btn:hover,
 :root[data-admin-theme='glass'] .admin-primary-btn:hover,
 :root[data-admin-theme='ivory'] .admin-primary-btn:hover,
 :root[data-admin-theme='prism'] .admin-primary-btn:hover {
@@ -2298,9 +2298,9 @@ button, input {
 :root[data-admin-theme='light'] .admin-ghost-btn:hover,
 :root[data-admin-theme='light'] .admin-soft-btn:hover,
 :root[data-admin-theme='light'] .admin-toggle-pill:hover,
-:root[data-admin-theme='graphite'] .admin-ghost-btn:hover,
-:root[data-admin-theme='graphite'] .admin-soft-btn:hover,
-:root[data-admin-theme='graphite'] .admin-toggle-pill:hover,
+:root[data-admin-theme='dark'] .admin-ghost-btn:hover,
+:root[data-admin-theme='dark'] .admin-soft-btn:hover,
+:root[data-admin-theme='dark'] .admin-toggle-pill:hover,
 :root[data-admin-theme='glass'] .admin-ghost-btn:hover,
 :root[data-admin-theme='glass'] .admin-soft-btn:hover,
 :root[data-admin-theme='glass'] .admin-toggle-pill:hover,
@@ -2320,8 +2320,8 @@ button, input {
 
 :root[data-admin-theme='light'] .admin-panel:hover,
 :root[data-admin-theme='light'] .admin-metric-card:hover,
-:root[data-admin-theme='graphite'] .admin-panel:hover,
-:root[data-admin-theme='graphite'] .admin-metric-card:hover,
+:root[data-admin-theme='dark'] .admin-panel:hover,
+:root[data-admin-theme='dark'] .admin-metric-card:hover,
 :root[data-admin-theme='glass'] .admin-panel:hover,
 :root[data-admin-theme='glass'] .admin-metric-card:hover,
 :root[data-admin-theme='ivory'] .admin-panel:hover,
@@ -2513,7 +2513,7 @@ button, input {
   box-shadow: var(--admin-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
-:root[data-admin-theme='graphite'] .admin-menu-panel {
+:root[data-admin-theme='dark'] .admin-menu-panel {
   border-color: var(--admin-border);
   background: rgba(20, 22, 25, 0.9);
 }
@@ -2555,7 +2555,7 @@ button, input {
   border-color: var(--admin-border);
 }
 
-:root[data-admin-theme='graphite'] .admin-menu-item,
+:root[data-admin-theme='dark'] .admin-menu-item,
 :root[data-admin-theme='glass'] .admin-menu-item,
 :root[data-admin-theme='prism'] .admin-menu-item {
   background: rgba(255, 255, 255, 0.065);
@@ -2567,7 +2567,7 @@ button, input {
 }
 
 :root[data-admin-theme='light'] .admin-menu-item:hover,
-:root[data-admin-theme='graphite'] .admin-menu-item:hover,
+:root[data-admin-theme='dark'] .admin-menu-item:hover,
 :root[data-admin-theme='glass'] .admin-menu-item:hover,
 :root[data-admin-theme='ivory'] .admin-menu-item:hover,
 :root[data-admin-theme='prism'] .admin-menu-item:hover {
@@ -2661,7 +2661,7 @@ button, input {
 }
 
 :root[data-admin-theme='light'] .admin-launchpad-link,
-:root[data-admin-theme='graphite'] .admin-launchpad-link,
+:root[data-admin-theme='dark'] .admin-launchpad-link,
 :root[data-admin-theme='glass'] .admin-launchpad-link,
 :root[data-admin-theme='ivory'] .admin-launchpad-link,
 :root[data-admin-theme='prism'] .admin-launchpad-link {
@@ -2688,7 +2688,7 @@ button, input {
 }
 
 :root[data-admin-theme='light'] .admin-launchpad-link:hover,
-:root[data-admin-theme='graphite'] .admin-launchpad-link:hover,
+:root[data-admin-theme='dark'] .admin-launchpad-link:hover,
 :root[data-admin-theme='glass'] .admin-launchpad-link:hover,
 :root[data-admin-theme='ivory'] .admin-launchpad-link:hover,
 :root[data-admin-theme='prism'] .admin-launchpad-link:hover {
@@ -2869,14 +2869,14 @@ button, input {
   background: rgba(255, 255, 255, 0.64);
 }
 
-:root[data-admin-theme='graphite'] .admin-chart-surface,
-:root[data-admin-theme='graphite'] .admin-legend-item,
-:root[data-admin-theme='graphite'] .admin-note-card,
-:root[data-admin-theme='graphite'] .admin-event-item,
-:root[data-admin-theme='graphite'] .admin-sku-preview,
-:root[data-admin-theme='graphite'] .admin-sku-master-card,
-:root[data-admin-theme='graphite'] .admin-sheet-wrap,
-:root[data-admin-theme='graphite'] .admin-settings-input,
+:root[data-admin-theme='dark'] .admin-chart-surface,
+:root[data-admin-theme='dark'] .admin-legend-item,
+:root[data-admin-theme='dark'] .admin-note-card,
+:root[data-admin-theme='dark'] .admin-event-item,
+:root[data-admin-theme='dark'] .admin-sku-preview,
+:root[data-admin-theme='dark'] .admin-sku-master-card,
+:root[data-admin-theme='dark'] .admin-sheet-wrap,
+:root[data-admin-theme='dark'] .admin-settings-input,
 :root[data-admin-theme='glass'] .admin-chart-surface,
 :root[data-admin-theme='glass'] .admin-legend-item,
 :root[data-admin-theme='glass'] .admin-note-card,
@@ -2896,13 +2896,13 @@ button, input {
   background: rgba(255, 255, 255, 0.065);
 }
 
-:root[data-admin-theme='graphite'] .admin-order-card,
+:root[data-admin-theme='dark'] .admin-order-card,
 :root[data-admin-theme='prism'] .admin-order-card {
   background: var(--admin-surface-soft);
   box-shadow: none;
 }
 
-:root[data-admin-theme='graphite'] .admin-order-card.is-critical,
+:root[data-admin-theme='dark'] .admin-order-card.is-critical,
 :root[data-admin-theme='prism'] .admin-order-card.is-critical {
   animation: admin-critical-flat-pulse 0.86s ease-in-out infinite;
 }
@@ -2930,7 +2930,7 @@ button, input {
   .admin-invoice-dropzone.is-dragging,
   .admin-launchpad-link:hover
 ),
-:root[data-admin-theme='graphite'] :is(
+:root[data-admin-theme='dark'] :is(
   .admin-primary-btn:hover,
   .admin-ghost-btn:hover,
   .admin-soft-btn:hover,
@@ -2983,7 +2983,7 @@ button, input {
 }
 
 :root[data-admin-theme='light'] :is(.admin-invoice-dropzone, .admin-invoice-dropzone:hover, .admin-invoice-dropzone.is-dragging, .admin-scanner-capture),
-:root[data-admin-theme='graphite'] :is(.admin-invoice-dropzone, .admin-invoice-dropzone:hover, .admin-invoice-dropzone.is-dragging, .admin-scanner-capture),
+:root[data-admin-theme='dark'] :is(.admin-invoice-dropzone, .admin-invoice-dropzone:hover, .admin-invoice-dropzone.is-dragging, .admin-scanner-capture),
 :root[data-admin-theme='glass'] :is(.admin-invoice-dropzone, .admin-invoice-dropzone:hover, .admin-invoice-dropzone.is-dragging, .admin-scanner-capture),
 :root[data-admin-theme='ivory'] :is(.admin-invoice-dropzone, .admin-invoice-dropzone:hover, .admin-invoice-dropzone.is-dragging, .admin-scanner-capture),
 :root[data-admin-theme='prism'] :is(.admin-invoice-dropzone, .admin-invoice-dropzone:hover, .admin-invoice-dropzone.is-dragging, .admin-scanner-capture) {
@@ -2991,7 +2991,7 @@ button, input {
 }
 
 :root[data-admin-theme='light'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell),
-:root[data-admin-theme='graphite'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell),
+:root[data-admin-theme='dark'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell),
 :root[data-admin-theme='glass'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell),
 :root[data-admin-theme='ivory'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell),
 :root[data-admin-theme='prism'] :is(.admin-build-badge, .admin-login-error, .admin-menu-item, .admin-store-login-shell) {
@@ -3616,6 +3616,754 @@ button, input {
   }
 
   .admin-source-color-swatches {
+    justify-content: flex-start;
+  }
+}
+
+/* Store settings panel */
+.admin-store-settings-modal {
+  padding: 24px;
+}
+
+.admin-store-settings-modal .admin-modal-backdrop {
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(10px);
+}
+
+.admin-store-settings-card {
+  display: grid;
+  grid-template-columns: 246px minmax(0, 1fr);
+  width: min(940px, 100%);
+  height: min(720px, calc(100svh - 48px));
+  max-height: 720px;
+  padding: 0;
+  overflow: hidden;
+  border-color: rgba(255, 255, 255, 0.13);
+  border-radius: 28px;
+  background: #101012;
+  box-shadow: 0 38px 130px rgba(0, 0, 0, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.admin-settings-sidebar {
+  display: flex;
+  min-width: 0;
+  padding: 18px 14px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.015);
+  flex-direction: column;
+}
+
+.admin-settings-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 2px 6px 22px;
+}
+
+.admin-settings-brand > span:last-child,
+.admin-settings-tab > span:nth-child(2),
+.admin-settings-scanner-summary > span,
+.admin-scanner-select > span:nth-child(2) {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.admin-settings-brand strong {
+  color: var(--admin-text);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 19px;
+  letter-spacing: 0;
+}
+
+.admin-settings-brand small,
+.admin-settings-tab small,
+.admin-settings-scanner-summary small,
+.admin-scanner-select small {
+  color: var(--admin-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.admin-settings-brand-icon,
+.admin-settings-tab-icon,
+.admin-settings-section-icon,
+.admin-scanner-select-icon,
+.admin-theme-option-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+}
+
+.admin-settings-brand-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  background: #fff;
+  color: #050505;
+}
+
+.admin-settings-brand-icon svg {
+  width: 23px;
+  height: 23px;
+}
+
+.admin-settings-nav {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-settings-tab {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 10px;
+  min-height: 66px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 20px;
+  background: transparent;
+  color: var(--admin-muted);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.admin-settings-tab:hover {
+  color: var(--admin-text);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.admin-settings-tab:active {
+  transform: scale(0.98);
+}
+
+.admin-settings-tab.is-active {
+  background: #fff;
+  color: #050505;
+}
+
+.admin-settings-tab.is-active small {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.admin-settings-tab-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.admin-settings-tab.is-active .admin-settings-tab-icon {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.admin-settings-tab strong {
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.admin-settings-tab svg,
+.admin-settings-kicker svg,
+.admin-settings-close svg,
+.admin-settings-save svg,
+.admin-settings-section-icon svg,
+.admin-scanner-select-icon svg,
+.admin-scanner-health-actions svg,
+.admin-theme-option svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.admin-settings-tab-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.admin-settings-chevron {
+  width: 17px;
+  height: 17px;
+  opacity: 0.45;
+}
+
+.admin-settings-scanner-summary {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  margin-top: auto;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.admin-settings-scanner-summary i {
+  width: 9px;
+  height: 9px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: #555;
+}
+
+.admin-settings-scanner-summary i.is-ready,
+.admin-settings-scanner-summary i.is-checking {
+  background: #f59e0b;
+}
+
+.admin-settings-scanner-summary i.is-ok {
+  background: #22c55e;
+}
+
+.admin-settings-scanner-summary i.is-error {
+  background: #ef4444;
+}
+
+.admin-settings-scanner-summary strong {
+  color: var(--admin-text);
+  font-size: 13px;
+}
+
+.admin-settings-main {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  padding: 24px;
+}
+
+.admin-settings-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 22px;
+}
+
+.admin-settings-header > div:first-child {
+  min-width: 0;
+}
+
+.admin-settings-kicker {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--admin-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-settings-kicker svg {
+  width: 15px;
+  height: 15px;
+}
+
+.admin-settings-header h3 {
+  margin: 7px 0 6px;
+  color: var(--admin-text);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 32px;
+  letter-spacing: 0;
+  line-height: 1.1;
+}
+
+.admin-settings-header p,
+.admin-settings-section-head p {
+  margin: 0;
+  color: var(--admin-muted);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.admin-settings-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-settings-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 112px;
+  min-height: 46px;
+  border-radius: 23px;
+}
+
+.admin-settings-save svg,
+.admin-settings-close svg,
+.admin-scanner-health-actions svg {
+  width: 17px;
+  height: 17px;
+}
+
+.admin-settings-close {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid var(--admin-border);
+  border-radius: 50%;
+  background: var(--admin-surface-soft);
+  color: var(--admin-text);
+  cursor: pointer;
+  place-items: center;
+}
+
+.admin-settings-panels {
+  min-height: 0;
+}
+
+.admin-settings-panel {
+  height: 100%;
+  min-height: 0;
+  padding: 19px;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.035);
+  animation: admin-settings-panel-in 0.24s ease both;
+}
+
+.admin-settings-panel[hidden] {
+  display: none;
+}
+
+@keyframes admin-settings-panel-in {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.admin-settings-section-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.admin-settings-section-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.075);
+  color: var(--admin-text);
+}
+
+.admin-settings-section-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.admin-settings-section-head h4 {
+  margin: 1px 0 4px;
+  color: var(--admin-text);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
+.admin-scanner-select {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 76px;
+  padding: 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--admin-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.admin-scanner-select:hover {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.admin-scanner-select-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.admin-scanner-select-icon svg {
+  width: 21px;
+  height: 21px;
+}
+
+.admin-scanner-select strong {
+  overflow: hidden;
+  color: var(--admin-text);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-scanner-select-action {
+  padding: 9px 12px;
+  border-radius: 17px;
+  background: #fff;
+  color: #050505;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.admin-store-settings-card .admin-scanner-health-card {
+  grid-template-columns: auto minmax(0, 1fr);
+  margin-top: 14px;
+  padding: 15px;
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.admin-store-settings-card .admin-scanner-health-actions {
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.admin-store-settings-card .admin-scanner-health-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 118px;
+  min-height: 44px;
+  border-radius: 22px;
+}
+
+.admin-store-settings-card .admin-scanner-health-actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.admin-store-settings-card .admin-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  height: 100%;
+}
+
+.admin-store-settings-card .admin-theme-option {
+  position: relative;
+  display: flex;
+  min-height: 228px;
+  padding: 16px;
+  overflow: hidden;
+  border: 1px solid var(--admin-border);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--admin-text);
+  flex-direction: column;
+  text-align: left;
+}
+
+.admin-store-settings-card .admin-theme-option:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: none;
+}
+
+.admin-store-settings-card .admin-theme-option.is-active {
+  transform: none;
+  border-color: #fff;
+  background: #fff;
+  color: #050505;
+  box-shadow: none;
+}
+
+.admin-theme-option-icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: auto;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.075);
+}
+
+.admin-theme-option-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.admin-theme-option.is-active .admin-theme-option-icon {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.admin-store-settings-card .admin-theme-option strong {
+  margin-top: 30px;
+  font-size: 16px;
+}
+
+.admin-store-settings-card .admin-theme-option small {
+  min-height: 44px;
+  margin-top: 7px;
+  color: var(--admin-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.admin-store-settings-card .admin-theme-option.is-active small {
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.admin-theme-check {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #050505;
+  color: #fff;
+  place-items: center;
+}
+
+.admin-theme-check svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.5;
+}
+
+.admin-theme-option.is-active .admin-theme-check {
+  display: grid;
+}
+
+.admin-store-settings-card .admin-source-color-list {
+  gap: 8px;
+}
+
+.admin-store-settings-card .admin-source-color-row {
+  min-height: 58px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+:root[data-admin-theme='light'] .admin-store-settings-card {
+  border-color: rgba(17, 24, 39, 0.14);
+  background: #fff;
+  box-shadow: 0 38px 100px rgba(30, 35, 44, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+:root[data-admin-theme='light'] .admin-settings-sidebar {
+  border-color: rgba(17, 24, 39, 0.1);
+  background: #f3f4f6;
+}
+
+:root[data-admin-theme='light'] .admin-settings-tab:hover,
+:root[data-admin-theme='light'] .admin-settings-panel,
+:root[data-admin-theme='light'] .admin-settings-scanner-summary,
+:root[data-admin-theme='light'] .admin-settings-section-icon,
+:root[data-admin-theme='light'] .admin-theme-option-icon {
+  background: rgba(17, 24, 39, 0.045);
+}
+
+:root[data-admin-theme='light'] .admin-settings-tab.is-active {
+  background: #17191c;
+  color: #fff;
+}
+
+:root[data-admin-theme='light'] .admin-settings-tab.is-active small {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+:root[data-admin-theme='light'] .admin-settings-tab.is-active .admin-settings-tab-icon {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+:root[data-admin-theme='light'] .admin-scanner-select,
+:root[data-admin-theme='light'] .admin-store-settings-card .admin-scanner-health-card,
+:root[data-admin-theme='light'] .admin-store-settings-card .admin-source-color-row {
+  background: #f6f7f8;
+}
+
+:root[data-admin-theme='light'] .admin-scanner-select:hover {
+  border-color: rgba(17, 24, 39, 0.25);
+  background: #f0f1f3;
+}
+
+:root[data-admin-theme='light'] .admin-scanner-select-action {
+  background: #17191c;
+  color: #fff;
+}
+
+:root[data-admin-theme='light'] .admin-store-settings-card .admin-theme-option.is-active {
+  border-color: #17191c;
+  background: #17191c;
+  color: #fff;
+}
+
+:root[data-admin-theme='light'] .admin-store-settings-card .admin-theme-option.is-active small {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+:root[data-admin-theme='light'] .admin-theme-option.is-active .admin-theme-option-icon {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+:root[data-admin-theme='light'] .admin-theme-check {
+  background: #fff;
+  color: #17191c;
+}
+
+@media (max-width: 760px) {
+  .admin-store-settings-modal {
+    align-items: end;
+    padding: 8px;
+  }
+
+  .admin-store-settings-card {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: calc(100svh - 16px);
+    max-height: none;
+    border-radius: 22px;
+  }
+
+  .admin-settings-sidebar {
+    padding: 12px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .admin-settings-brand,
+  .admin-settings-scanner-summary {
+    display: none;
+  }
+
+  .admin-settings-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .admin-settings-tab {
+    grid-template-columns: 34px minmax(0, 1fr);
+    min-height: 52px;
+    padding: 7px;
+    border-radius: 15px;
+  }
+
+  .admin-settings-tab-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+  }
+
+  .admin-settings-tab-icon svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .admin-settings-tab small,
+  .admin-settings-chevron {
+    display: none;
+  }
+
+  .admin-settings-tab strong {
+    font-size: 12px;
+  }
+
+  .admin-settings-main {
+    padding: 16px;
+  }
+
+  .admin-settings-header {
+    gap: 12px;
+    padding-bottom: 14px;
+  }
+
+  .admin-settings-header h3 {
+    font-size: 25px;
+  }
+
+  .admin-settings-header p {
+    display: none;
+  }
+
+  .admin-settings-save {
+    min-width: 46px;
+    width: 46px;
+    padding: 0;
+  }
+
+  .admin-settings-save span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .admin-settings-panel {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .admin-settings-section-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+  }
+
+  .admin-settings-section-head h4 {
+    font-size: 16px;
+  }
+
+  .admin-scanner-select {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .admin-scanner-select-action {
+    grid-column: 1 / -1;
+    text-align: center;
+  }
+
+  .admin-store-settings-card .admin-theme-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .admin-store-settings-card .admin-theme-option {
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr);
+    min-height: 96px;
+    gap: 3px 12px;
+  }
+
+  .admin-theme-option-icon {
+    grid-row: 1 / 3;
+    width: 46px;
+    height: 46px;
+    margin: 0;
+  }
+
+  .admin-store-settings-card .admin-theme-option strong {
+    align-self: end;
+    margin: 0;
+  }
+
+  .admin-store-settings-card .admin-theme-option small {
+    min-height: 0;
+    margin: 0;
+  }
+
+  .admin-store-settings-card .admin-source-color-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-store-settings-card .admin-source-color-swatches {
     justify-content: flex-start;
   }
 }

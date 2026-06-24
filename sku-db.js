@@ -4,7 +4,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const endpoint = root.dataset.skuDbEndpoint || '../api/sku-db/';
   const themeStorageKey = 'jg-admin-theme';
-  const adminThemes = ['dark', 'light', 'graphite', 'glass', 'ivory', 'prism'];
+  const adminThemes = ['dark', 'light', 'system'];
+  const legacyThemeMap = {
+    graphite: 'dark',
+    glass: 'light',
+    ivory: 'light',
+    prism: 'dark'
+  };
 
   const menuShell = document.querySelector('[data-menu-shell]');
   const menuTrigger = document.querySelector('[data-menu-trigger]');
@@ -49,8 +55,12 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const applyTheme = (theme) => {
-    const nextTheme = adminThemes.includes(theme) ? theme : 'dark';
-    document.documentElement.dataset.adminTheme = nextTheme;
+    const nextTheme = adminThemes.includes(theme) ? theme : (legacyThemeMap[theme] || 'dark');
+    const resolvedTheme = nextTheme === 'system'
+      ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+      : nextTheme;
+    document.documentElement.dataset.adminThemePreference = nextTheme;
+    document.documentElement.dataset.adminTheme = resolvedTheme;
     window.localStorage.setItem(themeStorageKey, nextTheme);
   };
 
@@ -181,10 +191,16 @@ document.addEventListener('DOMContentLoaded', () => {
   applyTheme(window.localStorage.getItem(themeStorageKey) || 'dark');
   setupTopbarMenu();
   document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
-    const currentTheme = document.documentElement.dataset.adminTheme || 'dark';
+    const currentTheme = document.documentElement.dataset.adminThemePreference || 'dark';
     const currentIndex = adminThemes.indexOf(currentTheme);
     applyTheme(adminThemes[(Math.max(currentIndex, 0) + 1) % adminThemes.length]);
   });
+  const systemThemeQuery = window.matchMedia('(prefers-color-scheme: light)');
+  const syncSystemTheme = () => {
+    if (document.documentElement.dataset.adminThemePreference === 'system') applyTheme('system');
+  };
+  if (typeof systemThemeQuery.addEventListener === 'function') systemThemeQuery.addEventListener('change', syncSystemTheme);
+  else if (typeof systemThemeQuery.addListener === 'function') systemThemeQuery.addListener(syncSystemTheme);
 
   loadDatabase().catch((error) => {
     const message = error instanceof Error ? error.message : 'Unable to load the live SKU database.';

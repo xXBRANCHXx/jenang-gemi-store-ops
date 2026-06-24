@@ -106,93 +106,142 @@ $currentEmployeeCanManageProfiles = jg_admin_can_manage_employee_profiles();
 
         <div class="admin-modal-shell admin-store-settings-modal" data-store-settings-modal hidden>
             <div class="admin-modal-backdrop" data-close-store-settings></div>
-            <form class="admin-modal-card admin-store-settings-card" data-store-settings-form>
-                <div class="admin-modal-head">
-                    <div>
-                        <span class="admin-panel-kicker">Store Settings</span>
-                        <h3>Scanner</h3>
+            <form class="admin-modal-card admin-store-settings-card" data-store-settings-form role="dialog" aria-modal="true" aria-labelledby="store-settings-title">
+                <aside class="admin-settings-sidebar">
+                    <div class="admin-settings-brand">
+                        <span class="admin-settings-brand-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5z"/><path d="M8 10.5h8M8 14h8"/></svg>
+                        </span>
+                        <span>
+                            <strong>Store Ops</strong>
+                            <small>Shipping settings</small>
+                        </span>
                     </div>
-                    <button type="button" class="admin-ghost-btn" data-close-store-settings>Close</button>
-                </div>
-                <div class="admin-scanner-settings-grid">
-                    <label class="admin-reprint-field">
-                        <span>Interface</span>
-                        <input class="admin-settings-input" value="USB-COM" readonly>
-                    </label>
-                    <label class="admin-reprint-field">
-                        <span>Volume</span>
-                        <select class="admin-settings-input" name="volume" data-scanner-setting="volume">
-                            <option value="LOW">LOW</option>
-                            <option value="MEDIUM">MEDIUM</option>
-                            <option value="HIGH">HIGH</option>
-                        </select>
-                    </label>
-                    <label class="admin-reprint-field">
-                        <span>Scan mode</span>
-                        <select class="admin-settings-input" name="scan_mode" data-scanner-setting="scan_mode">
-                            <option value="BUTTON_TRIGGER">BUTTON TRIGGER</option>
-                            <option value="CONTINUOUS">CONTINUOUS</option>
-                        </select>
-                    </label>
-                    <label class="admin-checkbox-line admin-scanner-toggle">
-                        <input type="checkbox" name="auto_induction" data-scanner-setting="auto_induction">
-                        <span>AUTO-INDUCTION</span>
-                    </label>
-                </div>
-                <div class="admin-scanner-health-card" data-scanner-health>
-                    <i aria-hidden="true"></i>
-                    <div>
-                        <strong data-scanner-health-title>Scanner not checked</strong>
-                        <span data-scanner-health-detail>Open Settings or save scanner settings to run a USB-COM health check.</span>
+
+                    <nav class="admin-settings-nav" aria-label="Settings sections">
+                        <button type="button" class="admin-settings-tab is-active" data-settings-tab="scanner" aria-selected="true">
+                            <span class="admin-settings-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3M7 12h10M8 9h1M11 9h2M15 9h1M8 15h2M12 15h1M15 15h1"/></svg></span>
+                            <span><strong>Scanner</strong><small>USB-COM setup</small></span>
+                            <svg class="admin-settings-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                        </button>
+                        <button type="button" class="admin-settings-tab" data-settings-tab="theme" aria-selected="false">
+                            <span class="admin-settings-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
+                            <span><strong>Theme</strong><small>Ops interface</small></span>
+                            <svg class="admin-settings-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                        </button>
+                        <button type="button" class="admin-settings-tab" data-settings-tab="platforms" aria-selected="false">
+                            <span class="admin-settings-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18h1.4a1.7 1.7 0 0 0 0-3.4h-.7a1.6 1.6 0 0 1-1.6-1.6c0-.9.7-1.6 1.6-1.6H15a6 6 0 0 0 0-12z"/><circle cx="7.5" cy="10.5" r=".8"/><circle cx="9.5" cy="6.8" r=".8"/><circle cx="14" cy="6.7" r=".8"/><circle cx="17.2" cy="9.8" r=".8"/></svg></span>
+                            <span><strong>Platforms</strong><small>Order color codes</small></span>
+                            <svg class="admin-settings-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                        </button>
+                    </nav>
+
+                    <div class="admin-settings-scanner-summary">
+                        <i data-scanner-summary-dot aria-hidden="true"></i>
+                        <span>
+                            <strong>Scanner status</strong>
+                            <small data-scanner-summary>No scanner selected</small>
+                        </span>
                     </div>
-                    <div class="admin-scanner-health-actions">
-                        <button type="button" class="admin-ghost-btn" data-scanner-health-check>Recheck</button>
-                        <button type="button" class="admin-primary-btn" data-scanner-test-scan>Test Scan</button>
+                </aside>
+
+                <main class="admin-settings-main">
+                    <header class="admin-settings-header">
+                        <div>
+                            <span class="admin-settings-kicker">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1z"/></svg>
+                                Order Ops Settings
+                            </span>
+                            <h3 id="store-settings-title" data-settings-title>Scanner setup</h3>
+                            <p>Configure how shipping staff process orders in the operational queue.</p>
+                        </div>
+                        <div class="admin-settings-header-actions">
+                            <button type="submit" class="admin-primary-btn admin-settings-save" data-settings-save>
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+                                <span data-settings-save-label>Save</span>
+                            </button>
+                            <button type="button" class="admin-settings-close" data-close-store-settings aria-label="Close settings" title="Close settings">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+                            </button>
+                        </div>
+                    </header>
+
+                    <p class="admin-form-error" data-store-settings-error hidden></p>
+
+                    <div class="admin-settings-panels">
+                        <section class="admin-settings-panel is-active" data-settings-panel="scanner">
+                            <div class="admin-settings-section-head">
+                                <span class="admin-settings-section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3v5M17 3v5M5 8h14v4a7 7 0 0 1-14 0zM12 19v2"/><path d="M9 5h6"/></svg></span>
+                                <div>
+                                    <h4>USB-COM scanner connection</h4>
+                                    <p>Select the barcode scanner connected to this Store Ops station.</p>
+                                </div>
+                            </div>
+
+                            <button type="button" class="admin-scanner-select" data-scanner-select>
+                                <span class="admin-scanner-select-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m13 2-2 8h7l-7 12 2-8H6z"/></svg></span>
+                                <span>
+                                    <small>Selected scanner</small>
+                                    <strong data-selected-scanner>No scanner selected</strong>
+                                </span>
+                                <span class="admin-scanner-select-action">Select scanner</span>
+                            </button>
+
+                            <div class="admin-scanner-health-card" data-scanner-health>
+                                <i aria-hidden="true"></i>
+                                <div>
+                                    <strong data-scanner-health-title>Scanner not checked</strong>
+                                    <span data-scanner-health-detail>Select a scanner, then use Test to confirm barcode data is arriving.</span>
+                                </div>
+                            </div>
+
+                            <div class="admin-scanner-health-actions">
+                                <button type="button" class="admin-ghost-btn" data-scanner-health-check>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>
+                                    Recheck
+                                </button>
+                                <button type="button" class="admin-primary-btn" data-scanner-test-scan>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3M7 12h10"/></svg>
+                                    Test
+                                </button>
+                            </div>
+                        </section>
+
+                        <section class="admin-settings-panel" data-settings-panel="theme" hidden>
+                            <div class="admin-theme-grid" aria-label="Dashboard theme">
+                                <button type="button" class="admin-theme-option" data-theme-option="dark" aria-pressed="false">
+                                    <span class="admin-theme-option-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20.7 15.1A9 9 0 0 1 8.9 3.3 9 9 0 1 0 20.7 15z"/></svg></span>
+                                    <strong>Dark</strong>
+                                    <small>Flat black for daily warehouse operations.</small>
+                                    <span class="admin-theme-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg></span>
+                                </button>
+                                <button type="button" class="admin-theme-option" data-theme-option="light" aria-pressed="false">
+                                    <span class="admin-theme-option-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span>
+                                    <strong>Light</strong>
+                                    <small>Clean contrast for bright workspaces.</small>
+                                    <span class="admin-theme-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg></span>
+                                </button>
+                                <button type="button" class="admin-theme-option" data-theme-option="system" aria-pressed="false">
+                                    <span class="admin-theme-option-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
+                                    <strong>System</strong>
+                                    <small>Follow this device automatically.</small>
+                                    <span class="admin-theme-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg></span>
+                                </button>
+                            </div>
+                        </section>
+
+                        <section class="admin-settings-panel" data-settings-panel="platforms" hidden>
+                            <div class="admin-settings-section-head">
+                                <span class="admin-settings-section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10h16M5 10v10h14V10M3 6l2-3h14l2 3v2a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0z"/></svg></span>
+                                <div>
+                                    <h4>Color-code order platforms</h4>
+                                    <p>Choose the colors used to identify each order source in the queue.</p>
+                                </div>
+                            </div>
+                            <div class="admin-source-color-list" data-source-color-list></div>
+                        </section>
                     </div>
-                </div>
-                <div class="admin-reprint-field">
-                    <span>Theme <small data-theme-label>Default</small></span>
-                    <div class="admin-theme-grid" aria-label="Dashboard themes">
-                        <button type="button" class="admin-theme-option" data-theme-option="dark" aria-pressed="false">
-                            <span class="admin-theme-swatch admin-theme-swatch-default"></span>
-                            <strong>Default</strong>
-                            <small>Original</small>
-                        </button>
-                        <button type="button" class="admin-theme-option" data-theme-option="light" aria-pressed="false">
-                            <span class="admin-theme-swatch admin-theme-swatch-studio"></span>
-                            <strong>Minimal White</strong>
-                            <small>Flat</small>
-                        </button>
-                        <button type="button" class="admin-theme-option" data-theme-option="graphite" aria-pressed="false">
-                            <span class="admin-theme-swatch admin-theme-swatch-graphite"></span>
-                            <strong>Flat Black</strong>
-                            <small>Mono</small>
-                        </button>
-                        <button type="button" class="admin-theme-option" data-theme-option="glass" aria-pressed="false">
-                            <span class="admin-theme-swatch admin-theme-swatch-glass"></span>
-                            <strong>Glass Lite</strong>
-                            <small>Frost</small>
-                        </button>
-                        <button type="button" class="admin-theme-option" data-theme-option="ivory" aria-pressed="false">
-                            <span class="admin-theme-swatch admin-theme-swatch-ivory"></span>
-                            <strong>Classic White</strong>
-                            <small>Soft</small>
-                        </button>
-                        <button type="button" class="admin-theme-option" data-theme-option="prism" aria-pressed="false">
-                            <span class="admin-theme-swatch admin-theme-swatch-prism"></span>
-                            <strong>Prism</strong>
-                            <small>Signal</small>
-                        </button>
-                    </div>
-                </div>
-                <div class="admin-reprint-field">
-                    <span>Order colors</span>
-                    <div class="admin-source-color-list" data-source-color-list></div>
-                </div>
-                <p class="admin-form-error" data-store-settings-error hidden></p>
-                <div class="admin-modal-actions">
-                    <button type="submit" class="admin-primary-btn">Save Scanner Settings</button>
-                </div>
+                </main>
             </form>
         </div>
 

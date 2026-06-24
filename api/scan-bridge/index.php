@@ -15,10 +15,6 @@ function jg_scan_bridge_fail(string $message, int $status = 422): void
 function jg_scan_bridge_default_settings(): array
 {
     return [
-        'interface' => 'USB-COM',
-        'volume' => 'MEDIUM',
-        'scan_mode' => 'BUTTON_TRIGGER',
-        'auto_induction' => false,
         'baud_rate' => 9600,
         'updated_at' => null,
     ];
@@ -48,40 +44,38 @@ function jg_scan_bridge_read_store(): array
     }
 
     $settings = is_array($decoded['settings'] ?? null) ? $decoded['settings'] : [];
-    return ['settings' => array_replace(jg_scan_bridge_default_settings(), $settings)];
+    $baudRate = (int) ($settings['baud_rate'] ?? 9600);
+    if (!in_array($baudRate, [9600, 19200, 38400, 57600, 115200], true)) {
+        $baudRate = 9600;
+    }
+
+    return ['settings' => [
+        'baud_rate' => $baudRate,
+        'updated_at' => is_string($settings['updated_at'] ?? null) ? $settings['updated_at'] : null,
+    ]];
 }
 
 function jg_scan_bridge_write_store(array $store): void
 {
     $path = jg_scan_bridge_store_path();
-    $encoded = json_encode([
-        'settings' => array_replace(jg_scan_bridge_default_settings(), is_array($store['settings'] ?? null) ? $store['settings'] : []),
-    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    $settings = is_array($store['settings'] ?? null) ? $store['settings'] : [];
+    $encoded = json_encode(['settings' => [
+        'baud_rate' => (int) ($settings['baud_rate'] ?? 9600),
+        'updated_at' => is_string($settings['updated_at'] ?? null) ? $settings['updated_at'] : null,
+    ]], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if (!is_string($encoded) || @file_put_contents($path, $encoded . PHP_EOL, LOCK_EX) === false) {
         jg_scan_bridge_fail('Unable to save scanner settings.', 500);
     }
 }
 
-function jg_scan_bridge_setting_choice(string $value, array $allowed, string $fallback): string
-{
-    $normalized = strtoupper(trim($value));
-    return in_array($normalized, $allowed, true) ? $normalized : $fallback;
-}
-
 function jg_scan_bridge_normalize_settings(array $payload, array $current): array
 {
-    $volume = jg_scan_bridge_setting_choice((string) ($payload['volume'] ?? $current['volume'] ?? ''), ['LOW', 'MEDIUM', 'HIGH'], 'MEDIUM');
-    $scanMode = jg_scan_bridge_setting_choice((string) ($payload['scan_mode'] ?? $current['scan_mode'] ?? ''), ['BUTTON_TRIGGER', 'CONTINUOUS'], 'BUTTON_TRIGGER');
     $baudRate = (int) ($payload['baud_rate'] ?? $current['baud_rate'] ?? 9600);
     if (!in_array($baudRate, [9600, 19200, 38400, 57600, 115200], true)) {
         $baudRate = 9600;
     }
 
     return [
-        'interface' => 'USB-COM',
-        'volume' => $volume,
-        'scan_mode' => $scanMode,
-        'auto_induction' => filter_var($payload['auto_induction'] ?? $current['auto_induction'] ?? false, FILTER_VALIDATE_BOOLEAN),
         'baud_rate' => $baudRate,
         'updated_at' => gmdate(DATE_ATOM),
     ];
