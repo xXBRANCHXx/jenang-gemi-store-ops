@@ -854,6 +854,19 @@ if ($method === 'POST') {
         jg_store_ops_orders_fail($message, $status);
     } catch (Throwable $error) {
         error_log('Store Ops order action failed: ' . $error->getMessage());
+        if (
+            isset($_GET['debug_action'])
+            && function_exists('jg_admin_current_employee_is_admin')
+            && jg_admin_current_employee_is_admin()
+        ) {
+            http_response_code(500);
+            echo json_encode([
+                'error' => 'Unable to update fulfillment state.',
+                'error_class' => get_class($error),
+                'error_detail' => $error->getMessage(),
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
         jg_store_ops_orders_fail('Unable to update fulfillment state.', 500);
     }
 }
