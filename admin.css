@@ -1253,12 +1253,14 @@ button, input {
 }
 
 .admin-instant-badge {
+  --instant-icon-ink: var(--admin-accent-secondary);
+  --instant-icon-fill: color-mix(in srgb, var(--admin-accent-secondary) 14%, transparent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 72px;
   height: 22px;
-  color: #171000;
+  color: var(--instant-icon-ink);
   flex: 0 0 72px;
 }
 
@@ -1268,11 +1270,14 @@ button, input {
   height: 22px;
 }
 
-.admin-instant-badge rect {
-  fill: var(--admin-accent-secondary);
+.admin-instant-badge-frame {
+  fill: var(--instant-icon-fill);
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
 }
 
-.admin-instant-badge path {
+.admin-instant-badge-bolt {
   fill: none;
   stroke: currentColor;
   stroke-width: 1.9;
@@ -1286,6 +1291,22 @@ button, input {
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.01em;
+}
+
+:root[data-admin-theme='light'] .admin-instant-badge {
+  --instant-icon-ink: var(--admin-accent-secondary);
+  --instant-icon-fill: color-mix(in srgb, var(--admin-accent-secondary) 10%, transparent);
+}
+
+:root[data-admin-theme='glass'] .admin-instant-badge,
+:root[data-admin-theme='ivory'] .admin-instant-badge {
+  --instant-icon-ink: var(--admin-accent-secondary);
+  --instant-icon-fill: color-mix(in srgb, var(--admin-accent-secondary) 12%, transparent);
+}
+
+:root[data-admin-theme='prism'] .admin-instant-badge {
+  --instant-icon-ink: var(--admin-accent-quaternary);
+  --instant-icon-fill: color-mix(in srgb, var(--admin-accent-quaternary) 16%, transparent);
 }
 
 .admin-order-deadline {
