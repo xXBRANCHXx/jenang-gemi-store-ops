@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ordersStorageKey = 'jg-store-live-orders';
   const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
-  const ordersEndpoint = '../../api/orders/';
+  const ordersEndpoint = '../../api/orders-v2/';
   const orderIdNode = document.querySelector('[data-print-order-id]');
   const statusNode = document.querySelector('[data-print-status]');
   const errorNode = document.querySelector('[data-print-error]');
@@ -261,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const platform = platformLabel(order.platform);
     if (statusNode) statusNode.textContent = `Fetching ${platform} label`;
     const sourcePlatform = normalizeSourceKey(order?.platform || 'shopee');
-    const response = await fetch(`../../api/orders/?shipping_label=1&order=${encodeURIComponent(order.id)}&platform=${encodeURIComponent(sourcePlatform)}${sourceAccount ? `&account=${encodeURIComponent(sourceAccount)}` : ''}${packageNumber ? `&package=${encodeURIComponent(packageNumber)}` : ''}`, {
+    const response = await fetch(`../../api/orders-v2/?shipping_label=1&order=${encodeURIComponent(order.id)}&platform=${encodeURIComponent(sourcePlatform)}${sourceAccount ? `&account=${encodeURIComponent(sourceAccount)}` : ''}${packageNumber ? `&package=${encodeURIComponent(packageNumber)}` : ''}`, {
       cache: 'no-store',
       credentials: 'same-origin',
       headers: { Accept: 'application/pdf,application/octet-stream,*/*' }
