@@ -1255,58 +1255,71 @@ button, input {
 .admin-instant-badge {
   --instant-icon-ink: var(--admin-accent-secondary);
   --instant-icon-fill: color-mix(in srgb, var(--admin-accent-secondary) 14%, transparent);
+  --instant-icon-border: color-mix(in srgb, var(--admin-accent-secondary) 34%, transparent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 72px;
+  gap: 4px;
+  width: 84px;
   height: 22px;
+  padding: 0 6px 0 5px;
+  border: 1px solid var(--instant-icon-border);
+  border-radius: 7px;
+  background: var(--instant-icon-fill);
   color: var(--instant-icon-ink);
-  flex: 0 0 72px;
+  flex: 0 0 84px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
 }
 
 .admin-instant-badge svg {
   display: block;
-  width: 72px;
-  height: 22px;
+  width: 30px;
+  height: 18px;
+  flex: 0 0 30px;
 }
 
-.admin-instant-badge-frame {
-  fill: var(--instant-icon-fill);
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linejoin: round;
-}
-
-.admin-instant-badge-bolt {
+.admin-instant-badge-speed,
+.admin-instant-badge-truck {
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.9;
+  stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
-.admin-instant-badge text {
-  fill: currentColor;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 9px;
-  font-weight: 900;
-  letter-spacing: 0.01em;
+.admin-instant-badge-wheel {
+  fill: var(--instant-icon-fill);
+  stroke: currentColor;
+  stroke-width: 1.7;
+}
+
+.admin-instant-badge-label {
+  display: inline-block;
+  transform: translateY(-0.2px);
 }
 
 :root[data-admin-theme='light'] .admin-instant-badge {
   --instant-icon-ink: var(--admin-accent-secondary);
   --instant-icon-fill: color-mix(in srgb, var(--admin-accent-secondary) 10%, transparent);
+  --instant-icon-border: color-mix(in srgb, var(--admin-accent-secondary) 28%, transparent);
 }
 
 :root[data-admin-theme='glass'] .admin-instant-badge,
 :root[data-admin-theme='ivory'] .admin-instant-badge {
   --instant-icon-ink: var(--admin-accent-secondary);
   --instant-icon-fill: color-mix(in srgb, var(--admin-accent-secondary) 12%, transparent);
+  --instant-icon-border: color-mix(in srgb, var(--admin-accent-secondary) 32%, transparent);
 }
 
 :root[data-admin-theme='prism'] .admin-instant-badge {
   --instant-icon-ink: var(--admin-accent-quaternary);
   --instant-icon-fill: color-mix(in srgb, var(--admin-accent-quaternary) 16%, transparent);
+  --instant-icon-border: color-mix(in srgb, var(--admin-accent-quaternary) 36%, transparent);
 }
 
 .admin-order-deadline {

@@ -12,7 +12,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 header('Expires: 0');
 
-$assetVersionPrefix = 'store-ops-instant-tag-icon-v4';
+$assetVersionPrefix = 'store-ops-instant-shipping-icon-v1';
 $adminCssVersion = $assetVersionPrefix . '-' . (string) @filemtime(dirname(__DIR__) . '/admin.css');
 $storeHomeJsVersion = $assetVersionPrefix . '-' . (string) @filemtime(dirname(__DIR__) . '/store-home.js');
 $currentEmployeeId = jg_admin_current_employee_id();
