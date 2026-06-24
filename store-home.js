@@ -39,6 +39,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const sourceColorList = document.querySelector('[data-source-color-list]');
   const scannerTestScanButton = document.querySelector('[data-scanner-test-scan]');
   const ordersStorageKey = 'jg-store-live-orders';
+  const ordersStorageMetaKey = 'jg-store-live-orders-meta';
+  const skuCatalogStorageKey = 'jg-store-sku-catalog';
   const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const themeStorageKey = 'jg-admin-theme';
@@ -51,6 +53,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const boardVisibleRows = 10;
   const boardVisibleColumns = 7;
   const boardVisibleCapacity = boardVisibleRows * boardVisibleColumns;
+  const ordersRefreshIntervalMs = 15000;
+  const ordersRefreshMinGapMs = 3500;
   const currentEmployee = {
     id: String(root.dataset.employeeId || 'shared-admin'),
     name: String(root.dataset.employeeName || 'Admin')
@@ -72,6 +76,9 @@ document.addEventListener('DOMContentLoaded', () => {
     activeOrderId: '',
     scans: new Map()
   };
+  let ordersRefreshPromise = null;
+  let lastOrdersRefreshAt = 0;
+  let skuCatalogRefreshPromise = null;
 
   const sourceColorOptions = [
     { value: 'none', label: 'No color' },
@@ -577,6 +584,35 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
+  const readStoredSkuCatalog = () => {
+    try {
+      const cached = JSON.parse(window.localStorage.getItem(skuCatalogStorageKey) || 'null');
+      const rows = Array.isArray(cached) ? cached : (Array.isArray(cached?.items) ? cached.items : []);
+      return rows.filter((item) => item && typeof item === 'object' && String(item.sku || '').trim());
+    } catch (_error) {
+      return [];
+    }
+  };
+
+  const saveSkuCatalog = () => {
+    try {
+      window.localStorage.setItem(skuCatalogStorageKey, JSON.stringify({
+        savedAt: Date.now(),
+        items: skuCatalog
+      }));
+    } catch (_error) {
+      // Cached SKU rows are an optional startup accelerator.
+    }
+  };
+
+  const hydrateSkuCatalogFromCache = () => {
+    const cached = readStoredSkuCatalog();
+    if (!cached.length) return false;
+    skuCatalog = cached;
+    applyAstraScanTargets();
+    return true;
+  };
+
   const loadSkuCatalog = async () => {
     const response = await fetch(skuDbEndpoint, {
       credentials: 'same-origin',
@@ -590,6 +626,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .map(normalizeSkuRow)
       .filter((item) => item.sku);
     applyAstraScanTargets();
+    saveSkuCatalog();
   };
 
   const consolidateScanItems = (items) => {
@@ -728,6 +765,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }, storedById);
   };
 
+  const normalizeCachedOrders = () => {
+    const stored = readStoredOrders();
+    if (!stored.length) return [];
+    const storedById = new Map(stored.map((order) => [String(order.id || ''), order]));
+    const catalogRows = catalogLookup();
+    return stored
+      .map((order) => normalizeOrder(order, catalogRows, storedById))
+      .filter((order) => order.id);
+  };
+
+  const hydrateOrdersFromCache = () => {
+    const cachedOrders = normalizeCachedOrders();
+    if (!cachedOrders.length) return false;
+    state.orders = cachedOrders;
+    renderBoard();
+    renderSourceColorList();
+    return true;
+  };
+
   const loadOrders = async () => {
     const response = await fetch(ordersEndpoint, {
       cache: 'no-store',
@@ -762,6 +818,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return cached;
       });
       window.localStorage.setItem(ordersStorageKey, JSON.stringify(cacheOrders));
+      window.localStorage.setItem(ordersStorageMetaKey, JSON.stringify({ savedAt: Date.now() }));
     } catch (_error) {
       // Keep the visible queue working even when local persistence is unavailable.
     }
@@ -1149,6 +1206,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (fulfillingCount) fulfillingCount.textContent = String(state.orders.filter((order) => !['UNCLAIMED', 'FULFILLED'].includes(order.fulfillmentStatus)).length);
   };
 
+  const renderBoardMessage = (message) => {
+    if (!board) return;
+    board.style.setProperty('--order-rows', String(boardVisibleRows));
+    board.style.setProperty('--order-columns', String(boardVisibleColumns));
+    board.innerHTML = `<div class="admin-board-empty">${escapeHtml(message)}</div>`;
+    renderMetrics();
+  };
+
   const renderBoard = () => {
     if (!board) return;
     const ordersChanged = syncOrdersFromStorage();
@@ -1427,17 +1492,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
   applyTheme(window.localStorage.getItem(themeStorageKey) || 'dark');
 
-  const refreshOrders = async (showError = true) => {
-    try {
-      state.orders = await loadOrders();
-      saveOrders();
-      renderBoard();
-      renderSourceColorList();
-    } catch (error) {
-      if (!showError) return;
-      const message = error instanceof Error ? error.message : 'Unable to load orders.';
-      if (board) board.innerHTML = `<div class="admin-board-empty">${escapeHtml(message)}</div>`;
+  const refreshSkuCatalog = async () => {
+    if (skuCatalogRefreshPromise) return skuCatalogRefreshPromise;
+    skuCatalogRefreshPromise = loadSkuCatalog()
+      .then(() => true)
+      .catch(() => false)
+      .finally(() => {
+        skuCatalogRefreshPromise = null;
+      });
+    return skuCatalogRefreshPromise;
+  };
+
+  const refreshOrders = async (showError = true, options = {}) => {
+    const force = Boolean(options.force);
+    const now = Date.now();
+    if (ordersRefreshPromise) return ordersRefreshPromise;
+    if (!force && lastOrdersRefreshAt && now - lastOrdersRefreshAt < ordersRefreshMinGapMs) {
+      return state.orders;
     }
+
+    ordersRefreshPromise = (async () => {
+      try {
+        state.orders = await loadOrders();
+        lastOrdersRefreshAt = Date.now();
+        saveOrders();
+        renderBoard();
+        renderSourceColorList();
+        return state.orders;
+      } catch (error) {
+        lastOrdersRefreshAt = Date.now();
+        if (showError && !state.orders.length) {
+          const message = error instanceof Error ? error.message : 'Unable to load orders.';
+          renderBoardMessage(message);
+        }
+        throw error;
+      } finally {
+        ordersRefreshPromise = null;
+      }
+    })();
+
+    return ordersRefreshPromise;
   };
 
   window.addEventListener('focus', () => {
@@ -1445,20 +1539,29 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   const initialize = async () => {
-    await loadScannerSettings();
-
-    try {
-      await loadSkuCatalog();
-    } catch (_error) {
-      skuCatalog = [];
+    renderScannerSettings();
+    hydrateSkuCatalogFromCache();
+    const hasCachedOrders = hydrateOrdersFromCache();
+    if (!hasCachedOrders) {
+      renderBoardMessage('Loading orders...');
     }
 
-    await refreshOrders();
     formatClock();
+    loadScannerSettings().catch(() => {});
+
+    window.setTimeout(() => {
+      refreshOrders(true, { force: true }).catch(() => {});
+      refreshSkuCatalog()
+        .then((updated) => {
+          if (updated) refreshOrders(false, { force: true }).catch(() => {});
+        })
+        .catch(() => {});
+    }, 0);
+
     window.setInterval(() => {
       formatClock();
       refreshOrders(false).catch(() => {});
-    }, 15000);
+    }, ordersRefreshIntervalMs);
   };
 
   initialize();
