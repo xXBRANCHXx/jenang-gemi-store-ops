@@ -1328,6 +1328,10 @@ button, input {
   color: rgba(255, 255, 255, 0.68);
 }
 
+:root[data-admin-theme='light'] .admin-start-order-btn:not(:disabled) {
+  color: #ffffff;
+}
+
 .admin-queue-notes {
   min-height: 100%;
 }
