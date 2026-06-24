@@ -13,6 +13,7 @@ $storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
 $currentEmployeeId = jg_admin_current_employee_id();
 $currentEmployeeName = jg_admin_current_employee_name();
 $currentEmployeeCanManageProfiles = jg_admin_can_manage_employee_profiles();
+$currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?: 'O';
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -28,7 +29,7 @@ $currentEmployeeCanManageProfiles = jg_admin_can_manage_employee_profiles();
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap">
     <link rel="stylesheet" href="../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
-<body class="admin-body is-dashboard">
+<body class="admin-body is-dashboard is-store-home">
     <div class="admin-build-badge" aria-label="Store build version">Build 1.03.01</div>
     <div
         class="admin-app admin-store-home"
@@ -38,51 +39,134 @@ $currentEmployeeCanManageProfiles = jg_admin_can_manage_employee_profiles();
     >
         <div class="admin-backdrop admin-backdrop-a"></div>
         <div class="admin-backdrop admin-backdrop-b"></div>
-        <header class="admin-topbar admin-store-topbar">
-            <section class="admin-store-command">
-                <article class="admin-store-stat">
-                    <span>Listed</span>
-                    <strong data-listed-count>0</strong>
-                </article>
-                <article class="admin-store-stat">
-                    <span>&lt;1h</span>
-                    <strong data-critical-count>0</strong>
-                </article>
-                <article class="admin-store-stat">
-                    <span>Claimed</span>
-                    <strong data-started-count>0</strong>
-                </article>
-                <article class="admin-store-stat">
-                    <span>Fulfilling</span>
-                    <strong data-fulfilling-count>0</strong>
-                </article>
-            </section>
-            <div class="admin-topbar-actions">
-                <div class="admin-view-indicator" data-board-employee><?php echo htmlspecialchars($currentEmployeeName, ENT_QUOTES, 'UTF-8'); ?></div>
-                <div class="admin-view-indicator" data-board-clock>Live Queue</div>
-                <a class="admin-ghost-btn admin-link-btn" href="../inventory/" target="_blank" rel="noopener">Inventory</a>
-                <a class="admin-ghost-btn admin-link-btn" href="../transactions/" target="_blank" rel="noopener">Transactions</a>
-                <a class="admin-ghost-btn admin-link-btn" href="../orders/" target="_blank" rel="noopener">Orders</a>
-                <a class="admin-ghost-btn admin-link-btn" href="../integrations/" target="_blank" rel="noopener">Integrations</a>
-                <button type="button" class="admin-ghost-btn admin-link-btn" data-open-reprint>Reprint</button>
-                <?php if ($currentEmployeeCanManageProfiles): ?>
-                    <button type="button" class="admin-ghost-btn admin-link-btn admin-icon-text-btn" data-open-employee-profiles aria-label="Employee profiles">
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 19.5a6 6 0 0 0-12 0"/><circle cx="9" cy="7.5" r="4"/><path d="M19 8v6M16 11h6"/></svg>
-                        <span>Profiles</span>
-                    </button>
-                <?php endif; ?>
-                <button type="button" class="admin-ghost-btn admin-link-btn" data-open-store-settings>Settings</button>
-                <a class="admin-primary-btn admin-link-btn" href="../logout/">Lock</a>
-            </div>
-        </header>
+        <button type="button" class="admin-store-sidebar-backdrop" data-store-sidebar-backdrop aria-label="Close navigation" tabindex="-1" hidden></button>
 
-        <main class="admin-layout">
-            <section class="admin-panel admin-panel-wide admin-fulfillment-panel">
-                <div class="admin-order-board-wrap">
-                    <div class="admin-order-board" data-order-board></div>
+        <aside class="admin-store-sidebar" data-store-sidebar id="store-navigation">
+            <header class="admin-store-sidebar-head">
+                <button type="button" class="admin-store-sidebar-toggle" data-store-sidebar-toggle aria-controls="store-navigation" aria-expanded="true" title="Collapse navigation">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M14 9l-3 3 3 3"/></svg>
+                </button>
+                <span class="admin-store-sidebar-brand-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5z"/><path d="M8 10.5h8M8 14h8"/></svg>
+                </span>
+                <span class="admin-store-sidebar-brand-copy">
+                    <strong>Store Ops</strong>
+                    <small>Processing only</small>
+                </span>
+            </header>
+
+            <nav class="admin-store-sidebar-nav" aria-label="Store Ops navigation">
+                <a class="admin-store-nav-item is-active" href="./" aria-current="page" title="Orders">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h6"/></svg>
+                    <span>Orders</span>
+                </a>
+                <a class="admin-store-nav-item" href="../inventory/" title="Inventory">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM4.4 7.7 12 12l7.6-4.3M12 12v9"/></svg>
+                    <span>Inventory</span>
+                </a>
+                <a class="admin-store-nav-item" href="../transactions/" title="Transactions">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3"/></svg>
+                    <span>Transactions</span>
+                </a>
+                <a class="admin-store-nav-item" href="../orders/" title="Order records">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4"/></svg>
+                    <span>Order records</span>
+                </a>
+                <a class="admin-store-nav-item" href="../integrations/" title="Integrations">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12h8M9 7V3M15 7V3M7 7h10v3a5 5 0 0 1-10 0zM12 15v6"/></svg>
+                    <span>Integrations</span>
+                </a>
+                <a class="admin-store-nav-item" href="../sku-db/" title="SKU catalog">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>
+                    <span>SKU catalog</span>
+                </a>
+            </nav>
+
+            <div class="admin-store-sidebar-tools">
+                <button type="button" class="admin-store-nav-item" data-open-reprint title="Reprint label">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></svg>
+                    <span>Reprint</span>
+                </button>
+                <button type="button" class="admin-store-nav-item" data-open-store-settings title="Settings">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1z"/></svg>
+                    <span>Settings</span>
+                </button>
+            </div>
+
+            <footer class="admin-store-sidebar-footer">
+                <?php if ($currentEmployeeCanManageProfiles): ?>
+                    <button type="button" class="admin-store-sidebar-profile" data-open-employee-profiles title="Employee profiles">
+                <?php else: ?>
+                    <div class="admin-store-sidebar-profile">
+                <?php endif; ?>
+                        <span class="admin-store-profile-avatar"><?php echo htmlspecialchars($currentEmployeeInitial, ENT_QUOTES, 'UTF-8'); ?></span>
+                        <span class="admin-store-profile-copy">
+                            <strong><?php echo htmlspecialchars($currentEmployeeName, ENT_QUOTES, 'UTF-8'); ?></strong>
+                            <small>Operator</small>
+                        </span>
+                <?php if ($currentEmployeeCanManageProfiles): ?>
+                    </button>
+                <?php else: ?>
+                    </div>
+                <?php endif; ?>
+                <a class="admin-store-lock" href="../logout/" title="Lock Store Ops">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+                    <span>Lock</span>
+                </a>
+            </footer>
+        </aside>
+
+        <div class="admin-store-workspace">
+            <header class="admin-topbar admin-store-topbar">
+                <button type="button" class="admin-store-mobile-menu" data-store-sidebar-toggle aria-controls="store-navigation" aria-expanded="true" aria-label="Open navigation">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+                <section class="admin-store-command">
+                    <article class="admin-store-stat">
+                        <span>Listed</span>
+                        <strong data-listed-count>0</strong>
+                    </article>
+                    <article class="admin-store-stat">
+                        <span>&lt;1h</span>
+                        <strong data-critical-count>0</strong>
+                    </article>
+                    <article class="admin-store-stat">
+                        <span>Claimed</span>
+                        <strong data-started-count>0</strong>
+                    </article>
+                    <article class="admin-store-stat">
+                        <span>Fulfilling</span>
+                        <strong data-fulfilling-count>0</strong>
+                    </article>
+                </section>
+                <div class="admin-topbar-actions">
+                    <div class="admin-view-indicator" data-board-clock>Live Queue</div>
+                    <?php if ($currentEmployeeCanManageProfiles): ?>
+                        <button type="button" class="admin-store-header-profile" data-open-employee-profiles aria-label="Open profile management">
+                    <?php else: ?>
+                        <div class="admin-store-header-profile">
+                    <?php endif; ?>
+                            <span class="admin-store-profile-avatar"><?php echo htmlspecialchars($currentEmployeeInitial, ENT_QUOTES, 'UTF-8'); ?></span>
+                            <span class="admin-store-profile-copy">
+                                <strong data-board-employee><?php echo htmlspecialchars($currentEmployeeName, ENT_QUOTES, 'UTF-8'); ?></strong>
+                                <small>Operator</small>
+                            </span>
+                    <?php if ($currentEmployeeCanManageProfiles): ?>
+                        </button>
+                    <?php else: ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
-            </section>
-        </main>
+            </header>
+
+            <main class="admin-layout">
+                <section class="admin-panel admin-panel-wide admin-fulfillment-panel">
+                    <div class="admin-order-board-wrap">
+                        <div class="admin-order-board" data-order-board></div>
+                    </div>
+                </section>
+            </main>
+        </div>
 
         <div class="admin-modal-shell admin-fulfillment-modal" data-fulfillment-modal hidden>
             <div class="admin-modal-backdrop" data-close-fulfillment-modal></div>

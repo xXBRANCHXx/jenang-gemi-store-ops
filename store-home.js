@@ -42,6 +42,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const scannerSummaryDot = document.querySelector('[data-scanner-summary-dot]');
   const settingsTitle = document.querySelector('[data-settings-title]');
   const settingsSaveLabel = document.querySelector('[data-settings-save-label]');
+  const sidebarBackdrop = document.querySelector('[data-store-sidebar-backdrop]');
+  const sidebarToggles = document.querySelectorAll('[data-store-sidebar-toggle]');
   const ordersStorageKey = 'jg-store-live-orders';
   const ordersStorageMetaKey = 'jg-store-live-orders-meta';
   const skuCatalogStorageKey = 'jg-store-sku-catalog';
@@ -49,13 +51,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const themeStorageKey = 'jg-admin-theme';
   const sourceColorStorageKey = 'jg-store-source-colors';
+  const sidebarStorageKey = 'jg-store-sidebar-expanded';
   const skuDbEndpoint = '../api/sku-db/';
   const ordersEndpoint = '../api/orders-v2/';
   const employeeProfilesEndpoint = '../api/employees-v2/';
   const scanBridgeEndpoint = '../api/scan-bridge/';
   const scanSerialEndpoint = '../api/scan-serial/';
-  const boardVisibleRows = 10;
-  const boardVisibleColumns = 7;
+  const boardVisibleRows = 5;
+  const boardVisibleColumns = 5;
   const boardVisibleCapacity = boardVisibleRows * boardVisibleColumns;
   const ordersRefreshIntervalMs = 15000;
   const ordersRefreshMinGapMs = 3500;
@@ -163,6 +166,8 @@ document.addEventListener('DOMContentLoaded', () => {
     return configured || defaultSourceColors[sourceKey] || 'none';
   };
 
+  const isCustomSourceColor = (value) => /^#[0-9a-f]{6}$/i.test(String(value || '').trim());
+
   const colorForSource = (sourceKey) => {
     const setting = colorSettingForSource(sourceKey);
     return setting === 'none' ? '' : setting;
@@ -199,6 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sourceColorList.innerHTML = sources.length
       ? sources.map(([sourceKey, label]) => {
         const selectedColor = colorSettingForSource(sourceKey);
+        const customColor = isCustomSourceColor(selectedColor) ? selectedColor.toUpperCase() : '#22D3EE';
         return `
           <div class="admin-source-color-row">
             <strong>${escapeHtml(label)}</strong>
@@ -215,6 +221,20 @@ document.addEventListener('DOMContentLoaded', () => {
                   aria-pressed="${selectedColor === option.value ? 'true' : 'false'}"
                 ></button>
               `).join('')}
+              <label
+                class="admin-source-color-custom ${isCustomSourceColor(selectedColor) ? 'is-active' : ''}"
+                style="--source-swatch: ${escapeHtml(customColor)}"
+                title="Custom color"
+                aria-label="${escapeHtml(label)} custom color"
+              >
+                <span aria-hidden="true">+</span>
+                <input
+                  type="color"
+                  value="${escapeHtml(customColor)}"
+                  data-source-color-custom-key="${escapeHtml(sourceKey)}"
+                  aria-label="Choose a custom color for ${escapeHtml(label)}"
+                >
+              </label>
             </div>
           </div>
         `;
@@ -223,6 +243,39 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   sourceColorMap = readSourceColorMap();
+
+  const compactSidebarQuery = window.matchMedia('(max-width: 760px)');
+
+  const storedSidebarExpanded = () => {
+    try {
+      const stored = window.localStorage.getItem(sidebarStorageKey);
+      return stored === null ? true : stored === '1';
+    } catch (_error) {
+      return true;
+    }
+  };
+
+  const setSidebarExpanded = (expanded, { persist = !compactSidebarQuery.matches } = {}) => {
+    const nextExpanded = Boolean(expanded);
+    root.classList.toggle('is-sidebar-expanded', nextExpanded);
+    sidebarToggles.forEach((button) => {
+      button.setAttribute('aria-expanded', String(nextExpanded));
+      button.setAttribute('aria-label', nextExpanded ? 'Collapse navigation' : 'Open navigation');
+      button.title = nextExpanded ? 'Collapse navigation' : 'Open navigation';
+    });
+    if (sidebarBackdrop) sidebarBackdrop.hidden = !(compactSidebarQuery.matches && nextExpanded);
+    if (persist) {
+      try {
+        window.localStorage.setItem(sidebarStorageKey, nextExpanded ? '1' : '0');
+      } catch (_error) {
+        // Navigation remains usable without persistence.
+      }
+    }
+  };
+
+  const syncSidebarForViewport = () => {
+    setSidebarExpanded(compactSidebarQuery.matches ? false : storedSidebarExpanded(), { persist: false });
+  };
 
   const normalizeThemePreference = (theme) => {
     if (adminThemes.includes(theme)) return theme;
@@ -1299,6 +1352,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const sourceKey = sourceKeyFromOrder(order);
       const sourceLabel = sourceLabelFromOrder(order);
       const sourceColor = colorForSource(sourceKey);
+      const customSourceColor = isCustomSourceColor(sourceColor) ? sourceColor.toUpperCase() : '';
       const isLocked = order.locked && !order.currentEmployeeCanWork;
       const claimedBySelf = order.claimedBy && order.claimedBy === currentEmployee.id;
       const claimLabel = order.claimedByName ? `${order.claimStale ? 'Stale' : 'Claimed'} by ${order.claimedByName}` : order.marketplaceStatus;
@@ -1307,7 +1361,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <article
           class="admin-order-card ${isCritical && !isLocked ? 'is-critical' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''}"
           data-source-key="${escapeHtml(sourceKey)}"
-          ${sourceColor ? `data-source-color="${escapeHtml(sourceColor)}"` : ''}
+          ${sourceColor ? `data-source-color="${customSourceColor ? 'custom' : escapeHtml(sourceColor)}"` : ''}
+          ${customSourceColor ? `style="--order-source-accent: ${escapeHtml(customSourceColor)}; --order-source-border: ${escapeHtml(customSourceColor)}; --order-source-border-hover: ${escapeHtml(customSourceColor)}"` : ''}
         >
           <div class="admin-order-card-top">
             <span class="admin-order-id">${escapeHtml(order.id)}</span>
@@ -1431,7 +1486,25 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelector('[data-open-reprint]')?.addEventListener('click', openReprintModal);
 
   document.querySelector('[data-open-store-settings]')?.addEventListener('click', openSettingsModal);
-  document.querySelector('[data-open-employee-profiles]')?.addEventListener('click', openEmployeeProfilesModal);
+  document.querySelectorAll('[data-open-employee-profiles]').forEach((button) => {
+    button.addEventListener('click', openEmployeeProfilesModal);
+  });
+  sidebarToggles.forEach((button) => {
+    button.addEventListener('click', () => {
+      setSidebarExpanded(!root.classList.contains('is-sidebar-expanded'));
+    });
+  });
+  sidebarBackdrop?.addEventListener('click', () => setSidebarExpanded(false, { persist: false }));
+  document.querySelectorAll('.admin-store-sidebar a').forEach((link) => {
+    link.addEventListener('click', () => {
+      if (compactSidebarQuery.matches) setSidebarExpanded(false, { persist: false });
+    });
+  });
+  if (typeof compactSidebarQuery.addEventListener === 'function') {
+    compactSidebarQuery.addEventListener('change', syncSidebarForViewport);
+  } else if (typeof compactSidebarQuery.addListener === 'function') {
+    compactSidebarQuery.addListener(syncSidebarForViewport);
+  }
   document.querySelectorAll('[data-settings-tab]').forEach((button) => {
     button.addEventListener('click', () => activateSettingsTab(button.dataset.settingsTab || 'scanner'));
   });
@@ -1457,6 +1530,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const sourceKey = normalizeSourceKey(button.dataset.sourceColorKey || '');
     const color = String(button.dataset.sourceColorValue || '').trim();
     if (!sourceKey || !sourceColorOptions.some((option) => option.value === color)) return;
+    sourceColorMap[sourceKey] = color;
+    saveSourceColorMap();
+    renderSourceColorList();
+    renderBoard();
+  });
+
+  sourceColorList?.addEventListener('change', (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || input.type !== 'color') return;
+    const sourceKey = normalizeSourceKey(input.dataset.sourceColorCustomKey || '');
+    const color = String(input.value || '').trim().toUpperCase();
+    if (!sourceKey || !isCustomSourceColor(color)) return;
     sourceColorMap[sourceKey] = color;
     saveSourceColorMap();
     renderSourceColorList();
@@ -1530,6 +1615,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.addEventListener('pointerdown', unlockAudio, { once: true });
   document.addEventListener('keydown', unlockAudio, { once: true });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && compactSidebarQuery.matches && root.classList.contains('is-sidebar-expanded')) {
+      setSidebarExpanded(false, { persist: false });
+    }
+  });
   window.addEventListener('storage', (event) => {
     if (event.key === themeStorageKey) {
       applyTheme(event.newValue || 'dark', { persist: false });
@@ -1547,10 +1637,15 @@ document.addEventListener('DOMContentLoaded', () => {
       renderBoard();
       return;
     }
+    if (event.key === sidebarStorageKey && !compactSidebarQuery.matches) {
+      setSidebarExpanded(event.newValue !== '0', { persist: false });
+      return;
+    }
     if (event.key !== ordersStorageKey) return;
     renderBoard();
   });
 
+  syncSidebarForViewport();
   applyTheme(window.localStorage.getItem(themeStorageKey) || 'dark');
   const systemThemeQuery = window.matchMedia('(prefers-color-scheme: light)');
   const syncSystemTheme = () => {
