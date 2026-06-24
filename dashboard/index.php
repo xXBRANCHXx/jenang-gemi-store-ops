@@ -66,9 +66,9 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM4.4 7.7 12 12l7.6-4.3M12 12v9"/></svg>
                     <span>Inventory</span>
                 </a>
-                <a class="admin-store-nav-item" href="../transactions/" title="Transactions">
+                <a class="admin-store-nav-item" href="../walk-ins/" title="Walk Ins">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3"/></svg>
-                    <span>Transactions</span>
+                    <span>Walk Ins</span>
                 </a>
                 <a class="admin-store-nav-item" href="../orders/" title="Order records">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4"/></svg>

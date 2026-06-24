@@ -40,6 +40,7 @@ function jg_store_ops_sku_database(PDO $pdo): array
             s.inventory_mode,
             s.skip_scan,
             s.cogs,
+            s.sale_price,
             s.created_at,
             s.updated_at
         FROM sku_skus s
@@ -70,6 +71,7 @@ function jg_store_ops_sku_database(PDO $pdo): array
             'inventory_mode' => (string) ($row['inventory_mode'] ?? ''),
             'skip_scan' => (int) ($row['skip_scan'] ?? 0) === 1,
             'cogs' => number_format((float) ($row['cogs'] ?? 0), 2, '.', ''),
+            'sale_price' => number_format((float) ($row['sale_price'] ?? 0), 2, '.', ''),
             'created_at' => (string) ($row['created_at'] ?? ''),
             'updated_at' => (string) ($row['updated_at'] ?? ''),
         ];

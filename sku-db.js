@@ -138,7 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
         row.flavor_name,
         row.unit_name,
         row.volume,
-        row.astra
+        row.astra,
+        row.sale_price
       ].join(' ').toLowerCase();
 
       return haystack.includes(search);
@@ -150,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const rows = filteredSkus();
 
     if (!rows.length) {
-      tableBody.innerHTML = `<tr><td colspan="11" class="admin-empty">${state.database.skus.length ? 'No SKUs match the current filters.' : 'No live SKUs found.'}</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="12" class="admin-empty">${state.database.skus.length ? 'No SKUs match the current filters.' : 'No live SKUs found.'}</td></tr>`;
       return;
     }
 
@@ -167,6 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${escapeHtml(row.current_stock ?? 0)}</td>
         <td>${escapeHtml(row.stock_trigger ?? 0)}</td>
         <td>${escapeHtml(row.cogs ?? 0)}</td>
+        <td>${escapeHtml(row.sale_price ?? 0)}</td>
       </tr>
     `).join('');
   };

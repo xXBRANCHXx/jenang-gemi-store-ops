@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require dirname(__DIR__) . '/auth-runtime.php';
+require dirname(__DIR__) . '/store-ops-shell.php';
 
 if (!jg_admin_is_authenticated()) {
     header('Location: ../');
@@ -9,6 +10,7 @@ if (!jg_admin_is_authenticated()) {
 }
 
 $adminCssVersion = (string) @filemtime(dirname(__DIR__) . '/admin.css');
+$storeShellJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-shell.js');
 $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.js');
 ?>
 <!DOCTYPE html>
@@ -25,29 +27,27 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap">
     <link rel="stylesheet" href="../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
-<body class="admin-body is-dashboard">
-    <div class="admin-build-badge" aria-label="Store build version">Build 1.03.01</div>
-    <div class="admin-app" data-transactions data-transactions-endpoint="../api/transactions/">
-        <div class="admin-backdrop admin-backdrop-a"></div>
-        <div class="admin-backdrop admin-backdrop-b"></div>
-        <header class="admin-topbar">
-            <div class="admin-topbar-brand">
-                <span class="admin-chip">Inventory</span>
-                <h1>Inventory Tracking</h1>
-                <p>Stock and COGS now move through invoice transactions. Invoice rows map item tags to SKUs, then apply COGS by PO number.</p>
-            </div>
-            <div class="admin-topbar-actions">
-                <a class="admin-ghost-btn admin-link-btn" href="../dashboard/" target="_blank" rel="noopener">Dashboard</a>
-                <a class="admin-ghost-btn admin-link-btn" href="../transactions/" target="_blank" rel="noopener">Transactions</a>
-                <a class="admin-primary-btn admin-link-btn" href="../sku-db/" target="_blank" rel="noopener">SKU Database</a>
-            </div>
-        </header>
+<body class="admin-body is-dashboard is-store-home">
+    <?php
+    jg_store_ops_shell_open([
+        'root_prefix' => '../',
+        'active' => 'inventory',
+        'title' => 'Inventory Tracking',
+        'eyebrow' => 'Store Ops',
+        'description' => 'Stock and COGS move through supplier invoice rows mapped to SKUs and PO numbers.',
+        'indicator' => 'Inventory',
+        'app_attributes' => [
+            'data-transactions' => true,
+            'data-transactions-endpoint' => '../api/transactions/',
+        ],
+    ]);
+    ?>
 
         <main class="admin-layout">
             <section class="admin-hero-panel">
                 <div class="admin-hero-copy">
                     <span class="admin-chip admin-chip-accent">PO Based COGS</span>
-                    <h2>Upload supplier invoices, preview the SKU map, then update inventory from the transaction rows.</h2>
+                    <h2>Upload supplier invoices, preview the SKU map, then update inventory from invoice rows.</h2>
                     <p>The system records invoice number, PO number, item tag, quantity, line total, SKU, and COGS per unit in <code>Transaction_Table</code>.</p>
                 </div>
                 <form class="admin-invoice-upload" data-invoice-upload-form enctype="multipart/form-data">
@@ -64,7 +64,7 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
             </section>
 
             <section class="admin-metric-grid">
-                <article class="admin-metric-card"><span>Transactions</span><strong data-transaction-count>0</strong><small>Imported invoice item rows</small></article>
+                <article class="admin-metric-card"><span>Invoice Rows</span><strong data-transaction-count>0</strong><small>Imported invoice item rows</small></article>
                 <article class="admin-metric-card"><span>Invoices</span><strong data-invoice-count>0</strong><small>Unique invoice numbers</small></article>
                 <article class="admin-metric-card"><span>POs</span><strong data-po-count>0</strong><small>Unique PO references</small></article>
                 <article class="admin-metric-card"><span>Low Stock</span><strong data-low-stock-count>0</strong><small>Rows at or below trigger</small></article>
@@ -134,8 +134,9 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
                 </div>
             </section>
         </main>
-    </div>
+    <?php jg_store_ops_shell_close(); ?>
 
+    <script src="../store-shell.js?v=<?php echo urlencode($storeShellJsVersion ?: '1'); ?>" defer></script>
     <script type="module" src="../transactions.js?v=<?php echo urlencode($transactionsJsVersion ?: '1'); ?>"></script>
 </body>
 </html>

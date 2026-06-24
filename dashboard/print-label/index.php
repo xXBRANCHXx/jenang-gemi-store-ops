@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require dirname(__DIR__, 2) . '/auth-runtime.php';
+require dirname(__DIR__, 2) . '/store-ops-shell.php';
 
 if (!jg_admin_is_authenticated()) {
     header('Location: ../../');
@@ -9,6 +10,7 @@ if (!jg_admin_is_authenticated()) {
 }
 
 $adminCssVersion = (string) @filemtime(dirname(__DIR__, 2) . '/admin.css');
+$storeShellJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/store-shell.js');
 $printLabelJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/print-label.js');
 ?>
 <!DOCTYPE html>
@@ -25,14 +27,21 @@ $printLabelJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/print-label.j
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap">
     <link rel="stylesheet" href="../../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
-<body class="admin-body is-dashboard">
-    <div class="admin-app admin-print-label-page" data-print-label-page>
-        <header class="admin-topbar admin-store-topbar">
-            <div class="admin-topbar-actions">
-                <a class="admin-ghost-btn admin-link-btn" href="../">Back</a>
-                <div class="admin-view-indicator" data-print-order-id>Order</div>
-            </div>
-        </header>
+<body class="admin-body is-dashboard is-store-home">
+    <?php
+    jg_store_ops_shell_open([
+        'root_prefix' => '../../',
+        'active' => 'orders',
+        'title' => 'Print Shipping Label',
+        'eyebrow' => 'Store Ops',
+        'description' => 'Select and print the label format for the active order.',
+        'indicator' => 'Order',
+        'app_class' => 'admin-print-label-page',
+        'app_attributes' => [
+            'data-print-label-page' => true,
+        ],
+    ]);
+    ?>
 
         <main class="admin-print-page-layout">
             <section class="admin-panel admin-print-page-card">
@@ -40,6 +49,7 @@ $printLabelJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/print-label.j
                     <div>
                         <span class="admin-panel-kicker">Shipping Label</span>
                         <h3>Print shipping label</h3>
+                        <span class="admin-panel-meta" data-print-order-id>Order</span>
                     </div>
                     <span class="admin-status-badge" data-print-status>Loading</span>
                 </div>
@@ -50,7 +60,8 @@ $printLabelJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/print-label.j
                 </div>
             </section>
         </main>
-    </div>
+    <?php jg_store_ops_shell_close(); ?>
+    <script src="../../store-shell.js?v=<?php echo urlencode($storeShellJsVersion ?: '1'); ?>" defer></script>
     <script src="../../print-label.js?v=<?php echo urlencode($printLabelJsVersion ?: '1'); ?>" defer></script>
 </body>
 </html>

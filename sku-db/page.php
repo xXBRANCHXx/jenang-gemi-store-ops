@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require dirname(__DIR__) . '/auth-runtime.php';
+require dirname(__DIR__) . '/store-ops-shell.php';
 
 if (!jg_admin_is_authenticated()) {
     header('Location: ../dashboard/');
@@ -9,6 +10,7 @@ if (!jg_admin_is_authenticated()) {
 }
 
 $adminCssVersion = (string) @filemtime(dirname(__DIR__) . '/admin.css');
+$storeShellJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-shell.js');
 $skuDbJsVersion = (string) @filemtime(dirname(__DIR__) . '/sku-db.js');
 ?>
 <!DOCTYPE html>
@@ -25,34 +27,21 @@ $skuDbJsVersion = (string) @filemtime(dirname(__DIR__) . '/sku-db.js');
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap">
     <link rel="stylesheet" href="../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
-<body class="admin-body is-dashboard">
-    <div class="admin-build-badge" aria-label="Dashboard build version">Build 1.03.01</div>
-    <div class="admin-app" data-sku-db data-sku-db-endpoint="../api/sku-db/">
-        <div class="admin-backdrop admin-backdrop-a"></div>
-        <div class="admin-backdrop admin-backdrop-b"></div>
-        <header class="admin-topbar">
-            <div class="admin-topbar-brand">
-                <span class="admin-chip">Live SKU Sheet</span>
-                <h1>Jenang Gemi SKU Database</h1>
-                <p>This store view is now read-only. New SKU creation and approvals only happen in the executive dashboard, while this page mirrors approved SKUs in a spreadsheet-style table.</p>
-            </div>
-            <div class="admin-topbar-actions">
-                <div class="admin-view-indicator">SKU Sheet</div>
-                <div class="admin-menu-shell" data-menu-shell>
-                    <button type="button" class="admin-ghost-btn admin-menu-trigger" data-menu-trigger aria-expanded="false" aria-label="Open dashboard menu">...</button>
-                    <div class="admin-menu-panel" data-menu-panel hidden>
-                        <a class="admin-menu-item admin-link-btn" href="../dashboard/" target="_blank" rel="noopener" data-dashboard-view-link="home">Home Dashboard</a>
-                        <a class="admin-menu-item admin-link-btn" href="../inventory/" target="_blank" rel="noopener">Inventory</a>
-                        <a class="admin-menu-item admin-link-btn" href="../transactions/" target="_blank" rel="noopener">Transactions</a>
-                        <a class="admin-menu-item admin-link-btn" href="../orders/" target="_blank" rel="noopener">Orders</a>
-                        <a class="admin-menu-item admin-link-btn" href="../integrations/" target="_blank" rel="noopener">Integrations</a>
-                        <a class="admin-menu-item admin-link-btn" href="../sku-db/" target="_blank" rel="noopener">SKU Database</a>
-                        <button type="button" class="admin-menu-item" data-theme-toggle>Toggle Theme</button>
-                        <a class="admin-menu-item admin-link-btn" href="../logout/">Lock Dashboard</a>
-                    </div>
-                </div>
-            </div>
-        </header>
+<body class="admin-body is-dashboard is-store-home">
+    <?php
+    jg_store_ops_shell_open([
+        'root_prefix' => '../',
+        'active' => 'sku-db',
+        'title' => 'Jenang Gemi SKU Database',
+        'eyebrow' => 'Live SKU Sheet',
+        'description' => 'Read-only Store Ops mirror of approved SKUs from the executive dashboard.',
+        'indicator' => 'SKU Sheet',
+        'app_attributes' => [
+            'data-sku-db' => true,
+            'data-sku-db-endpoint' => '../api/sku-db/',
+        ],
+    ]);
+    ?>
 
         <main class="admin-layout">
             <section class="admin-hero-panel">
@@ -133,18 +122,20 @@ $skuDbJsVersion = (string) @filemtime(dirname(__DIR__) . '/sku-db.js');
                                     <th>Stock</th>
                                     <th>Trigger</th>
                                     <th>COGS</th>
+                                    <th>Sale Price</th>
                                 </tr>
                             </thead>
                             <tbody data-sku-table-body>
-                                <tr><td colspan="11" class="admin-empty">Loading live SKU sheet…</td></tr>
+                                <tr><td colspan="12" class="admin-empty">Loading live SKU sheet...</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </article>
             </section>
         </main>
-    </div>
+    <?php jg_store_ops_shell_close(); ?>
 
+    <script src="../store-shell.js?v=<?php echo urlencode($storeShellJsVersion ?: '1'); ?>" defer></script>
     <script type="module" src="../sku-db.js?v=<?php echo urlencode($skuDbJsVersion ?: '1'); ?>"></script>
 </body>
 </html>

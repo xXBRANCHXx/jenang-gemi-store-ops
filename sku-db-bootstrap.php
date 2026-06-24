@@ -57,6 +57,7 @@ function jg_store_ops_sku_ensure_schema(PDO $pdo): void
 {
     jg_store_ops_sku_ensure_column($pdo, 'sku_skus', 'astra', 'DECIMAL(6,2) NOT NULL DEFAULT 0.00 AFTER volume');
     jg_store_ops_sku_ensure_column($pdo, 'sku_skus', 'skip_scan', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER inventory_mode');
+    jg_store_ops_sku_ensure_column($pdo, 'sku_skus', 'sale_price', 'DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER cogs');
     $pdo->exec('UPDATE sku_skus SET astra = volume WHERE astra <= 0');
 }
 
