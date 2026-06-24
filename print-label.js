@@ -51,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
       : (orderId.toUpperCase().startsWith('ZEROWEB-') ? 'zero_website' : (orderId.toUpperCase().startsWith('JGWEB-') ? 'jenang_gemi_website' : 'shopee')))
   } : null);
   const sourceAccount = requestedAccount || String(order?.sourceAccountKey || '');
+  const packageNumber = String(order?.packageNumber || order?.package_number || params.get('package') || params.get('package_id') || '');
   let returnTimer = 0;
   let printInProgress = false;
   let labelUrl = '';
@@ -260,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const platform = platformLabel(order.platform);
     if (statusNode) statusNode.textContent = `Fetching ${platform} label`;
     const sourcePlatform = normalizeSourceKey(order?.platform || 'shopee');
-    const response = await fetch(`../../api/orders/?shipping_label=1&order=${encodeURIComponent(order.id)}&platform=${encodeURIComponent(sourcePlatform)}${sourceAccount ? `&account=${encodeURIComponent(sourceAccount)}` : ''}`, {
+    const response = await fetch(`../../api/orders/?shipping_label=1&order=${encodeURIComponent(order.id)}&platform=${encodeURIComponent(sourcePlatform)}${sourceAccount ? `&account=${encodeURIComponent(sourceAccount)}` : ''}${packageNumber ? `&package=${encodeURIComponent(packageNumber)}` : ''}`, {
       cache: 'no-store',
       credentials: 'same-origin',
       headers: { Accept: 'application/pdf,application/octet-stream,*/*' }

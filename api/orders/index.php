@@ -925,6 +925,7 @@ if (isset($_GET['shipping_label'])) {
         'account' => $account,
         'setup_token' => $setupToken,
         'order' => $orderSn,
+        'package' => trim((string) ($_GET['package'] ?? $_GET['package_id'] ?? '')),
     ]);
     $url = $baseUrl . '/' . rawurlencode($platform) . '/orders/shipping-label?' . $query;
     jg_store_ops_orders_proxy_file($url, $platform . '-label-' . preg_replace('/[^A-Za-z0-9_-]+/', '-', $orderSn) . '.pdf');
@@ -972,14 +973,6 @@ foreach ($sources as $source) {
 
     jg_store_ops_orders_cache_write($url, $raw);
     $accountOrders = is_array($accountPayload['orders'] ?? null) ? $accountPayload['orders'] : [];
-    // Defense in depth against stale pre-cutover API/cache responses: a
-    // marketplace order is never an active Store Ops task without a stored label.
-    $accountOrders = array_values(array_filter($accountOrders, static function (mixed $order): bool {
-        return is_array($order)
-            && strtoupper(trim((string) ($order['status'] ?? ''))) === 'IS_LISTED'
-            && !empty($order['shipmentArranged'])
-            && !empty($order['labelReady']);
-    }));
     $successfulAccounts++;
     $decoded['orders'] = array_merge($decoded['orders'], $accountOrders);
     $decoded['meta']['accounts'][] = [
@@ -987,6 +980,8 @@ foreach ($sources as $source) {
         'account_key' => $account,
         'count' => count($accountOrders),
         'shop_id' => (string) ($accountPayload['meta']['shop_id'] ?? ''),
+        'label_backed_only' => !empty($accountPayload['meta']['label_backed_only']),
+        'hard_set_enabled' => !empty($accountPayload['meta']['hard_set']['enabled']),
     ];
 }
 
