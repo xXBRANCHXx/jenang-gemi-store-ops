@@ -110,7 +110,7 @@ function jg_admin_has_active_admin_employee(): bool
         $pdo = jg_store_ops_fulfillment_db();
         $stmt = $pdo->query(
             "SELECT COUNT(*)
-             FROM store_ops_employees
+             FROM store_ops_employees_v2
              WHERE active = 1
                AND LOWER(id) IN ('admin', 'shared-admin')"
         );
@@ -170,7 +170,7 @@ function jg_admin_attempt_employee_login(string $employeeId, string $pin): bool
         $pdo = jg_store_ops_fulfillment_db();
         $stmt = $pdo->prepare(
             'SELECT id, display_name, pin_hash
-             FROM store_ops_employees
+             FROM store_ops_employees_v2
              WHERE id = :id
                AND active = 1
              LIMIT 1'
