@@ -1357,6 +1357,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const claimedBySelf = order.claimedBy && order.claimedBy === currentEmployee.id;
       const claimLabel = order.claimedByName ? `${order.claimStale ? 'Stale' : 'Claimed'} by ${order.claimedByName}` : order.marketplaceStatus;
       const buttonLabel = order.claimStale ? 'Reclaim' : (claimedBySelf ? 'Resume' : (index === 0 ? 'Start Next' : 'Start'));
+      const buttonIcon = isLocked
+        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>'
+        : (order.claimStale
+          ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></svg>'
+          : (claimedBySelf
+            ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>'
+            : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7z"/></svg>'));
       return `
         <article
           class="admin-order-card ${isCritical && !isLocked ? 'is-critical' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''}"
@@ -1374,7 +1381,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>${escapeHtml(claimLabel)}</span>
             <span>${itemCount} item${itemCount === 1 ? '' : 's'}</span>
           </div>
-          <button type="button" class="admin-start-order-btn" data-start-order="${escapeHtml(order.id)}" ${isLocked ? 'disabled' : ''}>${escapeHtml(isLocked ? 'Locked' : buttonLabel)}</button>
+          <button type="button" class="admin-start-order-btn ${claimedBySelf ? 'is-resume' : ''} ${order.claimStale ? 'is-reclaim' : ''}" data-start-order="${escapeHtml(order.id)}" ${isLocked ? 'disabled' : ''}>${buttonIcon}<span>${escapeHtml(isLocked ? 'Locked' : buttonLabel)}</span></button>
         </article>
       `;
     }).join('');
