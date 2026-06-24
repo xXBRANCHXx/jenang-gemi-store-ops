@@ -127,7 +127,7 @@ function jg_store_ops_fulfillment_db(): PDO
 
 function jg_store_ops_fulfillment_normalize_key_part(string $value, int $maxLength = 96): string
 {
-    $normalized = strtolower(trim((string) preg_replace('/[^a-z0-9._-]+/i', '-', $value)), '.-_');
+    $normalized = trim(strtolower((string) preg_replace('/[^a-z0-9._-]+/i', '-', $value)), '.-_');
     return substr($normalized, 0, $maxLength);
 }
 

@@ -22,7 +22,7 @@ function jg_store_ops_employees_v2_request_json(): array
 
 function jg_store_ops_employees_v2_normalize_id(string $value): string
 {
-    $normalized = strtolower(trim((string) preg_replace('/[^a-z0-9._-]+/i', '-', $value)), '.-_');
+    $normalized = trim(strtolower((string) preg_replace('/[^a-z0-9._-]+/i', '-', $value)), '.-_');
     return substr($normalized, 0, 64);
 }
 
