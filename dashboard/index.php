@@ -8,8 +8,13 @@ if (!jg_admin_is_authenticated()) {
     exit;
 }
 
-$adminCssVersion = (string) @filemtime(dirname(__DIR__) . '/admin.css');
-$storeHomeJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-home.js');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+
+$assetVersionPrefix = 'store-ops-instant-label-v2';
+$adminCssVersion = $assetVersionPrefix . '-' . (string) @filemtime(dirname(__DIR__) . '/admin.css');
+$storeHomeJsVersion = $assetVersionPrefix . '-' . (string) @filemtime(dirname(__DIR__) . '/store-home.js');
 $currentEmployeeId = jg_admin_current_employee_id();
 $currentEmployeeName = jg_admin_current_employee_name();
 $currentEmployeeCanManageProfiles = jg_admin_can_manage_employee_profiles();
