@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const settingsError = document.querySelector('[data-store-settings-error]');
   const scannerTestScanButton = document.querySelector('[data-scanner-test-scan]');
   const scannerSelectButton = document.querySelector('[data-scanner-select]');
+  const scannerSelectAction = document.querySelector('.admin-scanner-select-action');
   const selectedScannerNode = document.querySelector('[data-selected-scanner]');
   const scannerSummary = document.querySelector('[data-scanner-summary]');
   const scannerSummaryDot = document.querySelector('[data-scanner-summary-dot]');
@@ -28,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   let selectedScannerPort = null;
   let selectedScannerLabel = '';
+  let selectedScannerVerified = false;
   let activeSettingsTab = 'scanner';
 
   const escapeHtml = (value) => String(value)
@@ -68,6 +70,30 @@ document.addEventListener('DOMContentLoaded', () => {
   const parseScannerCodes = (buffer) => String(buffer || '').split(/\r\n|\r|\n|\t/)
     .map((code) => code.trim().toUpperCase())
     .filter(Boolean);
+
+  const browserSerialSupported = () => Boolean(navigator.serial);
+
+  const browserSerialOpenOptions = () => ({
+    baudRate: Number(scannerSettings.baud_rate || 9600)
+  });
+
+  const isBrowserSerialPortOpen = (port) => Boolean(port?.readable || port?.writable);
+
+  const browserSerialErrorMessage = (error, fallback = 'Unable to use the USB-COM scanner.') => {
+    const message = error instanceof Error ? error.message : String(error || '');
+    if (!message) return fallback;
+    if (/open|networkerror|busy|in use|locked/i.test(message)) {
+      return `The browser could not open the scanner serial port. Close other Store Ops tabs or serial apps, unplug and reconnect the scanner, then try Find Scanner again. Browser detail: ${message}`;
+    }
+    return message;
+  };
+
+  const setSelectedScannerPort = (port, { verified = false } = {}) => {
+    selectedScannerPort = port || null;
+    selectedScannerLabel = port ? scannerPortLabel(port) : '';
+    selectedScannerVerified = Boolean(port && verified);
+    renderScannerSelection();
+  };
 
   const notifyScannerStatus = (stateName, title = '') => {
     try {
@@ -114,11 +140,24 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const openBrowserSerialPort = async (port) => {
-    if (!port.readable && !port.writable) {
-      await port.open({ baudRate: Number(scannerSettings.baud_rate || 9600) });
+    if (!port) {
+      throw new Error('No USB-COM scanner was selected.');
+    }
+    if (!isBrowserSerialPortOpen(port)) {
+      try {
+        await port.open(browserSerialOpenOptions());
+      } catch (error) {
+        if (isBrowserSerialPortOpen(port)) return false;
+        throw new Error(browserSerialErrorMessage(error, 'Unable to open the USB-COM scanner.'));
+      }
       return true;
     }
     return false;
+  };
+
+  const closeBrowserSerialPort = async (port) => {
+    if (!isBrowserSerialPortOpen(port)) return;
+    await port.close().catch(() => {});
   };
 
   const scannerPortLabel = (port) => {
@@ -136,6 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const label = selectedScannerLabel || 'No scanner selected';
     if (selectedScannerNode) selectedScannerNode.textContent = label;
     if (scannerSummary && !scannerSummary.dataset.healthMessage) scannerSummary.textContent = label;
+    if (scannerSelectAction) scannerSelectAction.textContent = selectedScannerPort || selectedScannerLabel ? 'Find again' : 'Find Scanner';
     if (scannerSelectButton instanceof HTMLButtonElement) {
       scannerSelectButton.classList.toggle('is-selected', Boolean(selectedScannerPort || selectedScannerLabel));
     }
@@ -193,35 +233,40 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const checkBrowserScannerHealth = async () => {
-    if (!navigator.serial) {
+    if (!browserSerialSupported()) {
       setScannerHealth('error', 'Browser cannot access USB-COM', 'Open Store Ops in Chrome or Edge so the browser can talk to the local USB-COM scanner.');
       return false;
     }
 
     const ports = await navigator.serial.getPorts();
     if (!ports.length) {
-      selectedScannerPort = null;
-      selectedScannerLabel = '';
-      renderScannerSelection();
-      setScannerHealth('error', 'No scanner selected', 'Choose Select scanner, then select the USB-COM barcode scanner from the browser prompt.');
+      setSelectedScannerPort(null);
+      setScannerHealth('ready', 'Find Scanner', 'Click Find Scanner, choose the USB-COM barcode scanner, then scan any barcode to pair it with Store Ops.');
       return false;
     }
 
     if (!selectedScannerPort || !ports.includes(selectedScannerPort)) {
-      selectedScannerPort = ports[0];
-      selectedScannerLabel = scannerPortLabel(selectedScannerPort);
-      renderScannerSelection();
+      setSelectedScannerPort(ports[0], { verified: selectedScannerVerified });
     }
 
-    setScannerHealth('ready', 'Scanner permission ready', `${selectedScannerLabel} is approved. Use Test and scan a real barcode to confirm data is arriving.`);
+    if (selectedScannerVerified) {
+      setScannerHealth('ok', 'Scanner connected', `${selectedScannerLabel} is paired with this browser.`);
+    } else {
+      setScannerHealth('ready', 'Scanner permission ready', `${selectedScannerLabel} is approved. Use Test and scan a real barcode to confirm data is arriving.`);
+    }
     return true;
   };
 
   const checkScannerHealth = async () => {
     setScannerHealth('checking', 'Checking scanner', 'Checking whether this browser can reach the local USB-COM scanner.');
     try {
-      if (!serverCanSeeLocalUsb()) {
+      if (browserSerialSupported()) {
         return await checkBrowserScannerHealth();
+      }
+
+      if (!serverCanSeeLocalUsb()) {
+        setScannerHealth('error', 'Browser cannot access USB-COM', 'Open Store Ops in Chrome or Edge so the browser can talk to the local USB-COM scanner.');
+        return false;
       }
 
       const query = new URLSearchParams({
@@ -249,21 +294,36 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const selectScanner = async () => {
-    if (!navigator.serial) {
+    if (!browserSerialSupported()) {
       setScannerHealth('error', 'Scanner selection unavailable', 'Use Chrome or Edge to select a USB-COM scanner from this device.');
       return null;
     }
+    if (scannerSelectButton instanceof HTMLButtonElement) scannerSelectButton.disabled = true;
     try {
+      setScannerHealth('checking', 'Finding scanner', 'Choose the USB-COM barcode scanner, then scan any barcode when Store Ops starts listening.');
       const port = await navigator.serial.requestPort();
-      selectedScannerPort = port;
-      selectedScannerLabel = scannerPortLabel(port);
-      renderScannerSelection();
-      setScannerHealth('ready', 'Scanner selected', `${selectedScannerLabel} is approved for this browser. Use Test and scan any barcode.`);
+      setSelectedScannerPort(port);
+      setScannerHealth('checking', 'Waiting for pairing scan', `Scan any barcode now to pair ${selectedScannerLabel} with Store Ops.`);
+      const openedHere = await openBrowserSerialPort(port);
+      try {
+        const codes = await readBrowserSerialCodes(port, 10000);
+        const code = String(codes[0] || '');
+        if (!code) {
+          setScannerHealth('ready', 'Scanner selected', `${selectedScannerLabel} is approved. Click Test and scan any barcode if pairing did not complete.`);
+          return port;
+        }
+        selectedScannerVerified = true;
+        setScannerHealth('ok', 'Scanner connected', `Received ${code} from ${selectedScannerLabel}.`);
+      } finally {
+        if (openedHere) await closeBrowserSerialPort(port);
+      }
       return port;
     } catch (error) {
       if (error instanceof DOMException && error.name === 'NotFoundError') return null;
-      setScannerHealth('error', 'Scanner selection failed', error instanceof Error ? error.message : 'Unable to select the USB-COM scanner.');
+      setScannerHealth('error', 'Scanner selection failed', browserSerialErrorMessage(error, 'Unable to select the USB-COM scanner.'));
       return null;
+    } finally {
+      if (scannerSelectButton instanceof HTMLButtonElement) scannerSelectButton.disabled = false;
     }
   };
 
@@ -271,16 +331,15 @@ document.addEventListener('DOMContentLoaded', () => {
     setScannerHealth('checking', 'Waiting for test scan', 'Scan any product barcode now.');
     if (scannerTestScanButton instanceof HTMLButtonElement) scannerTestScanButton.disabled = true;
     try {
-      if (!serverCanSeeLocalUsb()) {
-        if (!navigator.serial) {
-          throw new Error('This browser cannot access USB-COM scanners from a hosted Store Ops site. Use Chrome or Edge.');
-        }
+      if (browserSerialSupported()) {
         const approvedPorts = await navigator.serial.getPorts();
-        const port = selectedScannerPort || approvedPorts[0] || await selectScanner();
+        let port = selectedScannerPort || approvedPorts[0] || null;
+        if (!port) {
+          port = await selectScanner();
+          return Boolean(port && selectedScannerVerified);
+        }
         if (!port) return false;
-        selectedScannerPort = port;
-        selectedScannerLabel = scannerPortLabel(port);
-        renderScannerSelection();
+        setSelectedScannerPort(port, { verified: selectedScannerVerified });
         const openedHere = await openBrowserSerialPort(port);
         try {
           const codes = await readBrowserSerialCodes(port, 6000);
@@ -289,11 +348,16 @@ document.addEventListener('DOMContentLoaded', () => {
             setScannerHealth('error', 'Scanner test failed', 'The browser opened the local USB-COM port, but no barcode data arrived within 6 seconds.');
             return false;
           }
-          setScannerHealth('ok', 'Scanner working', `Received ${code} from ${selectedScannerLabel} through this browser.`);
+          selectedScannerVerified = true;
+          setScannerHealth('ok', 'Scanner connected', `Received ${code} from ${selectedScannerLabel} through this browser.`);
           return true;
         } finally {
-          if (openedHere) await port.close().catch(() => {});
+          if (openedHere) await closeBrowserSerialPort(port);
         }
+      }
+
+      if (!serverCanSeeLocalUsb()) {
+        throw new Error('This browser cannot access USB-COM scanners from a hosted Store Ops site. Use Chrome or Edge.');
       }
 
       const query = new URLSearchParams({
@@ -312,15 +376,28 @@ document.addEventListener('DOMContentLoaded', () => {
         return false;
       }
       selectedScannerLabel = payload.device || 'Local USB-COM scanner';
+      selectedScannerVerified = true;
       renderScannerSelection();
-      setScannerHealth('ok', 'Scanner working', `Received ${code} from ${payload.device || 'USB-COM scanner'} at ${payload.baud_rate || scannerSettings.baud_rate} baud.`);
+      setScannerHealth('ok', 'Scanner connected', `Received ${code} from ${payload.device || 'USB-COM scanner'} at ${payload.baud_rate || scannerSettings.baud_rate} baud.`);
       return true;
     } catch (error) {
-      setScannerHealth('error', 'Scanner test failed', error instanceof Error ? error.message : 'Unable to run scanner test.');
+      setScannerHealth('error', 'Scanner test failed', browserSerialErrorMessage(error, 'Unable to run scanner test.'));
       return false;
     } finally {
       if (scannerTestScanButton instanceof HTMLButtonElement) scannerTestScanButton.disabled = false;
     }
+  };
+
+  const bindBrowserSerialEvents = () => {
+    if (!browserSerialSupported() || typeof navigator.serial.addEventListener !== 'function') return;
+    navigator.serial.addEventListener('connect', () => {
+      checkBrowserScannerHealth().catch(() => {});
+    });
+    navigator.serial.addEventListener('disconnect', (event) => {
+      if (event.target && event.target !== selectedScannerPort) return;
+      setSelectedScannerPort(null);
+      setScannerHealth('ready', 'Scanner disconnected', 'Reconnect the scanner. If it was already paired with this browser, Store Ops will detect it when it appears again.');
+    });
   };
 
   const renderScannerSettings = () => {
@@ -666,6 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   syncSidebarForViewport();
+  bindBrowserSerialEvents();
   loadScannerSettings()
     .then(() => checkScannerHealth())
     .catch(() => {});

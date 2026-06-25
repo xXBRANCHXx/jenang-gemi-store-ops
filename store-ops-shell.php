@@ -242,7 +242,7 @@ function jg_store_ops_shell_close(): void
                                 <span class="admin-settings-section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3v5M17 3v5M5 8h14v4a7 7 0 0 1-14 0zM12 19v2"/><path d="M9 5h6"/></svg></span>
                                 <div>
                                     <h4>USB-COM scanner connection</h4>
-                                    <p>Select the barcode scanner connected to this Store Ops station.</p>
+                                    <p>Find the USB-COM scanner connected to this Store Ops station, then scan any barcode to pair it.</p>
                                 </div>
                             </div>
 
@@ -252,14 +252,14 @@ function jg_store_ops_shell_close(): void
                                     <small>Selected scanner</small>
                                     <strong data-selected-scanner>No scanner selected</strong>
                                 </span>
-                                <span class="admin-scanner-select-action">Select scanner</span>
+                                <span class="admin-scanner-select-action">Find Scanner</span>
                             </button>
 
                             <div class="admin-scanner-health-card" data-scanner-health>
                                 <i aria-hidden="true"></i>
                                 <div>
                                     <strong data-scanner-health-title>Scanner not checked</strong>
-                                    <span data-scanner-health-detail>Select a scanner, then use Test to confirm barcode data is arriving.</span>
+                                    <span data-scanner-health-detail>Click Find Scanner, scan any barcode to pair it, then use Test to confirm barcode data is arriving.</span>
                                 </div>
                             </div>
 

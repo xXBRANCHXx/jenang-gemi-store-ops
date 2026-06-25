@@ -522,6 +522,14 @@ document.addEventListener('DOMContentLoaded', () => {
     readSerialLoop().catch(() => {});
   };
 
+  const openApprovedSerialScanner = async () => {
+    if (!navigator.serial || serialPort?.readable || serialPort?.writable) return false;
+    const ports = await navigator.serial.getPorts();
+    if (!ports.length) return false;
+    await openSerialPort(ports[0]);
+    return true;
+  };
+
   const connectSerialScanner = async () => {
     if (!navigator.serial) {
       setError('This browser does not support USB-COM scanner access. Use Chrome or Edge, or keep the scanner in keyboard input mode.');
@@ -577,6 +585,21 @@ document.addEventListener('DOMContentLoaded', () => {
     serverSerialTimer = window.setInterval(pollServerSerialScanner, 280);
   };
 
+  const bindBrowserSerialEvents = () => {
+    if (!navigator.serial || typeof navigator.serial.addEventListener !== 'function') return;
+    navigator.serial.addEventListener('connect', () => {
+      openApprovedSerialScanner().catch(() => {
+        setScanStatus('Scanner waiting', 'Click Connect USB-COM Scanner and choose the barcode scanner.');
+      });
+    });
+    navigator.serial.addEventListener('disconnect', (event) => {
+      if (event.target && event.target !== serialPort) return;
+      if (serialReader) serialReader.cancel().catch(() => {});
+      serialPort = null;
+      setScanStatus('Scanner disconnected', 'Reconnect the USB-COM scanner or use keyboard-wedge input.');
+    });
+  };
+
   document.addEventListener('keydown', (event) => {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
 
@@ -616,10 +639,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      const ports = await navigator.serial.getPorts();
-      if (ports.length) {
-        await openSerialPort(ports[0]);
-      } else {
+      if (!(await openApprovedSerialScanner())) {
         setScanStatus('USB-COM scanner waiting', 'Click Connect USB-COM Scanner and choose the IWARE scanner. Hostinger cannot read laptop USB devices directly.');
         if (serverCanSeeLocalUsb()) startServerSerialPolling();
       }
@@ -637,5 +657,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (serialPort?.readable || serialPort?.writable) serialPort.close().catch(() => {});
   });
 
+  bindBrowserSerialEvents();
   initialize();
 });
