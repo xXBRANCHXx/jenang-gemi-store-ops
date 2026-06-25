@@ -35,7 +35,7 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
     <link rel="stylesheet" href="../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
 <body class="admin-body is-dashboard is-store-home">
-    <div class="admin-build-badge" aria-label="Store build version">Build 1.03.01</div>
+    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.00</div>
     <div
         class="admin-app admin-store-home"
         data-store-home
@@ -70,9 +70,13 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3"/></svg>
                     <span>Walk Ins</span>
                 </a>
-                <a class="admin-store-nav-item" href="../orders/" title="Order records">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4"/></svg>
-                    <span>Order records</span>
+                <a class="admin-store-nav-item" href="../whatsapp-orders/" title="WhatsApp Orders">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19.5 6.2 16A7.5 7.5 0 1 1 9 18.3z"/><path d="M9 9.5c.6 2 2 3.6 4.1 4.5l1.2-1.1 2.1.5c.2 0 .4.2.4.5v1.4c0 .4-.3.7-.7.7A8.9 8.9 0 0 1 7.2 8c0-.4.3-.7.7-.7h1.4c.2 0 .4.2.5.4l.5 2z"/></svg>
+                    <span>WhatsApp Orders</span>
+                </a>
+                <a class="admin-store-nav-item" href="../invoice-records/" title="Invoice Records">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4"/><path d="M3 12s2-4 6-4 6 4 6 4-2 4-6 4-6-4-6-4"/><circle cx="9" cy="12" r="1.5"/></svg>
+                    <span>Invoice Records</span>
                 </a>
                 <a class="admin-store-nav-item" href="../integrations/" title="Integrations">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12h8M9 7V3M15 7V3M7 7h10v3a5 5 0 0 1-10 0zM12 15v6"/></svg>

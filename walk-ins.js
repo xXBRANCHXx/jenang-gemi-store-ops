@@ -6,6 +6,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const scanBridgeEndpoint = root.dataset.scanBridgeEndpoint || '../api/scan-bridge/';
   const scanSerialEndpoint = root.dataset.scanSerialEndpoint || '../api/scan-serial/';
   const zeroLogoMarkup = window.JGWalkInsLogoMarkup || '<strong class="admin-walkins-invoice-logo-fallback">ZERO</strong>';
+  const invoiceType = String(root.dataset.walkInsInvoiceType || 'walk_in').trim() === 'whatsapp' ? 'whatsapp' : 'walk_in';
+  const isWhatsappInvoice = invoiceType === 'whatsapp';
+  const defaultCustomerName = root.dataset.walkInsDefaultCustomer || (isWhatsappInvoice ? 'WhatsApp customer' : 'Walk-in customer');
+  const contactKind = root.dataset.walkInsContactKind || (isWhatsappInvoice ? 'address' : 'email');
+  const contactFallback = contactKind === 'address' ? 'No address' : 'No email';
+  const contactPrintLabel = contactKind === 'address' ? 'address' : 'email';
+  const requiresSaleType = root.dataset.walkInsRequiresSaleType === 'true';
+  const saleTypePrintLabels = {
+    Whatsapp: 'Whatsapp',
+    Website: 'Whatsapp (from site)',
+    Partner: 'Whatsapp (from partner)'
+  };
   const firstPageItemLimit = 7;
   const continuationItemLimit = 9;
 
@@ -19,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     customerName: document.querySelector('[data-walkins-customer-name]'),
     customerPhone: document.querySelector('[data-walkins-customer-phone]'),
     customerEmail: document.querySelector('[data-walkins-customer-email]'),
+    saleType: document.querySelector('[data-walkins-sale-type]'),
     itemCount: document.querySelector('[data-walkins-item-count]'),
     cartList: document.querySelector('[data-walkins-cart-list]'),
     clearCart: document.querySelector('[data-walkins-clear-cart]'),
@@ -47,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     invoiceNumber: '',
     cart: [],
     paymentMethod: 'Cash',
+    saleType: '',
     invoicePrinted: false,
     recent: [],
     busy: false,
@@ -64,6 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let serverSerialTimer = 0;
   let serverSerialPolling = false;
   let serverSerialErrorShown = false;
+  let printCleanupTimer = 0;
   const recentScanSignals = new Map();
   const duplicateSignalWindowMs = 90;
 
@@ -249,10 +264,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const renderCustomerSummary = () => {
     const name = String(refs.customerName?.value || '').trim();
     const phone = String(refs.customerPhone?.value || '').trim();
-    const email = String(refs.customerEmail?.value || '').trim();
-    if (refs.summaryCustomer) refs.summaryCustomer.textContent = name || 'Walk-in customer';
-    if (refs.summaryContact) refs.summaryContact.textContent = `${phone || 'No phone'} / ${email || 'No email'}`;
+    const contact = String(refs.customerEmail?.value || '').trim();
+    if (refs.summaryCustomer) refs.summaryCustomer.textContent = name || defaultCustomerName;
+    if (refs.summaryContact) refs.summaryContact.textContent = `${phone || 'No phone'} / ${contact || contactFallback}`;
   };
+
+  const selectedSaleType = () => String(refs.saleType?.value || state.saleType || '').trim();
+  const invoiceCustomerLabel = () => {
+    if (!isWhatsappInvoice) return 'Walk In';
+    return saleTypePrintLabels[selectedSaleType()] || 'Whatsapp';
+  };
+  const missingSaleType = () => requiresSaleType && !selectedSaleType();
 
   const renderTotals = () => {
     const summary = totals();
@@ -264,11 +286,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (refs.total) refs.total.textContent = formatRupiah(summary.total);
     if (refs.complete instanceof HTMLButtonElement) {
       const needsPrintedInvoice = state.cart.length > 0 && !state.invoicePrinted;
-      refs.complete.disabled = state.busy || state.cart.length === 0 || needsPrintedInvoice;
+      const saleTypeMissing = missingSaleType();
+      refs.complete.disabled = state.busy || state.cart.length === 0 || needsPrintedInvoice || saleTypeMissing;
       refs.complete.classList.toggle('is-locked', needsPrintedInvoice);
-      refs.complete.title = needsPrintedInvoice ? 'Print this invoice before completing the sale.' : '';
+      refs.complete.title = saleTypeMissing
+        ? 'Choose a sale type before completing this invoice.'
+        : (needsPrintedInvoice ? 'Print this invoice before completing the sale.' : '');
     }
-    if (refs.print instanceof HTMLButtonElement) refs.print.disabled = state.cart.length === 0;
+    if (refs.print instanceof HTMLButtonElement) {
+      refs.print.disabled = state.cart.length === 0 || missingSaleType();
+      refs.print.title = missingSaleType() ? 'Choose a sale type before printing this invoice.' : '';
+    }
   };
 
   const renderCart = () => {
@@ -367,7 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <article class="admin-walkins-recent-row">
         <span>
           <strong>${escapeHtml(invoice.invoice_number || '')}</strong>
-          <small>${escapeHtml(invoice.customer_name || 'Walk-in customer')} / ${escapeHtml(invoice.payment_method || '')}</small>
+          <small>${escapeHtml(invoice.customer_name || defaultCustomerName)} / ${escapeHtml(invoice.invoice_label || invoice.sale_type || invoice.payment_method || '')}</small>
         </span>
         <b>${formatRupiah(invoice.total)}</b>
       </article>
@@ -573,10 +601,12 @@ document.addEventListener('DOMContentLoaded', () => {
     state.invoiceNumber = invoiceNumber || state.invoiceNumber;
     state.cart = [];
     state.paymentMethod = 'Cash';
+    state.saleType = '';
     state.invoicePrinted = false;
     if (refs.customerName instanceof HTMLInputElement) refs.customerName.value = '';
     if (refs.customerPhone instanceof HTMLInputElement) refs.customerPhone.value = '';
     if (refs.customerEmail instanceof HTMLInputElement) refs.customerEmail.value = '';
+    if (refs.saleType instanceof HTMLSelectElement) refs.saleType.value = '';
     document.querySelectorAll('[data-walkins-payment]').forEach((button) => {
       button.classList.toggle('is-active', button.dataset.walkinsPayment === 'Cash');
     });
@@ -595,9 +625,9 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const customerDetails = () => ({
-    name: String(refs.customerName?.value || '').trim() || 'Walk-in customer',
+    name: String(refs.customerName?.value || '').trim() || defaultCustomerName,
     phone: String(refs.customerPhone?.value || '').trim() || '-',
-    email: String(refs.customerEmail?.value || '').trim() || '-'
+    contact: String(refs.customerEmail?.value || '').trim() || '-'
   });
 
   const printItemRow = (item) => `
@@ -644,12 +674,12 @@ document.addEventListener('DOMContentLoaded', () => {
         </header>
         <section class="admin-walkins-invoice-title">
           <div class="admin-walkins-invoice-title-main">
-            <strong>ZERO Customer [Walk In]</strong>
+            <strong>ZERO Customer [${escapeHtml(invoiceCustomerLabel())}]</strong>
             ${isFirstPage ? `
               <div class="admin-walkins-invoice-customer">
                 <span>name : ${escapeHtml(customer.name)}</span>
                 <span>phone : ${escapeHtml(customer.phone)}</span>
-                <span>email : ${escapeHtml(customer.email)}</span>
+                <span>${escapeHtml(contactPrintLabel)} : ${escapeHtml(customer.contact)}</span>
               </div>
             ` : ''}
           </div>
@@ -717,6 +747,10 @@ document.addEventListener('DOMContentLoaded', () => {
       setError('Add at least one product before printing the invoice.');
       return false;
     }
+    if (missingSaleType()) {
+      setError('Choose a sale type before printing this invoice.');
+      return false;
+    }
     setError('');
     buildPrintableInvoice();
     document.body.classList.add('is-walkins-printing');
@@ -726,6 +760,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const finishInvoicePrint = () => {
+    window.clearTimeout(printCleanupTimer);
+    printCleanupTimer = 0;
     document.body.classList.remove('is-walkins-printing');
   };
 
@@ -734,6 +770,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       window.focus();
       window.print();
+      printCleanupTimer = window.setTimeout(finishInvoicePrint, 10000);
     } catch (_error) {
       state.invoicePrinted = false;
       finishInvoicePrint();
@@ -744,6 +781,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const completeSale = async () => {
     if (!state.cart.length || state.busy || !state.invoicePrinted) return;
+    if (missingSaleType()) {
+      setError('Choose a sale type before completing this invoice.');
+      renderTotals();
+      return;
+    }
     state.busy = true;
     renderTotals();
     setError('');
@@ -754,11 +796,14 @@ document.addEventListener('DOMContentLoaded', () => {
         method: 'POST',
         body: JSON.stringify({
           action: 'complete_sale',
+          invoice_type: invoiceType,
+          sale_type: selectedSaleType(),
           invoice_number: state.invoiceNumber,
           customer: {
             full_name: refs.customerName?.value || '',
             phone: refs.customerPhone?.value || '',
-            email: refs.customerEmail?.value || ''
+            email: isWhatsappInvoice ? '' : (refs.customerEmail?.value || ''),
+            address: isWhatsappInvoice ? (refs.customerEmail?.value || '') : ''
           },
           payment_method: state.paymentMethod,
           items: state.cart.map((item) => ({
@@ -843,6 +888,11 @@ document.addEventListener('DOMContentLoaded', () => {
       renderCustomerSummary();
       renderTotals();
     });
+  });
+  refs.saleType?.addEventListener('change', () => {
+    state.saleType = selectedSaleType();
+    invalidatePrintedInvoice();
+    renderTotals();
   });
   document.querySelectorAll('[data-walkins-payment]').forEach((button) => {
     button.addEventListener('click', () => {

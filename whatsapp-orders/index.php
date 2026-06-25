@@ -26,7 +26,7 @@ $zeroLogoSvg = preg_replace(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
-    <title>Walk Ins | Jenang Gemi Store Ops</title>
+    <title>WhatsApp Orders | Jenang Gemi Store Ops</title>
     <meta name="robots" content="noindex,nofollow">
     <?php require dirname(__DIR__) . '/theme-init.php'; ?>
     <link rel="icon" type="image/png" href="https://jenanggemi.com/Media/Jenang%20Gemi%20Website%20Logo.png">
@@ -39,17 +39,18 @@ $zeroLogoSvg = preg_replace(
     <?php
     jg_store_ops_shell_open([
         'root_prefix' => '../',
-        'active' => 'walk-ins',
-        'title' => 'Walk Ins',
+        'active' => 'whatsapp-orders',
+        'title' => 'WhatsApp Orders',
         'eyebrow' => 'Store Ops',
-        'description' => 'POS invoice builder for scanned SKUs and skip-scan quick adds.',
-        'indicator' => 'Walk-in sale',
+        'description' => 'WA invoice builder for direct WhatsApp, website, and partner customer requests.',
+        'indicator' => 'WA invoice',
         'app_attributes' => [
             'data-walk-ins' => true,
-            'data-walk-ins-endpoint' => '../api/walk-ins/?invoice_type=walk_in',
-            'data-walk-ins-invoice-type' => 'walk_in',
-            'data-walk-ins-default-customer' => 'Walk-in customer',
-            'data-walk-ins-contact-kind' => 'email',
+            'data-walk-ins-endpoint' => '../api/walk-ins/?invoice_type=whatsapp',
+            'data-walk-ins-invoice-type' => 'whatsapp',
+            'data-walk-ins-default-customer' => 'WhatsApp customer',
+            'data-walk-ins-contact-kind' => 'address',
+            'data-walk-ins-requires-sale-type' => 'true',
         ],
     ]);
     ?>
@@ -84,20 +85,29 @@ $zeroLogoSvg = preg_replace(
                                 <span class="admin-panel-kicker">Customer</span>
                                 <h3>Invoice details</h3>
                             </div>
-                            <span class="admin-panel-meta">Optional for walk-in customers</span>
+                            <span class="admin-panel-meta">Sale type is required</span>
                         </div>
-                        <div class="admin-walkins-customer-grid">
+                        <div class="admin-walkins-customer-grid admin-walkins-customer-grid-wa">
                             <label class="admin-walkins-input-shell">
                                 <span>Full name</span>
-                                <input type="text" data-walkins-customer-name placeholder="Walk-in customer" autocomplete="name">
+                                <input type="text" data-walkins-customer-name placeholder="WhatsApp customer" autocomplete="name">
                             </label>
                             <label class="admin-walkins-input-shell">
                                 <span>Phone</span>
-                                <input type="tel" data-walkins-customer-phone placeholder="Phone number" autocomplete="tel">
+                                <input type="tel" data-walkins-customer-phone placeholder="WhatsApp number" autocomplete="tel">
                             </label>
                             <label class="admin-walkins-input-shell">
-                                <span>Email</span>
-                                <input type="email" data-walkins-customer-email placeholder="Email" autocomplete="email">
+                                <span>Address</span>
+                                <input type="text" data-walkins-customer-email placeholder="Delivery address" autocomplete="street-address">
+                            </label>
+                            <label class="admin-walkins-input-shell">
+                                <span>Sale Type</span>
+                                <select data-walkins-sale-type required>
+                                    <option value="">Choose sale type</option>
+                                    <option value="Whatsapp">Whatsapp</option>
+                                    <option value="Website">Website</option>
+                                    <option value="Partner">Partner</option>
+                                </select>
                             </label>
                         </div>
                     </article>
@@ -151,8 +161,8 @@ $zeroLogoSvg = preg_replace(
                         </div>
                         <div class="admin-walkins-customer-summary">
                             <span>Customer</span>
-                            <strong data-walkins-summary-customer>Walk-in customer</strong>
-                            <small data-walkins-summary-contact>No phone / No email</small>
+                            <strong data-walkins-summary-customer>WhatsApp customer</strong>
+                            <small data-walkins-summary-contact>No phone / No address</small>
                         </div>
                         <dl class="admin-walkins-total-list">
                             <div><dt>Subtotal</dt><dd data-walkins-subtotal>Rp0</dd></div>
@@ -183,7 +193,7 @@ $zeroLogoSvg = preg_replace(
                         <div class="admin-panel-head">
                             <div>
                                 <span class="admin-panel-kicker">Recent</span>
-                                <h3>Walk-in invoices</h3>
+                                <h3>WhatsApp invoices</h3>
                             </div>
                         </div>
                         <div class="admin-walkins-recent-list" data-walkins-recent-list>
@@ -195,11 +205,11 @@ $zeroLogoSvg = preg_replace(
 
             <div class="admin-modal-shell admin-walkins-complete-modal" data-walkins-complete-modal hidden>
                 <div class="admin-modal-backdrop"></div>
-                <section class="admin-modal-card admin-walkins-complete-card" role="dialog" aria-modal="true" aria-labelledby="walkins-complete-title">
+                <section class="admin-modal-card admin-walkins-complete-card" role="dialog" aria-modal="true" aria-labelledby="whatsapp-complete-title">
                     <span class="admin-walkins-complete-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
                     </span>
-                    <h3 id="walkins-complete-title">Walk-in sale complete</h3>
+                    <h3 id="whatsapp-complete-title">WhatsApp sale complete</h3>
                     <p>Invoice was created, stock was deducted, and the sale was added to Store Ops.</p>
                     <strong data-walkins-complete-invoice>Invoice</strong>
                 </section>

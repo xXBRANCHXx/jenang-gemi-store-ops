@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const employeeProfilesEndpoint = '../api/employees-v2/';
   const scanBridgeEndpoint = '../api/scan-bridge/';
   const scanSerialEndpoint = '../api/scan-serial/';
+  const boardBaseRows = 6;
   const boardMaxColumns = 8;
   const boardMinColumnWidth = 128;
   const boardColumnGap = 7;
@@ -1404,10 +1405,28 @@ document.addEventListener('DOMContentLoaded', () => {
     ));
   };
 
+  const boardDimensions = (orderCount) => {
+    const columnLimit = availableBoardColumns();
+    const columnCount = Math.max(1, Math.min(columnLimit, Math.ceil((orderCount || 1) / boardBaseRows)));
+    const overflowCount = Math.max(0, (orderCount || 0) - (boardBaseRows * columnCount));
+    const rowCount = boardBaseRows + Math.ceil(overflowCount / columnCount);
+    return { columnCount, rowCount };
+  };
+
+  const orderGridPositionStyle = (index, columnCount) => {
+    const firstPageCapacity = boardBaseRows * columnCount;
+    if (index < firstPageCapacity) {
+      return `grid-row: ${(index % boardBaseRows) + 1}; grid-column: ${Math.floor(index / boardBaseRows) + 1};`;
+    }
+
+    const overflowIndex = index - firstPageCapacity;
+    return `grid-row: ${boardBaseRows + Math.floor(overflowIndex / columnCount) + 1}; grid-column: ${(overflowIndex % columnCount) + 1};`;
+  };
+
   const renderBoardMessage = (message) => {
     if (!board) return;
-    board.style.setProperty('--order-rows', '1');
-    board.style.setProperty('--order-columns', String(availableBoardColumns()));
+    board.style.setProperty('--order-rows', String(boardBaseRows));
+    board.style.setProperty('--order-columns', '1');
     board.innerHTML = `<div class="admin-board-empty">${escapeHtml(message)}</div>`;
     renderMetrics();
   };
@@ -1421,14 +1440,12 @@ document.addEventListener('DOMContentLoaded', () => {
       closeFulfillment();
     }
     const orders = listedOrders();
-    const columnLimit = availableBoardColumns();
-    const columnCount = Math.max(1, Math.min(columnLimit, orders.length || columnLimit));
-    const rowCount = Math.max(1, Math.ceil(orders.length / columnCount));
+    const { columnCount, rowCount } = boardDimensions(orders.length);
     board.style.setProperty('--order-rows', String(rowCount));
     board.style.setProperty('--order-columns', String(columnCount));
 
     if (boardDensity) boardDensity.textContent = `${columnCount} columns x ${rowCount} rows`;
-    if (boardOverflow) boardOverflow.hidden = rowCount <= 1;
+    if (boardOverflow) boardOverflow.hidden = rowCount <= boardBaseRows;
 
     if (!orders.length) {
       board.innerHTML = '<div class="admin-board-empty">No listed orders waiting.</div>';
@@ -1448,6 +1465,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const claimedBySelf = order.claimedBy && order.claimedBy === currentEmployee.id;
       const claimLabel = order.claimedByName ? `${order.claimStale ? 'Stale' : 'Claimed'} by ${order.claimedByName}` : order.marketplaceStatus;
       const buttonLabel = order.claimStale ? 'Reclaim' : (claimedBySelf ? 'Resume' : (index === 0 ? 'Start Next' : 'Start'));
+      const cardStyles = [
+        orderGridPositionStyle(index, columnCount),
+        customSourceColor ? `--order-source-accent: ${escapeHtml(customSourceColor)}; --order-source-border: ${escapeHtml(customSourceColor)}; --order-source-border-hover: ${escapeHtml(customSourceColor)}` : ''
+      ].filter(Boolean).join(' ');
       const buttonIcon = isLocked
         ? '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>'
         : (order.claimStale
@@ -1460,7 +1481,7 @@ document.addEventListener('DOMContentLoaded', () => {
           class="admin-order-card ${isCritical && !isLocked ? 'is-critical' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''}"
           data-source-key="${escapeHtml(sourceKey)}"
           ${sourceColor ? `data-source-color="${customSourceColor ? 'custom' : escapeHtml(sourceColor)}"` : ''}
-          ${customSourceColor ? `style="--order-source-accent: ${escapeHtml(customSourceColor)}; --order-source-border: ${escapeHtml(customSourceColor)}; --order-source-border-hover: ${escapeHtml(customSourceColor)}"` : ''}
+          ${cardStyles ? `style="${cardStyles}"` : ''}
         >
           <div class="admin-order-card-top">
             <span class="admin-order-id">${escapeHtml(order.id)}</span>

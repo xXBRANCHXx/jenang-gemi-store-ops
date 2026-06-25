@@ -25,14 +25,23 @@ function jg_store_ops_walkins_request_json(): array
     return is_array($decoded) ? $decoded : [];
 }
 
+function jg_store_ops_walkins_requested_invoice_type(array $payload = []): string
+{
+    return jg_store_ops_walkins_normalize_invoice_type(
+        $payload['invoice_type'] ?? $payload['order_type'] ?? $_GET['invoice_type'] ?? $_GET['order_type'] ?? 'walk_in'
+    );
+}
+
 function jg_store_ops_walkins_response(PDO $pdo): void
 {
+    $invoiceType = jg_store_ops_walkins_requested_invoice_type();
     echo json_encode(
         [
             'ok' => true,
-            'invoice_number' => jg_store_ops_walkins_invoice_number(),
+            'invoice_type' => $invoiceType,
+            'invoice_number' => jg_store_ops_walkins_invoice_number($invoiceType),
             'catalog' => jg_store_ops_walkins_fetch_catalog($pdo),
-            'recent' => jg_store_ops_walkins_recent($pdo),
+            'recent' => jg_store_ops_walkins_recent($pdo, 12, $invoiceType),
         ],
         JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
     );
@@ -49,6 +58,22 @@ $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 
 try {
     if ($method === 'GET') {
+        $action = (string) ($_GET['action'] ?? '');
+        if ($action === 'invoice') {
+            $invoiceNumber = jg_store_ops_walkins_normalize_invoice_number((string) ($_GET['invoice_number'] ?? ''));
+            $invoice = jg_store_ops_walkins_find_invoice($pdo, $invoiceNumber);
+            if ($invoice === null) {
+                jg_store_ops_walkins_fail('Invoice was not found.', 404);
+            }
+            echo json_encode(['ok' => true, 'sale' => $invoice], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        if ($action === 'sales_summary') {
+            echo json_encode(['ok' => true, 'summary' => jg_store_ops_walkins_sales_summary($pdo)], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
         jg_store_ops_walkins_response($pdo);
     }
 
@@ -60,14 +85,16 @@ try {
     $action = (string) ($payload['action'] ?? '');
 
     if ($action === 'complete_sale') {
+        $invoiceType = jg_store_ops_walkins_requested_invoice_type($payload);
         $result = jg_store_ops_walkins_complete_sale($pdo, $payload, jg_admin_current_employee_name());
         echo json_encode(
             [
                 'ok' => true,
                 'sale' => $result,
-                'invoice_number' => jg_store_ops_walkins_invoice_number(),
+                'invoice_type' => $invoiceType,
+                'invoice_number' => jg_store_ops_walkins_invoice_number($invoiceType),
                 'catalog' => jg_store_ops_walkins_fetch_catalog($pdo),
-                'recent' => jg_store_ops_walkins_recent($pdo),
+                'recent' => jg_store_ops_walkins_recent($pdo, 12, $invoiceType),
             ],
             JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
         );

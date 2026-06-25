@@ -12,7 +12,7 @@ Operational backend for `store.jenanggemi.com`.
 
 - SKU database and master catalog
 - Inventory and stock thresholds
-- Orders and order-edit workflow
+- Fulfillment, walk-in, WhatsApp, and invoice-record workflows
 - COGS history and operational pricing inputs
 - Webhook and API integrations to external systems
 
@@ -22,10 +22,15 @@ Operational backend for `store.jenanggemi.com`.
 - `/sku-db/`
 - `/sku-db/new/`
 - `/inventory/`
-- `/orders/`
+- `/walk-ins/`
+- `/whatsapp-orders/`
+- `/invoice-records/`
+- `/orders/` redirects to `/invoice-records/`
 - `/integrations/`
 - `/logout/`
 - `/api/orders/`
+- `/api/walk-ins/`
+- `/api/invoice-records/`
 
 ## Notes
 

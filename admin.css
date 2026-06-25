@@ -1442,12 +1442,25 @@ button, input {
 .admin-scan-item div {
   display: grid;
   gap: 5px;
+  min-width: 0;
 }
 
 .admin-pick-item strong,
 .admin-scan-item strong {
+  min-width: 0;
+  overflow: hidden;
   font-family: 'Space Grotesk', sans-serif;
   font-size: 1.1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-pick-item span,
+.admin-scan-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-pick-item em,
@@ -1602,7 +1615,17 @@ button, input {
   gap: 18px;
 }
 
-.admin-fulfillment-card .admin-quiz-stage,
+.admin-fulfillment-card {
+  max-height: calc(100svh - 28px);
+  overflow: hidden;
+}
+
+.admin-fulfillment-card .admin-quiz-stage {
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-content: start;
+}
+
 .admin-scan-page-card {
   align-content: start;
 }
@@ -1610,6 +1633,14 @@ button, input {
 .admin-pick-list,
 .admin-scan-list {
   align-content: start;
+}
+
+.admin-fulfillment-card .admin-pick-list {
+  min-height: 0;
+  max-height: min(52svh, 520px);
+  overflow: auto;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
 }
 
 .admin-store-scan-page {
@@ -4838,19 +4869,21 @@ button.admin-store-sidebar-profile:hover {
 
 .admin-store-home .admin-order-board-wrap {
   width: 100%;
-  height: auto;
-  max-height: none;
-  overflow: visible;
+  height: calc(100svh - 94px);
+  max-height: calc(100svh - 94px);
+  overflow: auto;
+  overscroll-behavior: contain;
   padding: 0;
+  scrollbar-gutter: stable;
 }
 
 .admin-store-home .admin-order-board {
   --order-card-min-width: 128px;
   grid-template-columns: repeat(var(--order-columns, 8), minmax(min(var(--order-card-min-width), 100%), 1fr));
-  grid-template-rows: repeat(var(--order-rows, 1), minmax(82px, auto));
-  grid-auto-flow: row;
+  grid-template-rows: repeat(var(--order-rows, 6), minmax(82px, auto));
+  grid-auto-flow: column;
   grid-auto-rows: minmax(82px, auto);
-  grid-auto-columns: auto;
+  grid-auto-columns: minmax(min(var(--order-card-min-width), 100%), 1fr);
   gap: 7px;
   height: auto;
   align-content: start;
@@ -5549,7 +5582,24 @@ button.admin-store-sidebar-profile:hover {
   outline: none;
 }
 
-.admin-walkins-input-shell input:focus {
+.admin-walkins-input-shell select {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 0 38px 0 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: 14px;
+  background: var(--admin-surface-soft);
+  color: var(--admin-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 850;
+  outline: none;
+}
+
+.admin-walkins-input-shell input:focus,
+.admin-walkins-input-shell select:focus {
   border-color: color-mix(in srgb, var(--admin-accent-primary) 55%, var(--admin-border));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--admin-accent-primary) 18%, transparent);
 }
@@ -5600,6 +5650,10 @@ button.admin-store-sidebar-profile:hover {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.admin-walkins-customer-grid-wa {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .admin-walkins-cart-card {
@@ -6468,6 +6522,146 @@ button.admin-store-sidebar-profile:hover {
   font-size: 3.8mm;
   font-weight: 500;
   white-space: nowrap;
+}
+
+/* Invoice Records */
+.admin-invoice-records-layout {
+  padding: 0 10px 8px;
+}
+
+.admin-invoice-records-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-invoice-record-stat {
+  min-height: 96px;
+  padding: 14px;
+  border-radius: 18px;
+  box-shadow: none;
+}
+
+.admin-invoice-record-stat strong {
+  font-size: clamp(1.4rem, 2.4vw, 2.2rem);
+}
+
+.admin-invoice-records-panel {
+  min-width: 0;
+  min-height: 0;
+  border-radius: 18px;
+  box-shadow: none;
+}
+
+.admin-invoice-records-table-wrap {
+  max-height: calc(100svh - 276px);
+  overflow: auto;
+}
+
+.admin-invoice-records-table th,
+.admin-invoice-records-table td {
+  vertical-align: middle;
+}
+
+.admin-invoice-records-table td {
+  white-space: nowrap;
+}
+
+.admin-invoice-records-table td:nth-child(3) {
+  min-width: 220px;
+}
+
+.admin-invoice-records-table td:nth-child(3) span,
+.admin-invoice-records-table td:nth-child(3) small {
+  display: block;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-invoice-records-table td:nth-child(3) small {
+  margin-top: 3px;
+  color: var(--admin-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.admin-invoice-records-table tr.is-analytics-hidden {
+  opacity: 0.52;
+}
+
+.admin-invoice-records-table tr.is-analytics-excluded {
+  color: var(--admin-muted);
+}
+
+.admin-status-badge-muted {
+  color: var(--admin-muted);
+  border-color: var(--admin-border);
+}
+
+.admin-invoice-eye-btn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--admin-accent-primary) 38%, var(--admin-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--admin-accent-primary) 13%, transparent);
+  color: var(--admin-accent-primary);
+  cursor: pointer;
+}
+
+.admin-invoice-eye-btn.is-hidden {
+  border-color: var(--admin-border);
+  background: var(--admin-surface-soft);
+  color: var(--admin-muted);
+  filter: grayscale(1);
+}
+
+.admin-invoice-eye-btn:hover {
+  border-color: color-mix(in srgb, var(--admin-accent-primary) 62%, var(--admin-border));
+}
+
+.admin-invoice-eye-btn svg,
+.admin-invoice-print-btn svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.admin-invoice-print-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  white-space: nowrap;
+}
+
+@media (max-width: 980px) {
+  .admin-invoice-records-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-invoice-records-table-wrap {
+    max-height: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-invoice-records-metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media screen {
+  body.admin-body.is-walkins-printing .admin-walkins-print-stage {
+    display: none !important;
+  }
 }
 
 @media (max-width: 1180px) {
