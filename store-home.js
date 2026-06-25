@@ -57,9 +57,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const employeeProfilesEndpoint = '../api/employees-v2/';
   const scanBridgeEndpoint = '../api/scan-bridge/';
   const scanSerialEndpoint = '../api/scan-serial/';
-  const boardVisibleRows = 5;
-  const boardVisibleColumns = 5;
-  const boardVisibleCapacity = boardVisibleRows * boardVisibleColumns;
+  const boardMaxColumns = 8;
+  const boardMinColumnWidth = 128;
+  const boardColumnGap = 7;
   const ordersRefreshIntervalMs = 15000;
   const ordersRefreshMinGapMs = 3500;
   const currentEmployee = {
@@ -85,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let ordersRefreshPromise = null;
   let lastOrdersRefreshAt = 0;
   let skuCatalogRefreshPromise = null;
+  let boardResizeTimer = 0;
 
   const sourceColorOptions = [
     { value: 'none', label: 'No color' },
@@ -271,6 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Navigation remains usable without persistence.
       }
     }
+    scheduleBoardRender();
   };
 
   const syncSidebarForViewport = () => {
@@ -1314,10 +1316,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (fulfillingCount) fulfillingCount.textContent = String(state.orders.filter((order) => !['UNCLAIMED', 'FULFILLED'].includes(order.fulfillmentStatus)).length);
   };
 
+  const availableBoardColumns = () => {
+    const boardWidth = Number(board?.clientWidth || board?.parentElement?.clientWidth || 0);
+    if (!Number.isFinite(boardWidth) || boardWidth <= 0) return boardMaxColumns;
+    return Math.max(1, Math.min(
+      boardMaxColumns,
+      Math.floor((boardWidth + boardColumnGap) / (boardMinColumnWidth + boardColumnGap))
+    ));
+  };
+
   const renderBoardMessage = (message) => {
     if (!board) return;
-    board.style.setProperty('--order-rows', String(boardVisibleRows));
-    board.style.setProperty('--order-columns', String(boardVisibleColumns));
+    board.style.setProperty('--order-rows', '1');
+    board.style.setProperty('--order-columns', String(availableBoardColumns()));
     board.innerHTML = `<div class="admin-board-empty">${escapeHtml(message)}</div>`;
     renderMetrics();
   };
@@ -1331,13 +1342,14 @@ document.addEventListener('DOMContentLoaded', () => {
       closeFulfillment();
     }
     const orders = listedOrders();
-    const rowCount = boardVisibleRows;
-    const columnCount = Math.max(boardVisibleColumns, Math.ceil(orders.length / rowCount));
+    const columnLimit = availableBoardColumns();
+    const columnCount = Math.max(1, Math.min(columnLimit, orders.length || columnLimit));
+    const rowCount = Math.max(1, Math.ceil(orders.length / columnCount));
     board.style.setProperty('--order-rows', String(rowCount));
-    board.style.setProperty('--order-columns', String(boardVisibleColumns));
+    board.style.setProperty('--order-columns', String(columnCount));
 
     if (boardDensity) boardDensity.textContent = `${columnCount} columns x ${rowCount} rows`;
-    if (boardOverflow) boardOverflow.hidden = orders.length <= boardVisibleCapacity;
+    if (boardOverflow) boardOverflow.hidden = rowCount <= 1;
 
     if (!orders.length) {
       board.innerHTML = '<div class="admin-board-empty">No listed orders waiting.</div>';
@@ -1388,6 +1400,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     renderMetrics();
     refreshSiren();
+  };
+
+  const scheduleBoardRender = () => {
+    window.clearTimeout(boardResizeTimer);
+    boardResizeTimer = window.setTimeout(renderBoard, 80);
   };
 
   const renderPickStage = (order) => {
@@ -1630,6 +1647,7 @@ document.addEventListener('DOMContentLoaded', () => {
       setSidebarExpanded(false, { persist: false });
     }
   });
+  window.addEventListener('resize', scheduleBoardRender);
   window.addEventListener('storage', (event) => {
     if (event.key === themeStorageKey) {
       applyTheme(event.newValue || 'dark', { persist: false });

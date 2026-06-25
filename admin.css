@@ -4465,10 +4465,12 @@ button, input {
   grid-template-columns: var(--store-sidebar-width) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   gap: 8px;
-  height: 100svh;
-  min-height: 0;
+  height: auto;
+  min-height: 100svh;
   padding: 8px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  align-items: start;
   transition: grid-template-columns 0.22s ease;
 }
 
@@ -4482,8 +4484,10 @@ button, input {
   display: flex;
   grid-column: 1;
   grid-row: 1;
+  align-self: start;
   min-width: 0;
   min-height: 0;
+  max-height: calc(100svh - 16px);
   padding: 9px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -4727,8 +4731,9 @@ button.admin-store-sidebar-profile:hover {
   display: grid;
   grid-column: 2;
   grid-row: 1;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
   gap: 6px;
+  align-self: start;
   min-width: 0;
   min-height: 0;
 }
@@ -4821,11 +4826,11 @@ button.admin-store-sidebar-profile:hover {
 }
 
 .admin-store-home .admin-layout {
-  overflow: hidden;
+  overflow: visible;
 }
 
 .admin-store-home .admin-fulfillment-panel {
-  height: 100%;
+  height: auto;
   padding: 5px;
   border-radius: 8px;
   background: var(--admin-bg);
@@ -4833,17 +4838,21 @@ button.admin-store-sidebar-profile:hover {
 
 .admin-store-home .admin-order-board-wrap {
   width: 100%;
-  height: 100%;
+  height: auto;
   max-height: none;
+  overflow: visible;
   padding: 0;
 }
 
 .admin-store-home .admin-order-board {
-  grid-template-columns: repeat(var(--order-columns, 5), minmax(188px, 1fr));
-  grid-template-rows: repeat(var(--order-rows, 5), minmax(82px, 96px));
-  grid-auto-columns: minmax(188px, 1fr);
+  --order-card-min-width: 128px;
+  grid-template-columns: repeat(var(--order-columns, 8), minmax(min(var(--order-card-min-width), 100%), 1fr));
+  grid-template-rows: repeat(var(--order-rows, 1), minmax(82px, auto));
+  grid-auto-flow: row;
+  grid-auto-rows: minmax(82px, auto);
+  grid-auto-columns: auto;
   gap: 7px;
-  height: 100%;
+  height: auto;
   align-content: start;
 }
 
@@ -4984,8 +4993,8 @@ button.admin-store-sidebar-profile:hover {
   }
 
   .admin-store-home .admin-order-board {
-    grid-template-columns: repeat(var(--order-columns, 5), minmax(174px, 1fr));
-    grid-auto-columns: minmax(174px, 1fr);
+    grid-template-columns: repeat(var(--order-columns, 8), minmax(min(var(--order-card-min-width), 100%), 1fr));
+    grid-auto-columns: auto;
   }
 }
 
@@ -5088,8 +5097,8 @@ button.admin-store-sidebar-profile:hover {
   }
 
   .admin-store-home .admin-order-board {
-    grid-template-columns: repeat(var(--order-columns, 5), minmax(166px, 1fr));
-    grid-auto-columns: minmax(166px, 1fr);
+    grid-template-columns: repeat(var(--order-columns, 8), minmax(min(var(--order-card-min-width), 100%), 1fr));
+    grid-auto-columns: auto;
   }
 
   .admin-store-sidebar-backdrop {
