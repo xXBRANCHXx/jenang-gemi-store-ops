@@ -46,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     invoiceNumber: '',
     cart: [],
     paymentMethod: 'Cash',
+    invoicePrinted: false,
     recent: [],
     busy: false,
     scannerReady: false,
@@ -260,7 +261,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (refs.tax) refs.tax.textContent = formatRupiah(summary.tax);
     if (refs.totalItems) refs.totalItems.textContent = String(summary.itemCount);
     if (refs.total) refs.total.textContent = formatRupiah(summary.total);
-    if (refs.complete instanceof HTMLButtonElement) refs.complete.disabled = state.busy || state.cart.length === 0;
+    if (refs.complete instanceof HTMLButtonElement) {
+      const needsPrintedInvoice = state.cart.length > 0 && !state.invoicePrinted;
+      refs.complete.disabled = state.busy || state.cart.length === 0 || needsPrintedInvoice;
+      refs.complete.classList.toggle('is-locked', needsPrintedInvoice);
+      refs.complete.title = needsPrintedInvoice ? 'Print this invoice before completing the sale.' : '';
+    }
     if (refs.print instanceof HTMLButtonElement) refs.print.disabled = state.cart.length === 0;
   };
 
@@ -375,9 +381,15 @@ document.addEventListener('DOMContentLoaded', () => {
     renderRecent();
   };
 
+  const invalidatePrintedInvoice = () => {
+    state.invoicePrinted = false;
+    if (refs.printStage) refs.printStage.innerHTML = '';
+  };
+
   const addToCart = (product, scanned) => {
     if (!product || !product.sku) return;
     setError('');
+    invalidatePrintedInvoice();
     const sku = normalizeCode(product.sku);
     const existing = state.cart.find((item) => normalizeCode(item.sku) === sku);
     if (existing) {
@@ -541,6 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const changeQuantity = (sku, delta) => {
+    invalidatePrintedInvoice();
     state.cart = state.cart
       .map((item) => normalizeCode(item.sku) === normalizeCode(sku)
         ? { ...item, qty: Math.max(0, Number(item.qty || 0) + delta) }
@@ -550,6 +563,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const removeItem = (sku) => {
+    invalidatePrintedInvoice();
     state.cart = state.cart.filter((item) => normalizeCode(item.sku) !== normalizeCode(sku));
     renderCart();
   };
@@ -558,6 +572,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.invoiceNumber = invoiceNumber || state.invoiceNumber;
     state.cart = [];
     state.paymentMethod = 'Cash';
+    state.invoicePrinted = false;
     if (refs.customerName instanceof HTMLInputElement) refs.customerName.value = '';
     if (refs.customerPhone instanceof HTMLInputElement) refs.customerPhone.value = '';
     if (refs.customerEmail instanceof HTMLInputElement) refs.customerEmail.value = '';
@@ -696,11 +711,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     setError('');
     buildPrintableInvoice();
+    state.invoicePrinted = true;
+    renderTotals();
     window.setTimeout(() => window.print(), 50);
   };
 
   const completeSale = async () => {
-    if (!state.cart.length || state.busy) return;
+    if (!state.cart.length || state.busy || !state.invoicePrinted) return;
     state.busy = true;
     renderTotals();
     setError('');
@@ -790,19 +807,25 @@ document.addEventListener('DOMContentLoaded', () => {
     if (remove instanceof HTMLButtonElement) removeItem(remove.dataset.cartRemove || '');
   });
   refs.clearCart?.addEventListener('click', () => {
+    invalidatePrintedInvoice();
     state.cart = [];
-    if (refs.printStage) refs.printStage.innerHTML = '';
     renderCart();
   });
   [refs.customerName, refs.customerPhone, refs.customerEmail].forEach((input) => {
-    input?.addEventListener('input', renderCustomerSummary);
+    input?.addEventListener('input', () => {
+      invalidatePrintedInvoice();
+      renderCustomerSummary();
+      renderTotals();
+    });
   });
   document.querySelectorAll('[data-walkins-payment]').forEach((button) => {
     button.addEventListener('click', () => {
+      invalidatePrintedInvoice();
       state.paymentMethod = button.dataset.walkinsPayment || 'Cash';
       document.querySelectorAll('[data-walkins-payment]').forEach((item) => {
         item.classList.toggle('is-active', item === button);
       });
+      renderTotals();
     });
   });
   refs.complete?.addEventListener('click', completeSale);

@@ -159,8 +159,13 @@ $walkInsJsVersion = (string) @filemtime(dirname(__DIR__) . '/walk-ins.js');
                             <button type="button" data-walkins-payment="QRIS">QRIS</button>
                             <button type="button" data-walkins-payment="Transfer">Transfer</button>
                         </div>
-                        <button type="button" class="admin-primary-btn admin-walkins-complete" data-walkins-complete disabled>Complete sale</button>
-                        <button type="button" class="admin-ghost-btn admin-walkins-print" data-walkins-print>Print invoice</button>
+                        <div class="admin-walkins-action-row">
+                            <button type="button" class="admin-ghost-btn admin-walkins-print" data-walkins-print>
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8V4h10v4M7 18H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 14h10v6H7zM17 12h.01"/></svg>
+                                <span>Print Invoice</span>
+                            </button>
+                            <button type="button" class="admin-primary-btn admin-walkins-complete" data-walkins-complete disabled>Complete sale</button>
+                        </div>
                     </article>
 
                     <article class="admin-panel admin-walkins-recent-card">

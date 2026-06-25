@@ -6005,15 +6005,49 @@ button.admin-store-sidebar-profile:hover {
   color: #111317;
 }
 
+.admin-walkins-action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 10px;
+}
+
 .admin-walkins-complete,
 .admin-walkins-print {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   width: 100%;
   min-height: 48px;
   border-radius: 999px;
+  min-width: 0;
+  padding-inline: 14px;
+  white-space: nowrap;
+}
+
+.admin-walkins-action-row .admin-walkins-complete,
+.admin-walkins-action-row .admin-walkins-print {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.admin-walkins-print svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .admin-walkins-complete[disabled] {
-  opacity: 0.45;
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+  color: rgba(255, 255, 255, 0.48);
+  opacity: 1;
   cursor: not-allowed;
 }
 
