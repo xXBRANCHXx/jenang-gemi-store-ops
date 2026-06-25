@@ -637,7 +637,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>0 sugar, 0 calorie, 0 carb</span>
           </div>
           <div class="admin-walkins-invoice-brand">
-            <img class="admin-walkins-invoice-logo" src="../assets/zero-logo-black-cropped.svg" alt="ZERO">
+            <img class="admin-walkins-invoice-logo" src="../assets/ZERO%20Logo%20Black.svg" alt="ZERO" onerror="this.hidden=true;this.nextElementSibling.hidden=false">
+            <strong class="admin-walkins-invoice-logo-fallback" hidden>ZERO</strong>
             <p>PT. Zero Foods Indonesia<br>Jl. Jombor Tegal No.124 A, Jombor Lor, Sinduadi, Kec. Mlati<br>Sleman YO 55284, Indonesia</p>
           </div>
         </header>
