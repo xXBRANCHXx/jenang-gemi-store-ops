@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const endpoint = root.dataset.walkInsEndpoint || '../api/walk-ins/';
   const scanBridgeEndpoint = root.dataset.scanBridgeEndpoint || '../api/scan-bridge/';
   const scanSerialEndpoint = root.dataset.scanSerialEndpoint || '../api/scan-serial/';
+  const zeroLogoSrc = window.JGWalkInsLogoSrc || '../assets/ZERO%20Logo%20Black.svg';
   const firstPageItemLimit = 7;
   const continuationItemLimit = 9;
 
@@ -637,7 +638,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>0 sugar, 0 calorie, 0 carb</span>
           </div>
           <div class="admin-walkins-invoice-brand">
-            <img class="admin-walkins-invoice-logo" src="../assets/ZERO%20Logo%20Black.svg" alt="ZERO" onerror="this.hidden=true;this.nextElementSibling.hidden=false">
+            <img class="admin-walkins-invoice-logo" src="${escapeHtml(zeroLogoSrc)}" alt="ZERO" onerror="this.hidden=true;this.nextElementSibling.hidden=false">
             <strong class="admin-walkins-invoice-logo-fallback" hidden>ZERO</strong>
             <p>PT. Zero Foods Indonesia<br>Jl. Jombor Tegal No.124 A, Jombor Lor, Sinduadi, Kec. Mlati<br>Sleman YO 55284, Indonesia</p>
           </div>
