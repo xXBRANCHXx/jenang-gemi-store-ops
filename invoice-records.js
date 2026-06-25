@@ -3,12 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!root) return;
 
   const endpoint = root.dataset.invoiceRecordsEndpoint || '../api/invoice-records/';
-  const zeroLogoMarkup = `
-    <svg class="admin-walkins-invoice-logo" role="img" aria-label="ZERO" viewBox="0 0 420 112" xmlns="http://www.w3.org/2000/svg">
-      <text x="0" y="78" fill="#000" font-family="Arial Black, Arial, sans-serif" font-size="86" font-weight="900" letter-spacing="2">ZERO</text>
-      <rect x="5" y="94" width="315" height="7" rx="3.5" fill="#000"></rect>
-    </svg>
-  `;
+  const zeroLogoMarkup = '<img class="admin-walkins-invoice-logo" src="../assets/zero-logo-cropped.png" alt="ZERO" decoding="sync">';
   const firstPageItemLimit = 7;
   const continuationItemLimit = 9;
 
@@ -312,6 +307,17 @@ document.addEventListener('DOMContentLoaded', () => {
     refs.printStage.innerHTML = pages.map((pageItems, index) => invoicePageHtml(sale, pageItems, index, pages.length)).join('');
   };
 
+  const waitForPrintAssets = async () => {
+    const images = Array.from(refs.printStage?.querySelectorAll('img') || []);
+    await Promise.all(images.map((image) => {
+      if (image.complete) return Promise.resolve();
+      return new Promise((resolve) => {
+        image.addEventListener('load', resolve, { once: true });
+        image.addEventListener('error', resolve, { once: true });
+      });
+    }));
+  };
+
   const finishInvoicePrint = () => {
     window.clearTimeout(printCleanupTimer);
     printCleanupTimer = 0;
@@ -326,6 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const url = `${endpoint}?${new URLSearchParams({ action: 'invoice', invoice_number: invoiceNumber }).toString()}`;
       const payload = await requestJson({ url });
       buildPrintableInvoice(payload.sale || {});
+      await waitForPrintAssets();
       document.body.classList.add('is-walkins-printing');
       window.focus();
       window.print();

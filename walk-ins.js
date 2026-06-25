@@ -5,12 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const endpoint = root.dataset.walkInsEndpoint || '../api/walk-ins/';
   const scanBridgeEndpoint = root.dataset.scanBridgeEndpoint || '../api/scan-bridge/';
   const scanSerialEndpoint = root.dataset.scanSerialEndpoint || '../api/scan-serial/';
-  const zeroLogoMarkup = `
-    <svg class="admin-walkins-invoice-logo" role="img" aria-label="ZERO" viewBox="0 0 420 112" xmlns="http://www.w3.org/2000/svg">
-      <text x="0" y="78" fill="#000" font-family="Arial Black, Arial, sans-serif" font-size="86" font-weight="900" letter-spacing="2">ZERO</text>
-      <rect x="5" y="94" width="315" height="7" rx="3.5" fill="#000"></rect>
-    </svg>
-  `;
+  const zeroLogoMarkup = '<img class="admin-walkins-invoice-logo" src="../assets/zero-logo-cropped.png" alt="ZERO" decoding="sync">';
   const invoiceType = String(root.dataset.walkInsInvoiceType || 'walk_in').trim() === 'whatsapp' ? 'whatsapp' : 'walk_in';
   const isWhatsappInvoice = invoiceType === 'whatsapp';
   const defaultCustomerName = root.dataset.walkInsDefaultCustomer || (isWhatsappInvoice ? 'WhatsApp customer' : 'Walk-in customer');
@@ -747,6 +742,17 @@ document.addEventListener('DOMContentLoaded', () => {
     refs.printStage.innerHTML = pages.map((pageItems, index) => invoicePageHtml(pageItems, index, pages.length, summary)).join('');
   };
 
+  const waitForPrintAssets = async () => {
+    const images = Array.from(refs.printStage?.querySelectorAll('img') || []);
+    await Promise.all(images.map((image) => {
+      if (image.complete) return Promise.resolve();
+      return new Promise((resolve) => {
+        image.addEventListener('load', resolve, { once: true });
+        image.addEventListener('error', resolve, { once: true });
+      });
+    }));
+  };
+
   const prepareInvoicePrint = () => {
     if (!state.cart.length) {
       setError('Add at least one product before printing the invoice.');
@@ -770,9 +776,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.remove('is-walkins-printing');
   };
 
-  const printInvoice = () => {
+  const printInvoice = async () => {
     if (!prepareInvoicePrint()) return;
     try {
+      await waitForPrintAssets();
       window.focus();
       window.print();
       printCleanupTimer = window.setTimeout(finishInvoicePrint, 10000);
