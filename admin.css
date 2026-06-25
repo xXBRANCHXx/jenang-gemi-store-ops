@@ -6190,7 +6190,6 @@ button.admin-store-sidebar-profile:hover {
 }
 
 .admin-walkins-invoice-brand {
-  position: relative;
   display: grid;
   justify-items: end;
   min-width: 84mm;
@@ -6198,23 +6197,10 @@ button.admin-store-sidebar-profile:hover {
   text-align: right;
 }
 
-.admin-walkins-invoice-brand > span {
-  position: absolute;
-  top: 3mm;
-  right: 51mm;
-  margin: 0;
-  color: #111827;
-  font-size: 2.4mm;
-  line-height: 1;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-}
-
-.admin-walkins-invoice-brand strong {
-  font-size: 18mm;
-  font-weight: 950;
-  letter-spacing: 0;
-  line-height: 0.9;
+.admin-walkins-invoice-logo {
+  display: block;
+  width: 78mm;
+  height: auto;
 }
 
 .admin-walkins-invoice-brand p {
@@ -6226,13 +6212,19 @@ button.admin-store-sidebar-profile:hover {
 
 .admin-walkins-invoice-title {
   display: flex;
-  align-items: end;
+  align-items: start;
   justify-content: space-between;
   gap: 10mm;
-  margin-top: 23mm;
+  margin-top: 20mm;
 }
 
-.admin-walkins-invoice-title > strong {
+.admin-walkins-invoice-title-main {
+  display: grid;
+  gap: 3mm;
+  min-width: 0;
+}
+
+.admin-walkins-invoice-title-main > strong {
   color: #111827;
   font-family: 'Space Grotesk', sans-serif;
   font-size: 3.6mm;
@@ -6240,21 +6232,15 @@ button.admin-store-sidebar-profile:hover {
   white-space: nowrap;
 }
 
-.admin-walkins-invoice-title div {
+.admin-walkins-invoice-number {
   display: grid;
   justify-items: end;
   min-width: 0;
   text-align: right;
 }
 
-.admin-walkins-invoice-title span {
-  color: #111827;
-  font-size: 3.4mm;
-  font-weight: 600;
-}
-
-.admin-walkins-invoice-title h2 {
-  margin: 1mm 0 0;
+.admin-walkins-invoice-number h2 {
+  margin: 0;
   color: #238eaa;
   font-family: 'Space Grotesk', sans-serif;
   font-size: 7.6mm;
@@ -6323,7 +6309,6 @@ button.admin-store-sidebar-profile:hover {
 .admin-walkins-invoice-customer {
   display: grid;
   gap: 1mm;
-  padding: 7mm 3mm 4mm;
   color: #111827;
   font-family: 'Space Grotesk', sans-serif;
   font-size: 3.4mm;
@@ -6356,25 +6341,41 @@ button.admin-store-sidebar-profile:hover {
 
 .admin-walkins-invoice-total {
   display: flex;
-  align-items: baseline;
+  align-items: start;
   justify-content: flex-end;
-  gap: 5mm;
+  gap: 7mm;
   margin-top: 8mm;
   padding-right: 3mm;
   color: #000;
   font-family: 'Plus Jakarta Sans', Arial, sans-serif;
-  font-size: 5.2mm;
   font-weight: 950;
 }
 
+.admin-walkins-invoice-total div {
+  display: grid;
+  justify-items: end;
+  gap: 1mm;
+}
+
+.admin-walkins-invoice-total strong,
 .admin-walkins-invoice-total span {
   min-width: 36mm;
+  font-size: 5.2mm;
+  line-height: 1;
+  text-align: right;
+}
+
+.admin-walkins-invoice-total small {
+  color: #6b7280;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2.7mm;
+  font-weight: 800;
 }
 
 .admin-walkins-invoice-terms {
   display: grid;
-  gap: 6mm;
-  margin-top: 21mm;
+  gap: 3mm;
+  margin-top: 16mm;
   padding-left: 3mm;
   color: #111827;
   font-family: 'Space Grotesk', sans-serif;
@@ -6382,7 +6383,25 @@ button.admin-store-sidebar-profile:hover {
   font-weight: 800;
 }
 
-.admin-walkins-invoice-terms span {
+.admin-walkins-invoice-payment-details {
+  display: grid;
+  gap: 1mm;
+}
+
+.admin-walkins-invoice-payment-details span {
+  color: #5fa5bb;
+  font-size: 2.8mm;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-walkins-invoice-payment-details b {
+  color: #111827;
+  font-size: 3.2mm;
+}
+
+.admin-walkins-invoice-terms > span {
   color: #6b7280;
 }
 

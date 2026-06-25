@@ -637,15 +637,22 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>0 sugar, 0 calorie, 0 carb</span>
           </div>
           <div class="admin-walkins-invoice-brand">
-            <span>zerofoods.id</span>
-            <strong>ZERO</strong>
+            <img class="admin-walkins-invoice-logo" src="../assets/zero-logo-black-cropped.svg" alt="ZERO">
             <p>PT. Zero Foods Indonesia<br>Jl. Jombor Tegal No.124 A, Jombor Lor, Sinduadi, Kec. Mlati<br>Sleman YO 55284, Indonesia</p>
           </div>
         </header>
         <section class="admin-walkins-invoice-title">
-          <strong>ZERO Customer [Walk In]</strong>
-          <div>
-            <span>BCA - 03-788-688-18 [PT. ZERO FOODS INDONESIA]</span>
+          <div class="admin-walkins-invoice-title-main">
+            <strong>ZERO Customer [Walk In]</strong>
+            ${isFirstPage ? `
+              <div class="admin-walkins-invoice-customer">
+                <span>name : ${escapeHtml(customer.name)}</span>
+                <span>phone : ${escapeHtml(customer.phone)}</span>
+                <span>email : ${escapeHtml(customer.email)}</span>
+              </div>
+            ` : ''}
+          </div>
+          <div class="admin-walkins-invoice-number">
             <h2>Invoice ${escapeHtml(invoiceNumber)}</h2>
           </div>
         </section>
@@ -661,24 +668,24 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>Disc.%</span>
             <span>Amount</span>
           </div>
-          ${isFirstPage ? `
-            <div class="admin-walkins-invoice-customer">
-              <span>name : ${escapeHtml(customer.name)}</span>
-              <span>phone : ${escapeHtml(customer.phone)}</span>
-              <span>email : ${escapeHtml(customer.email)}</span>
-            </div>
-          ` : ''}
           <div class="admin-walkins-invoice-rows">
             ${items.length ? items.map(printItemRow).join('') : '<div class="admin-walkins-invoice-row"><span>No products added</span><span>0.00 Units</span><span>0.00</span><span>0.00</span><span>Rp 0.00</span></div>'}
           </div>
         </section>
         ${isLastPage ? `
           <section class="admin-walkins-invoice-total">
-            <strong>Total</strong>
+            <div>
+              <strong>Amount Due</strong>
+              <small>*tax included.</small>
+            </div>
             <span>${formatPrintTotal(summary.total)}</span>
           </section>
           <section class="admin-walkins-invoice-terms">
             <strong>Payment Communication: ${escapeHtml(invoiceNumber)}</strong>
+            <div class="admin-walkins-invoice-payment-details">
+              <span>Payment Details</span>
+              <b>BCA - 03-788-688-18 [PT. ZERO FOODS INDONESIA]</b>
+            </div>
             <span>Terms &amp; Conditions: https://royal-production.odoo.com/terms</span>
           </section>
         ` : '<section class="admin-walkins-invoice-spacer"></section>'}
