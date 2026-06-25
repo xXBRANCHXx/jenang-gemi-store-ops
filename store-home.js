@@ -93,6 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   let ordersRefreshPromise = null;
   let lastOrdersRefreshAt = 0;
+  let ordersEtag = '';
   let skuCatalogRefreshPromise = null;
   let boardResizeTimer = 0;
   let clientCacheDbPromise = null;
@@ -920,6 +921,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  const readStoredOrdersMeta = () => {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(ordersStorageMetaKey) || '{}');
+      return stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+    } catch (_error) {
+      return {};
+    }
+  };
+
   const catalogLookup = () => {
     const rows = new Map();
     const addLookup = (value, item) => {
@@ -1029,6 +1039,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const hydrateOrdersFromCache = () => {
     const cachedOrders = normalizeCachedOrders();
     if (!cachedOrders.length) return false;
+    ordersEtag = String(readStoredOrdersMeta().etag || '');
     state.orders = cachedOrders;
     renderBoard();
     renderSourceColorList();
@@ -1041,6 +1052,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const rows = Array.isArray(cached) ? cached : (Array.isArray(cached?.orders) ? cached.orders : []);
     const cachedOrders = normalizeCachedOrders(rows);
     if (!cachedOrders.length) return false;
+    ordersEtag = String(cached?.etag || ordersEtag || '');
     state.orders = cachedOrders;
     renderBoard();
     renderSourceColorList();
@@ -1048,15 +1060,22 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const loadOrders = async () => {
+    const headers = { Accept: 'application/json' };
+    if (ordersEtag && state.orders.length) headers['If-None-Match'] = ordersEtag;
     const response = await fetch(ordersEndpoint, {
       cache: 'no-store',
       credentials: 'same-origin',
-      headers: { Accept: 'application/json' }
+      headers
     });
+    if (response.status === 304) {
+      lastOrdersRefreshAt = Date.now();
+      return null;
+    }
     const payload = await response.json();
     if (!response.ok || !payload.ok) {
       throw new Error(payload.error || 'Unable to load orders.');
     }
+    ordersEtag = response.headers.get('ETag') || response.headers.get('etag') || ordersEtag;
 
     partnerOrderSources = (Array.isArray(payload.meta?.partner_orders?.sources) ? payload.meta.partner_orders.sources : [])
       .map((source) => ({
@@ -1082,7 +1101,7 @@ document.addEventListener('DOMContentLoaded', () => {
       delete cached.clientClaimReleaseRequested;
       return cached;
     });
-    const meta = { savedAt: Date.now() };
+    const meta = { savedAt: Date.now(), etag: ordersEtag };
     try {
       window.localStorage.setItem(ordersStorageKey, JSON.stringify(cacheOrders));
       window.localStorage.setItem(ordersStorageMetaKey, JSON.stringify(meta));
@@ -1526,11 +1545,22 @@ document.addEventListener('DOMContentLoaded', () => {
     return `grid-row: ${(index % rowCount) + 1}; grid-column: ${Math.floor(index / rowCount) + 1};`;
   };
 
-  const renderBoardMessage = (message) => {
+  const renderBoardMessage = (message, options = {}) => {
     if (!board) return;
     board.style.setProperty('--order-rows', String(boardBaseRows));
     board.style.setProperty('--order-columns', '1');
-    board.innerHTML = `<div class="admin-board-empty">${escapeHtml(message)}</div>`;
+    if (options.loading) {
+      board.innerHTML = `
+        <div class="admin-board-empty admin-board-loading" role="status" aria-live="polite">
+          <strong>${escapeHtml(message)}</strong>
+          <span class="admin-loading-worm" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i>
+          </span>
+        </div>
+      `;
+    } else {
+      board.innerHTML = `<div class="admin-board-empty">${escapeHtml(message)}</div>`;
+    }
     renderMetrics();
   };
 
@@ -1960,7 +1990,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     ordersRefreshPromise = (async () => {
       try {
-        state.orders = await loadOrders();
+        const loadedOrders = await loadOrders();
+        if (loadedOrders === null) {
+          renderBoard();
+          return state.orders;
+        }
+        state.orders = loadedOrders;
         lastOrdersRefreshAt = Date.now();
         saveOrders();
         renderBoard();
@@ -1990,7 +2025,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hydrateSkuCatalogFromCache();
     const hasCachedOrders = hydrateOrdersFromCache();
     if (!hasCachedOrders) {
-      renderBoardMessage('Loading orders...');
+      renderBoardMessage('Loading Orders', { loading: true });
     }
     hydrateSkuCatalogFromDurableCache()
       .then((updated) => {

@@ -853,6 +853,31 @@ function jg_store_ops_orders_apply_default_fulfillment(array $orders): array
     return $orders;
 }
 
+function jg_store_ops_orders_etag_from_payload(string $payload): string
+{
+    return '"jg-orders-v2-' . hash('sha256', $payload) . '"';
+}
+
+function jg_store_ops_orders_request_has_etag(string $etag): bool
+{
+    $headers = [];
+    $ifNoneMatch = (string) ($_SERVER['HTTP_IF_NONE_MATCH'] ?? '');
+    if ($ifNoneMatch !== '') {
+        $headers[] = $ifNoneMatch;
+    }
+
+    foreach ($headers as $header) {
+        foreach (explode(',', $header) as $candidate) {
+            $candidate = trim($candidate);
+            if ($candidate === '*' || $candidate === $etag || $candidate === 'W/' . $etag) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 jg_admin_require_auth_json();
 
 $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
@@ -1144,4 +1169,17 @@ try {
     $decoded['meta']['fulfillment'] = 'unavailable';
 }
 
-echo json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+$encoded = json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+if (!is_string($encoded)) {
+    jg_store_ops_orders_fail('Unable to encode order feed.', 500);
+}
+
+$etag = jg_store_ops_orders_etag_from_payload($encoded);
+header('ETag: ' . $etag);
+header('Cache-Control: private, no-store');
+if (jg_store_ops_orders_request_has_etag($etag)) {
+    http_response_code(304);
+    exit;
+}
+
+echo $encoded;
