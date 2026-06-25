@@ -65,6 +65,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const boardColumnGap = 7;
   const ordersRefreshIntervalMs = 15000;
   const ordersRefreshMinGapMs = 3500;
+  const cachedStartupRefreshDelayMs = 30000;
+  const clientCacheDbName = 'jg-store-ops-client-cache';
+  const clientCacheStoreName = 'entries';
   const currentEmployee = {
     id: String(root.dataset.employeeId || 'shared-admin'),
     name: String(root.dataset.employeeName || 'Admin')
@@ -92,6 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let lastOrdersRefreshAt = 0;
   let skuCatalogRefreshPromise = null;
   let boardResizeTimer = 0;
+  let clientCacheDbPromise = null;
 
   const sourceColorOptions = [
     { value: 'none', label: 'No color' },
@@ -107,6 +111,64 @@ document.addEventListener('DOMContentLoaded', () => {
   const defaultSourceColors = {
     'jenang-gemi-shopee': 'aqua',
     'zero-shopee': 'lime'
+  };
+
+  const idleTask = (callback, timeout = 1200) => {
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(callback, { timeout });
+      return;
+    }
+    window.setTimeout(callback, 0);
+  };
+
+  const openClientCacheDb = () => {
+    if (!window.indexedDB) return Promise.reject(new Error('IndexedDB is unavailable.'));
+    if (clientCacheDbPromise) return clientCacheDbPromise;
+    clientCacheDbPromise = new Promise((resolve, reject) => {
+      const request = window.indexedDB.open(clientCacheDbName, 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(clientCacheStoreName)) {
+          db.createObjectStore(clientCacheStoreName, { keyPath: 'key' });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('Unable to open Store Ops client cache.'));
+      request.onblocked = () => reject(new Error('Store Ops client cache is blocked by another tab.'));
+    });
+    return clientCacheDbPromise;
+  };
+
+  const readClientCache = async (key) => {
+    try {
+      const db = await openClientCacheDb();
+      return await new Promise((resolve, reject) => {
+        const tx = db.transaction(clientCacheStoreName, 'readonly');
+        const store = tx.objectStore(clientCacheStoreName);
+        const request = store.get(key);
+        request.onsuccess = () => resolve(request.result?.value || null);
+        request.onerror = () => reject(request.error || new Error('Unable to read Store Ops client cache.'));
+      });
+    } catch (_error) {
+      return null;
+    }
+  };
+
+  const writeClientCache = (key, value) => {
+    idleTask(() => {
+      openClientCacheDb()
+        .then((db) => new Promise((resolve, reject) => {
+          const tx = db.transaction(clientCacheStoreName, 'readwrite');
+          tx.oncomplete = resolve;
+          tx.onerror = () => reject(tx.error || new Error('Unable to write Store Ops client cache.'));
+          tx.objectStore(clientCacheStoreName).put({
+            key,
+            value,
+            updatedAt: Date.now()
+          });
+        }))
+        .catch(() => {});
+    });
   };
 
   const normalizeSourceKey = (value) => String(value || '')
@@ -771,20 +833,33 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const saveSkuCatalog = () => {
+    const payload = {
+      savedAt: Date.now(),
+      items: skuCatalog
+    };
     try {
-      window.localStorage.setItem(skuCatalogStorageKey, JSON.stringify({
-        savedAt: Date.now(),
-        items: skuCatalog
-      }));
+      window.localStorage.setItem(skuCatalogStorageKey, JSON.stringify(payload));
     } catch (_error) {
       // Cached SKU rows are an optional startup accelerator.
     }
+    writeClientCache(skuCatalogStorageKey, payload);
   };
 
   const hydrateSkuCatalogFromCache = () => {
     const cached = readStoredSkuCatalog();
     if (!cached.length) return false;
     skuCatalog = cached;
+    applyAstraScanTargets();
+    return true;
+  };
+
+  const hydrateSkuCatalogFromDurableCache = async () => {
+    if (skuCatalog.length) return false;
+    const cached = await readClientCache(skuCatalogStorageKey);
+    const rows = Array.isArray(cached) ? cached : (Array.isArray(cached?.items) ? cached.items : []);
+    const normalized = rows.filter((item) => item && typeof item === 'object' && String(item.sku || '').trim());
+    if (!normalized.length) return false;
+    skuCatalog = normalized;
     applyAstraScanTargets();
     return true;
   };
@@ -941,8 +1016,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }, storedById);
   };
 
-  const normalizeCachedOrders = () => {
-    const stored = readStoredOrders();
+  const normalizeCachedOrders = (orders = readStoredOrders()) => {
+    const stored = Array.isArray(orders) ? orders : [];
     if (!stored.length) return [];
     const storedById = new Map(stored.map((order) => [String(order.id || ''), order]));
     const catalogRows = catalogLookup();
@@ -953,6 +1028,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const hydrateOrdersFromCache = () => {
     const cachedOrders = normalizeCachedOrders();
+    if (!cachedOrders.length) return false;
+    state.orders = cachedOrders;
+    renderBoard();
+    renderSourceColorList();
+    return true;
+  };
+
+  const hydrateOrdersFromDurableCache = async () => {
+    if (state.orders.length) return false;
+    const cached = await readClientCache(ordersStorageKey);
+    const rows = Array.isArray(cached) ? cached : (Array.isArray(cached?.orders) ? cached.orders : []);
+    const cachedOrders = normalizeCachedOrders(rows);
     if (!cachedOrders.length) return false;
     state.orders = cachedOrders;
     renderBoard();
@@ -987,17 +1074,25 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const saveOrders = () => {
+    const cacheOrders = state.orders.map((order) => {
+      const cached = { ...order };
+      delete cached.started;
+      delete cached.clientClaimPending;
+      delete cached.clientClaimRequestId;
+      delete cached.clientClaimReleaseRequested;
+      return cached;
+    });
+    const meta = { savedAt: Date.now() };
     try {
-      const cacheOrders = state.orders.map((order) => {
-        const cached = { ...order };
-        delete cached.started;
-        return cached;
-      });
       window.localStorage.setItem(ordersStorageKey, JSON.stringify(cacheOrders));
-      window.localStorage.setItem(ordersStorageMetaKey, JSON.stringify({ savedAt: Date.now() }));
+      window.localStorage.setItem(ordersStorageMetaKey, JSON.stringify(meta));
     } catch (_error) {
       // Keep the visible queue working even when local persistence is unavailable.
     }
+    writeClientCache(ordersStorageKey, {
+      ...meta,
+      orders: cacheOrders
+    });
   };
 
   const syncOrdersFromStorage = () => {
@@ -1072,10 +1167,11 @@ document.addEventListener('DOMContentLoaded', () => {
     ...extra
   });
 
-  const postOrderAction = async (action, order, extra = {}) => {
+  const postOrderAction = async (action, order, extra = {}, options = {}) => {
     const response = await fetch(ordersEndpoint, {
       method: 'POST',
       credentials: 'same-origin',
+      keepalive: Boolean(options.keepalive),
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(orderActionPayload(action, order, extra))
     });
@@ -1084,6 +1180,11 @@ document.addEventListener('DOMContentLoaded', () => {
       throw new Error(payload.error || 'Unable to update order.');
     }
     return payload;
+  };
+
+  const showBoardAlert = (message) => {
+    if (!board || !message) return;
+    board.insertAdjacentHTML('afterbegin', `<div class="admin-board-empty admin-board-alert">${escapeHtml(message)}</div>`);
   };
 
   const applyFulfillmentState = (order, fulfillment) => {
@@ -1542,22 +1643,62 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const openFulfillment = async (orderId) => {
+  const applyOptimisticClaim = (order) => {
+    const now = new Date().toISOString();
+    order.fulfillmentStatus = ['SCAN_COMPLETED', 'LABEL_PRINTED'].includes(String(order.fulfillmentStatus || ''))
+      ? order.fulfillmentStatus
+      : 'CLAIMED';
+    order.claimedBy = currentEmployee.id;
+    order.claimedByName = currentEmployee.name;
+    order.claimedAt = order.claimedAt || now;
+    order.locked = false;
+    order.currentEmployeeCanWork = true;
+    order.claimStale = false;
+    order.started = true;
+    order.clientClaimPending = true;
+    order.clientClaimRequestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  };
+
+  const releaseAfterPendingClaim = (order) => {
+    if (!order?.clientClaimReleaseRequested) return;
+    postOrderAction('release_order', order, {}, { keepalive: true })
+      .then((payload) => {
+        applyFulfillmentState(order, payload.fulfillment || payload.order);
+        saveOrders();
+        renderBoard();
+      })
+      .catch(() => refreshOrders(false, { force: true }).catch(() => {}));
+  };
+
+  const syncClaimInBackground = (order, claimRequestId) => {
+    postOrderAction('claim_order', order, {}, { keepalive: true })
+      .then((payload) => {
+        if (order.clientClaimRequestId !== claimRequestId) return;
+        order.clientClaimPending = false;
+        delete order.clientClaimRequestId;
+        applyFulfillmentState(order, payload.fulfillment || payload.order);
+        saveOrders();
+        if (state.activeOrderId === order.id) renderPickStage(order);
+        renderBoard();
+        releaseAfterPendingClaim(order);
+      })
+      .catch((error) => {
+        if (order.clientClaimRequestId !== claimRequestId) return;
+        order.clientClaimPending = false;
+        delete order.clientClaimRequestId;
+        order.started = false;
+        if (state.activeOrderId === order.id) closeFulfillment(false);
+        refreshOrders(false, { force: true }).catch(() => {});
+        renderBoard();
+        showBoardAlert(error instanceof Error ? error.message : 'Unable to claim this order.');
+      });
+  };
+
+  const openFulfillment = (orderId) => {
     const order = state.orders.find((item) => item.id === orderId);
     if (!order) return;
     if (order.locked && !order.currentEmployeeCanWork) return;
-    try {
-      const payload = await postOrderAction('claim_order', order);
-      applyFulfillmentState(order, payload.fulfillment || payload.order);
-    } catch (error) {
-      if (board) {
-        const message = error instanceof Error ? error.message : 'Unable to claim this order.';
-        board.insertAdjacentHTML('afterbegin', `<div class="admin-board-empty admin-board-alert">${escapeHtml(message)}</div>`);
-      }
-      refreshOrders(false).catch(() => {});
-      return;
-    }
-    order.started = true;
+    applyOptimisticClaim(order);
     state.activeOrderId = order.id;
     state.scans = new Map();
     saveOrders();
@@ -1566,6 +1707,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (pickStage) pickStage.hidden = false;
     if (modal) modal.hidden = false;
     renderBoard();
+    syncClaimInBackground(order, order.clientClaimRequestId);
   };
 
   const closeFulfillment = (releaseClaim = false) => {
@@ -1573,6 +1715,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modal) modal.hidden = true;
     state.activeOrderId = '';
     state.scans = new Map();
+    if (releaseClaim && order?.clientClaimPending) {
+      order.clientClaimReleaseRequested = true;
+      order.started = false;
+      saveOrders();
+      renderBoard();
+      return;
+    }
     if (releaseClaim && order && order.claimedBy === currentEmployee.id && order.fulfillmentStatus === 'CLAIMED') {
       postOrderAction('release_order', order)
         .then((payload) => {
@@ -1843,6 +1992,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!hasCachedOrders) {
       renderBoardMessage('Loading orders...');
     }
+    hydrateSkuCatalogFromDurableCache()
+      .then((updated) => {
+        if (updated) renderBoard();
+      })
+      .catch(() => {});
+    hydrateOrdersFromDurableCache().catch(() => {});
 
     formatClock();
     loadScannerSettings().catch(() => {});
@@ -1854,12 +2009,11 @@ document.addEventListener('DOMContentLoaded', () => {
           if (updated) refreshOrders(false, { force: true }).catch(() => {});
         })
         .catch(() => {});
-    }, 0);
-
-    window.setInterval(() => {
-      formatClock();
-      refreshOrders(false).catch(() => {});
-    }, ordersRefreshIntervalMs);
+      window.setInterval(() => {
+        formatClock();
+        refreshOrders(false).catch(() => {});
+      }, ordersRefreshIntervalMs);
+    }, hasCachedOrders ? cachedStartupRefreshDelayMs : 0);
   };
 
   initialize();

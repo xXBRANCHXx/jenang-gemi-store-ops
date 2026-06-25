@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ordersStorageKey = 'jg-store-live-orders';
   const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
+  const pendingScanQueueStorageKey = 'jg-store-pending-scan-queues-v1';
   const ordersEndpoint = '../../api/orders-v2/';
   const orderIdNode = document.querySelector('[data-print-order-id]');
   const statusNode = document.querySelector('[data-print-status]');
@@ -89,6 +90,29 @@ document.addEventListener('DOMContentLoaded', () => {
     return account || platform || 'default';
   };
 
+  const scanQueueKey = () => [
+    normalizeSourceKey(order?.platform || ''),
+    sourceKeyFromOrder(order),
+    String(order?.id || orderId || '')
+  ].join('\u0000');
+
+  const readPendingScanQueues = () => {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(pendingScanQueueStorageKey) || '{}');
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (_error) {
+      return {};
+    }
+  };
+
+  const writePendingScanQueues = (queues) => {
+    try {
+      window.localStorage.setItem(pendingScanQueueStorageKey, JSON.stringify(queues));
+    } catch (_error) {
+      // Keep the queue available in this page load if storage is blocked.
+    }
+  };
+
   const orderActionPayload = (action, extra = {}) => ({
     action,
     order_id: String(order?.id || orderId || ''),
@@ -97,10 +121,11 @@ document.addEventListener('DOMContentLoaded', () => {
     ...extra
   });
 
-  const postOrderAction = async (action, extra = {}) => {
+  const postOrderAction = async (action, extra = {}, options = {}) => {
     const response = await fetch(ordersEndpoint, {
       method: 'POST',
       credentials: 'same-origin',
+      keepalive: Boolean(options.keepalive),
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(orderActionPayload(action, extra))
     });
@@ -109,6 +134,40 @@ document.addEventListener('DOMContentLoaded', () => {
       throw new Error(payload.error || 'Unable to update fulfillment state.');
     }
     return payload;
+  };
+
+  const flushPendingScanQueueForOrder = async () => {
+    if (!order || isReprint) return;
+    const queues = readPendingScanQueues();
+    let key = scanQueueKey();
+    let queue = queues[key];
+    if (!queue) {
+      const fallback = Object.entries(queues).find(([, candidate]) => (
+        candidate
+        && typeof candidate === 'object'
+        && String(candidate.order_id || '').trim() === String(order.id || orderId || '').trim()
+      ));
+      if (fallback) {
+        key = fallback[0];
+        queue = fallback[1];
+      }
+    }
+    if (!queue || typeof queue !== 'object') return;
+
+    const events = Array.isArray(queue.events) ? queue.events.filter((event) => event && typeof event === 'object') : [];
+    const progress = queue.progress && typeof queue.progress === 'object'
+      ? queue.progress
+      : { completed: 0, required: 0 };
+    if (statusNode) statusNode.textContent = 'Syncing scans';
+    await postOrderAction('claim_order', {}, { keepalive: true });
+    if (events.length) {
+      await postOrderAction('record_scan', { events, progress });
+    }
+    if (queue.complete) {
+      await postOrderAction('complete_scan', { progress });
+    }
+    delete queues[key];
+    writePendingScanQueues(queues);
   };
 
   const setError = (message) => {
@@ -147,6 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const markPrintedOnServer = async () => {
     if (!order) return;
+    await flushPendingScanQueueForOrder();
     await postOrderAction(isReprint ? 'reprint_label' : 'label_printed', {
       printed_at: new Date().toISOString()
     });

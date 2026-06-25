@@ -4,9 +4,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const ordersStorageKey = 'jg-store-live-orders';
   const activeOrderStorageKey = 'jg-store-active-order-id';
+  const pendingScanQueueStorageKey = 'jg-store-pending-scan-queues-v1';
   const scanBridgeEndpoint = '../../api/scan-bridge/';
   const scanSerialEndpoint = '../../api/scan-serial/';
   const ordersEndpoint = '../../api/orders-v2/';
+  const scanFlushDelayMs = 30000;
   const orderIdNode = document.querySelector('[data-scan-order-id]');
   const scanError = document.querySelector('[data-scan-error]');
   const scanList = document.querySelector('[data-scan-list]');
@@ -56,10 +58,13 @@ document.addEventListener('DOMContentLoaded', () => {
   let lastScanKey = '';
   let lastScanAt = 0;
   let pendingScanEvents = [];
+  let activeFlushBatch = [];
   let flushTimer = 0;
   let flushingScans = false;
   let scanCompletedOnServer = false;
-  let completingScan = false;
+  let scanCompletionQueued = false;
+  let claimSynced = false;
+  let claimSyncPromise = null;
 
   if (orderIdNode) orderIdNode.textContent = order?.id || 'Order missing';
 
@@ -129,10 +134,11 @@ document.addEventListener('DOMContentLoaded', () => {
     ...extra
   });
 
-  const postOrderAction = async (action, extra = {}) => {
+  const postOrderAction = async (action, extra = {}, options = {}) => {
     const response = await fetch(ordersEndpoint, {
       method: 'POST',
       credentials: 'same-origin',
+      keepalive: Boolean(options.keepalive),
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(orderActionPayload(action, extra))
     });
@@ -141,6 +147,29 @@ document.addEventListener('DOMContentLoaded', () => {
       throw new Error(payload.error || 'Unable to sync scan activity.');
     }
     return payload;
+  };
+
+  const scanQueueKey = () => [
+    normalizeSourceKey(order?.platform || ''),
+    sourceKeyFromOrder(order),
+    String(order?.id || orderId || '')
+  ].join('\u0000');
+
+  const readPendingScanQueues = () => {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(pendingScanQueueStorageKey) || '{}');
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (_error) {
+      return {};
+    }
+  };
+
+  const writePendingScanQueues = (queues) => {
+    try {
+      window.localStorage.setItem(pendingScanQueueStorageKey, JSON.stringify(queues));
+    } catch (_error) {
+      // Scan state remains in memory for this page load.
+    }
   };
 
   const consolidateScanItems = (items) => {
@@ -192,9 +221,59 @@ document.addEventListener('DOMContentLoaded', () => {
     required: totalRequired()
   });
 
+  const clearPendingScanQueue = () => {
+    if (!order) return;
+    const queues = readPendingScanQueues();
+    delete queues[scanQueueKey()];
+    writePendingScanQueues(queues);
+  };
+
+  const persistPendingScanQueue = () => {
+    if (!order) return;
+    const hasPendingCompletion = scanCompletionQueued && !scanCompletedOnServer;
+    if (!pendingScanEvents.length && !hasPendingCompletion) {
+      clearPendingScanQueue();
+      return;
+    }
+
+    const queues = readPendingScanQueues();
+    queues[scanQueueKey()] = {
+      order_id: String(order.id || orderId || ''),
+      source_platform: normalizeSourceKey(order.platform || ''),
+      source_account: sourceKeyFromOrder(order),
+      events: activeFlushBatch.concat(pendingScanEvents),
+      progress: currentProgress(),
+      complete: hasPendingCompletion,
+      updated_at: new Date().toISOString()
+    };
+    writePendingScanQueues(queues);
+  };
+
+  const restorePendingScanQueue = () => {
+    if (!order) return;
+    const queue = readPendingScanQueues()[scanQueueKey()];
+    if (!queue || typeof queue !== 'object') return;
+    pendingScanEvents = Array.isArray(queue.events) ? queue.events.filter((event) => event && typeof event === 'object') : [];
+    scanCompletionQueued = Boolean(queue.complete);
+    pendingScanEvents.forEach((event) => {
+      if (event.type !== 'scan') return;
+      const sku = String(event.sku || '').trim();
+      if (!sku) return;
+      scans.set(sku, scanCountFor(sku) + Math.max(1, Number(event.quantity || 1)));
+    });
+  };
+
+  const scheduleScanFlush = (delay = scanFlushDelayMs) => {
+    if (flushTimer) return;
+    flushTimer = window.setTimeout(() => {
+      flushTimer = 0;
+      flushScanEvents().catch(() => {});
+    }, delay);
+  };
+
   const updateSyncStatus = (stateName = '') => {
     if (!syncStatus) return;
-    const pending = pendingScanEvents.length;
+    const pending = pendingScanEvents.length + (scanCompletionQueued && !scanCompletedOnServer ? 1 : 0);
     syncStatus.hidden = stateName === '' && pending === 0 && !flushingScans;
     syncStatus.classList.toggle('is-error', stateName === 'error');
     syncStatus.textContent = stateName === 'error'
@@ -209,90 +288,74 @@ document.addEventListener('DOMContentLoaded', () => {
       progress_scanned: totalScanned(),
       progress_required: totalRequired()
     });
+    persistPendingScanQueue();
     updateSyncStatus();
-    window.clearTimeout(flushTimer);
-    flushTimer = window.setTimeout(() => {
-      flushScanEvents().catch(() => {});
-    }, 1500);
+    scheduleScanFlush();
+  };
+
+  const ensureClaimOnServer = async () => {
+    if (!order || claimSynced) return true;
+    if (claimSyncPromise) return claimSyncPromise;
+    claimSyncPromise = postOrderAction('claim_order')
+      .then(() => {
+        claimSynced = true;
+        return true;
+      })
+      .finally(() => {
+        claimSyncPromise = null;
+      });
+    return claimSyncPromise;
   };
 
   const flushScanEvents = async () => {
-    if (!order || flushingScans || pendingScanEvents.length === 0) {
+    const hasPendingCompletion = scanCompletionQueued && !scanCompletedOnServer;
+    if (!order || flushingScans || (pendingScanEvents.length === 0 && !hasPendingCompletion)) {
       updateSyncStatus();
-      return pendingScanEvents.length === 0;
+      return pendingScanEvents.length === 0 && !hasPendingCompletion;
     }
 
     flushingScans = true;
     updateSyncStatus();
     const batch = pendingScanEvents.splice(0, pendingScanEvents.length);
+    activeFlushBatch = batch;
+    persistPendingScanQueue();
     try {
-      await postOrderAction('record_scan', {
-        events: batch,
-        progress: currentProgress()
-      });
+      await ensureClaimOnServer();
+      if (batch.length) {
+        await postOrderAction('record_scan', {
+          events: batch,
+          progress: currentProgress()
+        });
+      }
+      if (scanCompletionQueued && !scanCompletedOnServer) {
+        await postOrderAction('complete_scan', { progress: currentProgress() });
+        scanCompletedOnServer = true;
+      }
+      activeFlushBatch = [];
       flushingScans = false;
+      persistPendingScanQueue();
       updateSyncStatus();
-      return pendingScanEvents.length === 0;
+      return pendingScanEvents.length === 0 && (!scanCompletionQueued || scanCompletedOnServer);
     } catch (error) {
-      pendingScanEvents = batch.concat(pendingScanEvents);
+      pendingScanEvents = activeFlushBatch.concat(pendingScanEvents);
+      activeFlushBatch = [];
       flushingScans = false;
+      persistPendingScanQueue();
       updateSyncStatus('error');
+      scheduleScanFlush();
       setError(error instanceof Error ? error.message : 'Scan sync failed. Final fulfillment is blocked until sync completes.');
       return false;
     }
   };
 
-  const flushScanEventsBeacon = () => {
-    if (!order || pendingScanEvents.length === 0) return;
-    const batch = pendingScanEvents.splice(0, pendingScanEvents.length);
-    const payload = JSON.stringify(orderActionPayload('record_scan', {
-      events: batch,
-      progress: currentProgress()
-    }));
-    if (navigator.sendBeacon) {
-      const queued = navigator.sendBeacon(ordersEndpoint, new Blob([payload], { type: 'application/json' }));
-      if (queued) return;
-    }
-    fetch(ordersEndpoint, {
-      method: 'POST',
-      credentials: 'same-origin',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: payload
-    }).catch(() => {});
-  };
-
-  const completeScanOnServer = async () => {
-    if (!order || scanCompletedOnServer || completingScan) return false;
-    completingScan = true;
-    setScanStatus('Syncing scan results', 'Saving final scan progress before label choices open.');
-    const flushed = await flushScanEvents();
-    if (!flushed || pendingScanEvents.length > 0) {
-      completingScan = false;
-      setScanStatus('Sync pending', 'Final fulfillment is blocked until scan activity reaches the server.');
-      return false;
-    }
-
-    try {
-      await postOrderAction('complete_scan', { progress: currentProgress() });
-      scanCompletedOnServer = true;
-      completingScan = false;
-      return true;
-    } catch (error) {
-      completingScan = false;
-      updateSyncStatus('error');
-      setError(error instanceof Error ? error.message : 'Unable to complete scan on the server.');
-      setScanStatus('Sync pending', 'Final fulfillment is blocked until scan completion reaches the server.');
-      return false;
-    }
-  };
-
   const maybeOpenPrintLabelPage = () => {
-    if (!order || printRedirecting || completingScan || scanCompletedOnServer) return;
+    if (!order || printRedirecting) return;
     if (totalRequired() <= 0 || totalScanned() < totalRequired()) return;
-    completeScanOnServer().then((complete) => {
-      if (complete) openPrintLabelPage();
-    });
+    scanCompletionQueued = true;
+    persistPendingScanQueue();
+    updateSyncStatus();
+    scheduleScanFlush();
+    openPrintLabelPage();
   };
 
   const normalizeScanCode = (value) => String(value || '').trim().toUpperCase();
@@ -324,7 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (_error) {
       // Query string still carries the order id.
     }
-    setScanStatus('Scan complete', 'Opening label choices.');
+    setScanStatus('Scan complete', 'Opening label choices while sync continues in the background.');
     window.setTimeout(() => {
       const account = String(order.sourceAccountKey || order.account_key || '');
       const platform = String(order.platform || '').toLowerCase();
@@ -631,7 +694,12 @@ document.addEventListener('DOMContentLoaded', () => {
       scannerSettings = { baud_rate: 9600 };
     }
 
+    restorePendingScanQueue();
     render();
+    updateSyncStatus();
+    if (pendingScanEvents.length || (scanCompletionQueued && !scanCompletedOnServer)) {
+      scheduleScanFlush();
+    }
     if (!navigator.serial) {
       setScanStatus('Checking USB-COM scanner', 'Reading the local serial device if the server can access it.');
       startServerSerialPolling();
@@ -651,7 +719,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.addEventListener('pagehide', () => {
     window.clearTimeout(flushTimer);
-    flushScanEventsBeacon();
+    flushTimer = 0;
+    persistPendingScanQueue();
     window.clearInterval(serverSerialTimer);
     if (serialReader) serialReader.cancel().catch(() => {});
     if (serialPort?.readable || serialPort?.writable) serialPort.close().catch(() => {});
