@@ -6322,14 +6322,19 @@ button.admin-store-sidebar-profile:hover {
 .admin-walkins-invoice-row {
   min-height: 9.2mm;
   padding: 0 3mm;
+  border-bottom: 0.25mm solid #e5e7eb;
   color: #111827;
   font-family: 'Space Grotesk', sans-serif;
   font-size: 3.4mm;
   font-weight: 800;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 .admin-walkins-invoice-row:nth-child(even) {
-  background: #f0f0f0;
+  background: #e9ecef;
+  border-top: 0.25mm solid #d9dde2;
+  border-bottom-color: #d9dde2;
 }
 
 .admin-walkins-invoice-row span {
