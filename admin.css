@@ -4749,8 +4749,7 @@ button.admin-store-sidebar-profile:hover {
 
 .admin-store-home:not(.is-sidebar-expanded) :is(
   .admin-store-sidebar-brand-copy,
-  .admin-store-nav-item span,
-  .admin-store-settings-launch span
+  .admin-store-nav-item > span:not(.admin-store-nav-internet-icon)
 ) {
   display: none;
 }
