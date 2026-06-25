@@ -13,9 +13,13 @@ $adminCssVersion = (string) @filemtime(dirname(__DIR__) . '/admin.css');
 $storeShellJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-shell.js');
 $walkInsJsVersion = (string) @filemtime(dirname(__DIR__) . '/walk-ins.js');
 $zeroLogoPath = dirname(__DIR__) . '/assets/ZERO Logo Black.svg';
-$zeroLogoSrc = is_readable($zeroLogoPath)
-    ? 'data:image/svg+xml;base64,' . base64_encode((string) file_get_contents($zeroLogoPath))
-    : '../assets/ZERO%20Logo%20Black.svg';
+$zeroLogoSvg = is_readable($zeroLogoPath) ? (string) file_get_contents($zeroLogoPath) : '';
+$zeroLogoSvg = preg_replace(
+    '/<svg\b(?![^>]*\bclass=)/',
+    '<svg class="admin-walkins-invoice-logo" role="img" aria-label="ZERO"',
+    $zeroLogoSvg,
+    1
+) ?: '';
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -203,7 +207,7 @@ $zeroLogoSrc = is_readable($zeroLogoPath)
     <?php jg_store_ops_shell_close(); ?>
     <script src="../store-shell.js?v=<?php echo urlencode($storeShellJsVersion ?: '1'); ?>" defer></script>
     <script>
-        window.JGWalkInsLogoSrc = <?php echo json_encode($zeroLogoSrc, JSON_UNESCAPED_SLASHES); ?>;
+        window.JGWalkInsLogoMarkup = <?php echo json_encode($zeroLogoSvg, JSON_UNESCAPED_SLASHES); ?>;
     </script>
     <script src="../walk-ins.js?v=<?php echo urlencode($walkInsJsVersion ?: '1'); ?>" defer></script>
 </body>
