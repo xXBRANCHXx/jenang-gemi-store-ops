@@ -4576,7 +4576,9 @@ button, input {
   justify-self: center;
   width: 18px;
   height: 18px;
-  object-fit: contain;
+  background: currentColor;
+  mask: var(--admin-store-nav-icon) center / contain no-repeat;
+  -webkit-mask: var(--admin-store-nav-icon) center / contain no-repeat;
 }
 
 .admin-store-sidebar-brand-copy,

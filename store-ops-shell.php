@@ -27,12 +27,12 @@ function jg_store_ops_shell_attr(array $attributes): string
 function jg_store_ops_shell_svg(string $name): string
 {
     $remoteIcons = [
-        'whatsapp-orders' => 'https://cdn.simpleicons.org/whatsapp/25D366',
-        'invoice-records' => 'https://api.iconify.design/material-symbols:receipt-long-outline.svg?color=%23f59e0b',
+        'whatsapp-orders' => 'https://cdn.simpleicons.org/whatsapp',
+        'invoice-records' => 'https://api.iconify.design/material-symbols:receipt-long-outline.svg',
     ];
     if (isset($remoteIcons[$name])) {
         return sprintf(
-            '<img class="admin-store-nav-internet-icon" src="%s" alt="" aria-hidden="true" decoding="async">',
+            '<span class="admin-store-nav-internet-icon" style="--admin-store-nav-icon: url(%s);" aria-hidden="true"></span>',
             htmlspecialchars($remoteIcons[$name], ENT_QUOTES, 'UTF-8')
         );
     }
