@@ -26,12 +26,21 @@ function jg_store_ops_shell_attr(array $attributes): string
 
 function jg_store_ops_shell_svg(string $name): string
 {
+    $remoteIcons = [
+        'whatsapp-orders' => 'https://cdn.simpleicons.org/whatsapp/25D366',
+        'invoice-records' => 'https://api.iconify.design/material-symbols:receipt-long-outline.svg?color=%23f59e0b',
+    ];
+    if (isset($remoteIcons[$name])) {
+        return sprintf(
+            '<img class="admin-store-nav-internet-icon" src="%s" alt="" aria-hidden="true" decoding="async">',
+            htmlspecialchars($remoteIcons[$name], ENT_QUOTES, 'UTF-8')
+        );
+    }
+
     $icons = [
         'orders' => '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h6"/></svg>',
         'inventory' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM4.4 7.7 12 12l7.6-4.3M12 12v9"/></svg>',
         'walk-ins' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3"/></svg>',
-        'whatsapp-orders' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19.5 6.2 16A7.5 7.5 0 1 1 9 18.3z"/><path d="M9 9.5c.6 2 2 3.6 4.1 4.5l1.2-1.1 2.1.5c.2 0 .4.2.4.5v1.4c0 .4-.3.7-.7.7A8.9 8.9 0 0 1 7.2 8c0-.4.3-.7.7-.7h1.4c.2 0 .4.2.5.4l.5 2z"/></svg>',
-        'invoice-records' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4"/><path d="M3 12s2-4 6-4 6 4 6 4-2 4-6 4-6-4-6-4"/><circle cx="9" cy="12" r="1.5"/></svg>',
         'integrations' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12h8M9 7V3M15 7V3M7 7h10v3a5 5 0 0 1-10 0zM12 15v6"/></svg>',
         'sku-db' => '<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>',
         'reprint' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></svg>',

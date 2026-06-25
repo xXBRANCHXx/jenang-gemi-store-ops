@@ -1408,19 +1408,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const boardDimensions = (orderCount) => {
     const columnLimit = availableBoardColumns();
     const columnCount = Math.max(1, Math.min(columnLimit, Math.ceil((orderCount || 1) / boardBaseRows)));
-    const overflowCount = Math.max(0, (orderCount || 0) - (boardBaseRows * columnCount));
-    const rowCount = boardBaseRows + Math.ceil(overflowCount / columnCount);
+    const rowCount = Math.max(boardBaseRows, Math.ceil((orderCount || 1) / columnCount));
     return { columnCount, rowCount };
   };
 
-  const orderGridPositionStyle = (index, columnCount) => {
-    const firstPageCapacity = boardBaseRows * columnCount;
-    if (index < firstPageCapacity) {
-      return `grid-row: ${(index % boardBaseRows) + 1}; grid-column: ${Math.floor(index / boardBaseRows) + 1};`;
-    }
-
-    const overflowIndex = index - firstPageCapacity;
-    return `grid-row: ${boardBaseRows + Math.floor(overflowIndex / columnCount) + 1}; grid-column: ${(overflowIndex % columnCount) + 1};`;
+  const orderGridPositionStyle = (index, rowCount) => {
+    return `grid-row: ${(index % rowCount) + 1}; grid-column: ${Math.floor(index / rowCount) + 1};`;
   };
 
   const renderBoardMessage = (message) => {
@@ -1466,7 +1459,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const claimLabel = order.claimedByName ? `${order.claimStale ? 'Stale' : 'Claimed'} by ${order.claimedByName}` : order.marketplaceStatus;
       const buttonLabel = order.claimStale ? 'Reclaim' : (claimedBySelf ? 'Resume' : (index === 0 ? 'Start Next' : 'Start'));
       const cardStyles = [
-        orderGridPositionStyle(index, columnCount),
+        orderGridPositionStyle(index, rowCount),
         customSourceColor ? `--order-source-accent: ${escapeHtml(customSourceColor)}; --order-source-border: ${escapeHtml(customSourceColor)}; --order-source-border-hover: ${escapeHtml(customSourceColor)}` : ''
       ].filter(Boolean).join(' ');
       const buttonIcon = isLocked

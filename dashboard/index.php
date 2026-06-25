@@ -71,11 +71,11 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
                     <span>Walk Ins</span>
                 </a>
                 <a class="admin-store-nav-item" href="../whatsapp-orders/" title="WhatsApp Orders">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19.5 6.2 16A7.5 7.5 0 1 1 9 18.3z"/><path d="M9 9.5c.6 2 2 3.6 4.1 4.5l1.2-1.1 2.1.5c.2 0 .4.2.4.5v1.4c0 .4-.3.7-.7.7A8.9 8.9 0 0 1 7.2 8c0-.4.3-.7.7-.7h1.4c.2 0 .4.2.5.4l.5 2z"/></svg>
+                    <img class="admin-store-nav-internet-icon" src="https://cdn.simpleicons.org/whatsapp/25D366" alt="" aria-hidden="true" decoding="async">
                     <span>WhatsApp Orders</span>
                 </a>
                 <a class="admin-store-nav-item" href="../invoice-records/" title="Invoice Records">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4"/><path d="M3 12s2-4 6-4 6 4 6 4-2 4-6 4-6-4-6-4"/><circle cx="9" cy="12" r="1.5"/></svg>
+                    <img class="admin-store-nav-internet-icon" src="https://api.iconify.design/material-symbols:receipt-long-outline.svg?color=%23f59e0b" alt="" aria-hidden="true" decoding="async">
                     <span>Invoice Records</span>
                 </a>
                 <a class="admin-store-nav-item" href="../integrations/" title="Integrations">

@@ -4570,6 +4570,15 @@ button, input {
   stroke-linejoin: round;
 }
 
+.admin-store-nav-internet-icon {
+  display: block;
+  align-self: center;
+  justify-self: center;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
 .admin-store-sidebar-brand-copy,
 .admin-store-profile-copy {
   display: grid;
@@ -4633,7 +4642,8 @@ button, input {
   white-space: nowrap;
 }
 
-.admin-store-nav-item svg {
+.admin-store-nav-item svg,
+.admin-store-nav-internet-icon {
   display: block;
   align-self: center;
   justify-self: center;
