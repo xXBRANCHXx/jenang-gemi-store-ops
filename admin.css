@@ -6513,19 +6513,19 @@ button.admin-store-sidebar-profile:hover {
     margin: 0;
   }
 
-  .admin-app.admin-store-shell:has(.admin-walkins-print-stage) .admin-store-sidebar,
-  .admin-app.admin-store-shell:has(.admin-walkins-print-stage) .admin-backdrop,
-  .admin-app.admin-store-shell:has(.admin-walkins-print-stage) .admin-modal-shell,
-  .admin-app.admin-store-shell:has(.admin-walkins-print-stage) .admin-store-workspace > :not(.admin-walkins-print-stage),
+  body.admin-body.is-walkins-printing .admin-app.admin-store-shell .admin-store-sidebar,
+  body.admin-body.is-walkins-printing .admin-app.admin-store-shell .admin-backdrop,
+  body.admin-body.is-walkins-printing .admin-app.admin-store-shell .admin-modal-shell,
+  body.admin-body.is-walkins-printing .admin-app.admin-store-shell .admin-store-workspace > :not(.admin-walkins-print-stage),
   .admin-build-badge {
     display: none !important;
   }
 
-  body.admin-body:has(.admin-walkins-print-stage) {
+  body.admin-body.is-walkins-printing {
     background: #fff !important;
   }
 
-  .admin-app.admin-store-shell:has(.admin-walkins-print-stage) {
+  body.admin-body.is-walkins-printing .admin-app.admin-store-shell {
     display: block;
     width: auto;
     height: auto;
@@ -6535,7 +6535,7 @@ button.admin-store-sidebar-profile:hover {
     background: #fff;
   }
 
-  .admin-app.admin-store-shell:has(.admin-walkins-print-stage) .admin-store-workspace {
+  body.admin-body.is-walkins-printing .admin-app.admin-store-shell .admin-store-workspace {
     display: block;
     width: auto;
     min-height: 0;
@@ -6544,7 +6544,7 @@ button.admin-store-sidebar-profile:hover {
     background: #fff;
   }
 
-  .admin-walkins-print-stage {
+  body.admin-body.is-walkins-printing .admin-walkins-print-stage {
     display: block !important;
     width: 210mm;
     min-height: 297mm;

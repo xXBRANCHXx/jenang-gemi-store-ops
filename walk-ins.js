@@ -704,16 +704,34 @@ document.addEventListener('DOMContentLoaded', () => {
     refs.printStage.innerHTML = pages.map((pageItems, index) => invoicePageHtml(pageItems, index, pages.length, summary)).join('');
   };
 
-  const printInvoice = () => {
+  const prepareInvoicePrint = () => {
     if (!state.cart.length) {
       setError('Add at least one product before printing the invoice.');
-      return;
+      return false;
     }
     setError('');
     buildPrintableInvoice();
+    document.body.classList.add('is-walkins-printing');
     state.invoicePrinted = true;
     renderTotals();
-    window.setTimeout(() => window.print(), 50);
+    return true;
+  };
+
+  const finishInvoicePrint = () => {
+    document.body.classList.remove('is-walkins-printing');
+  };
+
+  const printInvoice = () => {
+    if (!prepareInvoicePrint()) return;
+    try {
+      window.focus();
+      window.print();
+    } catch (_error) {
+      state.invoicePrinted = false;
+      finishInvoicePrint();
+      renderTotals();
+      setError('Unable to open the print dialog from this browser.');
+    }
   };
 
   const completeSale = async () => {
@@ -875,7 +893,10 @@ document.addEventListener('DOMContentLoaded', () => {
     connectApprovedScanner().catch(() => {});
   });
 
-  window.addEventListener('beforeprint', buildPrintableInvoice);
+  window.addEventListener('beforeprint', () => {
+    if (state.cart.length) prepareInvoicePrint();
+  });
+  window.addEventListener('afterprint', finishInvoicePrint);
   window.addEventListener('pagehide', () => {
     window.clearInterval(serverSerialTimer);
     window.clearTimeout(scanBufferTimer);
