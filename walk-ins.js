@@ -57,11 +57,13 @@ document.addEventListener('DOMContentLoaded', () => {
   let scanBufferTimer = 0;
   let serialPort = null;
   let serialReader = null;
+  let serialLoopActive = false;
   let serialReadBuffer = '';
   let serverSerialTimer = 0;
+  let serverSerialPolling = false;
   let serverSerialErrorShown = false;
-  let lastScanKey = '';
-  let lastScanAt = 0;
+  const recentScanSignals = new Map();
+  const duplicateSignalWindowMs = 90;
 
   const escapeHtml = (value) => String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -193,6 +195,17 @@ document.addEventListener('DOMContentLoaded', () => {
       if (product) return product;
     }
     return null;
+  };
+
+  const shouldIgnoreDuplicateSignal = (code, source) => {
+    const now = Date.now();
+    const key = `${source}:${code}`;
+    const previous = recentScanSignals.get(key) || 0;
+    recentScanSignals.set(key, now);
+    recentScanSignals.forEach((timestamp, signalKey) => {
+      if (now - timestamp > 1000) recentScanSignals.delete(signalKey);
+    });
+    return previous > 0 && now - previous < duplicateSignalWindowMs;
   };
 
   const scannerPortLabel = (port) => {
@@ -385,13 +398,10 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCart();
   };
 
-  const handleScan = (value) => {
+  const handleScan = (value, source = 'scanner') => {
     const code = normalizeCode(value);
     if (!code) return false;
-    const now = Date.now();
-    if (lastScanKey === code && now - lastScanAt < 350) return false;
-    lastScanKey = code;
-    lastScanAt = now;
+    if (shouldIgnoreDuplicateSignal(code, source)) return false;
     const product = findProductByScan(code);
     if (!product) {
       setError(`Barcode "${code}" was not found in the live SKU database.`);
@@ -406,40 +416,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const value = scanBuffer;
     scanBuffer = '';
     window.clearTimeout(scanBufferTimer);
-    handleScan(value);
+    handleScan(value, 'keyboard');
   };
 
   const pushSerialChunk = (chunk) => {
     serialReadBuffer += chunk;
     const parts = serialReadBuffer.split(/\r\n|\r|\n|\t/);
     serialReadBuffer = parts.pop() || '';
-    parts.forEach((part) => handleScan(part));
+    parts.forEach((part) => handleScan(part, 'browser-serial'));
     window.clearTimeout(scanBufferTimer);
     scanBufferTimer = window.setTimeout(() => {
       if (!serialReadBuffer.trim()) return;
       const value = serialReadBuffer;
       serialReadBuffer = '';
-      handleScan(value);
+      handleScan(value, 'browser-serial');
     }, 160);
   };
 
   const readSerialLoop = async () => {
-    if (!serialPort?.readable) return;
-    const decoder = new TextDecoderStream();
-    const closed = serialPort.readable.pipeTo(decoder.writable);
-    serialReader = decoder.readable.getReader();
+    if (serialLoopActive || !serialPort?.readable) return;
+    serialLoopActive = true;
+    const decoder = new TextDecoder();
+    serialReader = serialPort.readable.getReader();
     try {
       while (true) {
         const { value, done } = await serialReader.read();
         if (done) break;
-        if (value) pushSerialChunk(value);
+        if (value) pushSerialChunk(decoder.decode(value, { stream: true }));
       }
-    } catch (_error) {
+      const remaining = decoder.decode();
+      if (remaining) pushSerialChunk(remaining);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
       setScannerStatus(false, state.scannerLabel, 'Scanner disconnected');
     } finally {
       serialReader?.releaseLock();
       serialReader = null;
-      await closed.catch(() => {});
+      serialLoopActive = false;
     }
   };
 
@@ -456,12 +469,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const pollServerSerialScanner = async () => {
     if (serialPort?.readable || serialPort?.writable) return;
+    if (serverSerialPolling) return;
     if (!serverCanSeeLocalUsb()) {
       window.clearInterval(serverSerialTimer);
       serverSerialTimer = 0;
       setScannerStatus(false, '', 'No scanner selected');
       return;
     }
+    serverSerialPolling = true;
     try {
       const query = new URLSearchParams({ baud_rate: String(state.scannerSettings.baud_rate || 9600) });
       const response = await fetch(`${scanSerialEndpoint}?${query.toString()}`, {
@@ -476,11 +491,13 @@ document.addEventListener('DOMContentLoaded', () => {
       serverSerialErrorShown = false;
       const label = payload.device || 'Local USB-COM scanner';
       setScannerStatus(true, label, label);
-      (Array.isArray(payload.codes) ? payload.codes : []).forEach((code) => handleScan(code));
+      (Array.isArray(payload.codes) ? payload.codes : []).forEach((code) => handleScan(code, 'server-serial'));
     } catch (error) {
       if (serverSerialErrorShown) return;
       serverSerialErrorShown = true;
       setScannerStatus(false, '', error instanceof Error ? error.message : 'Connect scanner');
+    } finally {
+      serverSerialPolling = false;
     }
   };
 
