@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const orderSummary = document.querySelector('[data-order-summary]');
   const pickList = document.querySelector('[data-pick-list]');
   const listedCount = document.querySelector('[data-listed-count]');
+  const productsLeftCount = document.querySelector('[data-products-left-count]');
   const criticalCount = document.querySelector('[data-critical-count]');
   const startedCount = document.querySelector('[data-started-count]');
   const fulfillingCount = document.querySelector('[data-fulfilling-count]');
@@ -1021,6 +1022,12 @@ document.addEventListener('DOMContentLoaded', () => {
     .filter((order) => order.status !== 'FULFILLED' && order.fulfillmentStatus !== 'FULFILLED')
     .sort((a, b) => a.deadlineAt - b.deadlineAt);
 
+  const orderProductCount = (order) => (Array.isArray(order?.items) ? order.items : [])
+    .reduce((sum, item) => sum + Math.max(0, Number(item.quantity || item.qty || 0)), 0);
+
+  const productsLeftToPackage = (orders) => orders
+    .reduce((sum, order) => sum + orderProductCount(order), 0);
+
   const activeOrder = () => state.orders.find((order) => order.id === state.activeOrderId) || null;
 
   const normalizeOrderId = (value) => String(value || '').trim().toUpperCase();
@@ -1392,6 +1399,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const renderMetrics = () => {
     const listed = listedOrders();
     if (listedCount) listedCount.textContent = String(listed.length);
+    if (productsLeftCount) productsLeftCount.textContent = String(productsLeftToPackage(listed));
     if (criticalCount) criticalCount.textContent = String(listed.filter((order) => isCriticalOrder(order)).length);
     if (startedCount) startedCount.textContent = String(state.orders.filter((order) => order.claimedBy && order.fulfillmentStatus !== 'FULFILLED').length);
     if (fulfillingCount) fulfillingCount.textContent = String(state.orders.filter((order) => !['UNCLAIMED', 'FULFILLED'].includes(order.fulfillmentStatus)).length);
@@ -1450,7 +1458,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     board.innerHTML = orders.map((order, index) => {
       const isCritical = isCriticalOrder(order);
-      const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
+      const itemCount = orderProductCount(order);
       const sourceKey = sourceKeyFromOrder(order);
       const sourceLabel = sourceLabelFromOrder(order);
       const sourceColor = colorForSource(sourceKey);
@@ -1485,7 +1493,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="admin-order-meta">
             <span>${escapeHtml(sourceLabel)}</span>
             <span>${escapeHtml(claimLabel)}</span>
-            <span>${itemCount} item${itemCount === 1 ? '' : 's'}</span>
+            <span>${itemCount} product${itemCount === 1 ? '' : 's'}</span>
           </div>
           <button type="button" class="admin-start-order-btn ${claimedBySelf ? 'is-resume' : ''} ${order.claimStale ? 'is-reclaim' : ''}" data-start-order="${escapeHtml(order.id)}" ${isLocked ? 'disabled' : ''}>${buttonIcon}<span>${escapeHtml(isLocked ? 'Locked' : buttonLabel)}</span></button>
         </article>

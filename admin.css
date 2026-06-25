@@ -4518,6 +4518,7 @@ button, input {
   align-self: start;
   min-width: 0;
   min-height: 0;
+  height: calc(100svh - 16px);
   max-height: calc(100svh - 16px);
   padding: 9px;
   overflow: hidden;
@@ -4618,7 +4619,7 @@ button, input {
 }
 
 .admin-store-sidebar-tools {
-  margin-top: 10px;
+  margin-top: auto;
   padding-top: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -4668,8 +4669,8 @@ button, input {
 .admin-store-sidebar-footer {
   display: grid;
   gap: 7px;
-  margin-top: auto;
-  padding-top: 12px;
+  margin-top: 0;
+  padding-top: 7px;
 }
 
 .admin-store-sidebar-profile,
@@ -5060,6 +5061,8 @@ button.admin-store-sidebar-profile:hover {
     inset: 6px auto 6px 6px;
     z-index: 12010;
     width: min(82vw, 280px);
+    height: auto;
+    max-height: none;
     transform: translateX(calc(-100% - 12px));
     transition: transform 0.22s ease;
   }
@@ -5937,9 +5940,9 @@ button.admin-store-sidebar-profile:hover {
   flex-direction: column;
   gap: 14px;
   overflow: hidden;
-  border-color: rgba(255, 255, 255, 0.09);
-  background: #111317;
-  color: #fff;
+  border-color: var(--admin-border);
+  background: var(--admin-surface);
+  color: var(--admin-text);
 }
 
 .admin-walkins-summary-head,
@@ -5965,7 +5968,7 @@ button.admin-store-sidebar-profile:hover {
 .admin-walkins-summary-head span,
 .admin-walkins-customer-summary span,
 .admin-walkins-grand-total span {
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--admin-muted);
   font-size: 10px;
   font-weight: 950;
   letter-spacing: 0.12em;
@@ -5981,16 +5984,16 @@ button.admin-store-sidebar-profile:hover {
 }
 
 .admin-walkins-summary-card .admin-ghost-btn {
-  border-color: rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.045);
-  color: rgba(255, 255, 255, 0.72);
+  border-color: var(--admin-border);
+  background: var(--admin-surface-soft);
+  color: var(--admin-text);
 }
 
 .admin-walkins-customer-summary {
   padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--admin-border);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--admin-surface-soft);
 }
 
 .admin-walkins-customer-summary strong,
@@ -6006,7 +6009,7 @@ button.admin-store-sidebar-profile:hover {
 }
 
 .admin-walkins-customer-summary small {
-  color: rgba(255, 255, 255, 0.42);
+  color: var(--admin-muted);
   font-size: 11px;
   font-weight: 800;
 }
@@ -6016,15 +6019,15 @@ button.admin-store-sidebar-profile:hover {
   gap: 8px;
   margin: 0;
   padding: 14px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.09);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  border-top: 1px solid var(--admin-border);
+  border-bottom: 1px solid var(--admin-border);
 }
 
 .admin-walkins-total-list div {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  color: rgba(255, 255, 255, 0.48);
+  color: var(--admin-muted);
   font-size: 12px;
   font-weight: 850;
 }
@@ -6056,10 +6059,10 @@ button.admin-store-sidebar-profile:hover {
 
 .admin-walkins-payment-grid button {
   min-height: 42px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--admin-border);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.045);
-  color: rgba(255, 255, 255, 0.56);
+  background: var(--admin-surface-soft);
+  color: var(--admin-muted);
   cursor: pointer;
   font: inherit;
   font-size: 12px;
@@ -6067,8 +6070,8 @@ button.admin-store-sidebar-profile:hover {
 }
 
 .admin-walkins-payment-grid button.is-active {
-  background: #fff;
-  color: #111317;
+  background: var(--admin-accent-primary);
+  color: var(--admin-bg);
 }
 
 .admin-walkins-action-row {
@@ -6109,10 +6112,10 @@ button.admin-store-sidebar-profile:hover {
 }
 
 .admin-walkins-complete[disabled] {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--admin-muted) 14%, transparent);
+  border-color: var(--admin-border);
   box-shadow: none;
-  color: rgba(255, 255, 255, 0.48);
+  color: var(--admin-muted);
   opacity: 1;
   cursor: not-allowed;
 }

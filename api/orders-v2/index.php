@@ -244,6 +244,88 @@ function jg_store_ops_orders_cache_write(string $url, string $raw): void
     @file_put_contents(jg_store_ops_orders_cache_path($url), $payload, LOCK_EX);
 }
 
+function jg_store_ops_orders_status_token(mixed $value): string
+{
+    if (!is_scalar($value)) {
+        return '';
+    }
+    return trim((string) preg_replace('/[^A-Z0-9]+/', '_', strtoupper(trim((string) $value))), '_');
+}
+
+/**
+ * @return array<int, string>
+ */
+function jg_store_ops_orders_status_values(array $order): array
+{
+    $statusKeys = [
+        'status',
+        'marketplaceStatus',
+        'marketplace_status',
+        'orderStatus',
+        'order_status',
+        'shippingStatus',
+        'shipping_status',
+        'fulfillmentStatus',
+        'fulfillment_status',
+        'collectionStatus',
+        'collection_status',
+        'logisticsStatus',
+        'logistics_status',
+        'rawStatus',
+        'raw_status',
+    ];
+    $values = [];
+    $collect = static function (array $source) use (&$values, $statusKeys): void {
+        foreach ($statusKeys as $key) {
+            $status = jg_store_ops_orders_status_token($source[$key] ?? null);
+            if ($status !== '') {
+                $values[] = $status;
+            }
+        }
+    };
+
+    $collect($order);
+    foreach (['raw', 'payload', 'source', 'marketplace', 'original', 'order'] as $nestedKey) {
+        if (is_array($order[$nestedKey] ?? null)) {
+            $collect($order[$nestedKey]);
+        }
+    }
+
+    return array_values(array_unique($values));
+}
+
+function jg_store_ops_orders_tiktok_awaiting_collection_processed(array $order, string $sourcePlatform): bool
+{
+    $platform = jg_store_ops_orders_normalize_account((string) ($order['platform'] ?? $order['source_platform'] ?? $sourcePlatform));
+    $source = jg_store_ops_orders_normalize_account($sourcePlatform);
+    if ($source !== 'tiktok' && $platform !== 'tiktok' && !str_contains($platform, 'tiktok')) {
+        return false;
+    }
+
+    return in_array('AWAITING_COLLECTION', jg_store_ops_orders_status_values($order), true);
+}
+
+/**
+ * @param array<int, mixed> $orders
+ * @return array<int, array<string, mixed>>
+ */
+function jg_store_ops_orders_filter_marketplace_queue(array $orders, string $sourcePlatform, int &$processedCollectionCount = 0): array
+{
+    $filtered = [];
+    foreach ($orders as $order) {
+        if (!is_array($order)) {
+            continue;
+        }
+        if (jg_store_ops_orders_tiktok_awaiting_collection_processed($order, $sourcePlatform)) {
+            $processedCollectionCount++;
+            continue;
+        }
+        $filtered[] = $order;
+    }
+
+    return $filtered;
+}
+
 function jg_store_ops_orders_proxy_file(string $url, string $fallbackFilename): void
 {
     if (function_exists('curl_init')) {
@@ -979,6 +1061,7 @@ $decoded = [
 ];
 $errors = [];
 $successfulAccounts = 0;
+$processedCollectionOrders = 0;
 
 foreach ($sources as $source) {
     $platform = $source['platform'];
@@ -1006,12 +1089,16 @@ foreach ($sources as $source) {
 
     jg_store_ops_orders_cache_write($url, $raw);
     $accountOrders = is_array($accountPayload['orders'] ?? null) ? $accountPayload['orders'] : [];
+    $accountProcessedCollectionOrders = 0;
+    $accountOrders = jg_store_ops_orders_filter_marketplace_queue($accountOrders, $platform, $accountProcessedCollectionOrders);
+    $processedCollectionOrders += $accountProcessedCollectionOrders;
     $successfulAccounts++;
     $decoded['orders'] = array_merge($decoded['orders'], $accountOrders);
     $decoded['meta']['accounts'][] = [
         'platform' => $platform,
         'account_key' => $account,
         'count' => count($accountOrders),
+        'processed_collection_count' => $accountProcessedCollectionOrders,
         'shop_id' => (string) ($accountPayload['meta']['shop_id'] ?? ''),
         'label_backed_only' => !empty($accountPayload['meta']['label_backed_only']),
         'hard_set_enabled' => !empty($accountPayload['meta']['hard_set']['enabled']),
@@ -1042,6 +1129,7 @@ $decoded['meta']['website_orders'] = [
     'sources' => JG_STORE_OPS_WEBSITE_PLATFORMS,
 ];
 $decoded['meta']['errors'] = $errors;
+$decoded['meta']['processed_collection_count'] = $processedCollectionOrders;
 $decoded['meta']['count'] = count($decoded['orders']);
 $decoded['meta']['current_employee'] = [
     'id' => jg_store_ops_orders_current_employee_id(),

@@ -26,21 +26,12 @@ function jg_store_ops_shell_attr(array $attributes): string
 
 function jg_store_ops_shell_svg(string $name): string
 {
-    $remoteIcons = [
-        'whatsapp-orders' => 'https://cdn.simpleicons.org/whatsapp',
-        'invoice-records' => 'https://api.iconify.design/material-symbols:receipt-long-outline.svg',
-    ];
-    if (isset($remoteIcons[$name])) {
-        return sprintf(
-            '<span class="admin-store-nav-internet-icon" style="--admin-store-nav-icon: url(%s);" aria-hidden="true"></span>',
-            htmlspecialchars($remoteIcons[$name], ENT_QUOTES, 'UTF-8')
-        );
-    }
-
     $icons = [
         'orders' => '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h6"/></svg>',
         'inventory' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM4.4 7.7 12 12l7.6-4.3M12 12v9"/></svg>',
         'walk-ins' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3"/></svg>',
+        'whatsapp-orders' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5.2 19.3.9-3.3a7.7 7.7 0 1 1 3 2.2z"/><path d="M9.7 8.8c.2-.5.4-.5.8-.5h.6c.2 0 .4.1.5.4l.7 1.6c.1.3.1.5-.1.7l-.4.5c.5.9 1.2 1.6 2.2 2.1l.5-.5c.2-.2.4-.2.7-.1l1.5.7c.3.1.4.3.4.6v.5c0 .4-.2.7-.6.8-.8.2-2.5.1-4.4-1.3-1.9-1.4-3.1-3.3-3.2-4.5 0-.4.1-.7.3-1z"/></svg>',
+        'invoice-records' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-2-1.2-2 1.2-2-1.2-2 1.2-2-1.2L6 21zM9 8h6M9 12h6M9 16h4"/></svg>',
         'integrations' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12h8M9 7V3M15 7V3M7 7h10v3a5 5 0 0 1-10 0zM12 15v6"/></svg>',
         'sku-db' => '<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>',
         'reprint' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></svg>',

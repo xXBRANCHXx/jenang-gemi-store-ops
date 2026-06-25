@@ -5,7 +5,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const endpoint = root.dataset.walkInsEndpoint || '../api/walk-ins/';
   const scanBridgeEndpoint = root.dataset.scanBridgeEndpoint || '../api/scan-bridge/';
   const scanSerialEndpoint = root.dataset.scanSerialEndpoint || '../api/scan-serial/';
-  const zeroLogoMarkup = window.JGWalkInsLogoMarkup || '<strong class="admin-walkins-invoice-logo-fallback">ZERO</strong>';
+  const zeroLogoMarkup = `
+    <svg class="admin-walkins-invoice-logo" role="img" aria-label="ZERO" viewBox="0 0 420 112" xmlns="http://www.w3.org/2000/svg">
+      <text x="0" y="78" fill="#000" font-family="Arial Black, Arial, sans-serif" font-size="86" font-weight="900" letter-spacing="2">ZERO</text>
+      <rect x="5" y="94" width="315" height="7" rx="3.5" fill="#000"></rect>
+    </svg>
+  `;
   const invoiceType = String(root.dataset.walkInsInvoiceType || 'walk_in').trim() === 'whatsapp' ? 'whatsapp' : 'walk_in';
   const isWhatsappInvoice = invoiceType === 'whatsapp';
   const defaultCustomerName = root.dataset.walkInsDefaultCustomer || (isWhatsappInvoice ? 'WhatsApp customer' : 'Walk-in customer');

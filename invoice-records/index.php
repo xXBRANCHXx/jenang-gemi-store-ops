@@ -12,14 +12,6 @@ if (!jg_admin_is_authenticated()) {
 $adminCssVersion = (string) @filemtime(dirname(__DIR__) . '/admin.css');
 $storeShellJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-shell.js');
 $invoiceRecordsJsVersion = (string) @filemtime(dirname(__DIR__) . '/invoice-records.js');
-$zeroLogoPath = dirname(__DIR__) . '/assets/ZERO Logo Black.svg';
-$zeroLogoSvg = is_readable($zeroLogoPath) ? (string) file_get_contents($zeroLogoPath) : '';
-$zeroLogoSvg = preg_replace(
-    '/<svg\b(?![^>]*\bclass=)/',
-    '<svg class="admin-walkins-invoice-logo" role="img" aria-label="ZERO"',
-    $zeroLogoSvg,
-    1
-) ?: '';
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -109,9 +101,6 @@ $zeroLogoSvg = preg_replace(
 
     <?php jg_store_ops_shell_close(); ?>
     <script src="../store-shell.js?v=<?php echo urlencode($storeShellJsVersion ?: '1'); ?>" defer></script>
-    <script>
-        window.JGInvoiceRecordsLogoMarkup = <?php echo json_encode($zeroLogoSvg, JSON_UNESCAPED_SLASHES); ?>;
-    </script>
     <script src="../invoice-records.js?v=<?php echo urlencode($invoiceRecordsJsVersion ?: '1'); ?>" defer></script>
 </body>
 </html>

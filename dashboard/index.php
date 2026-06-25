@@ -70,11 +70,11 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
                     <span>Walk Ins</span>
                 </a>
                 <a class="admin-store-nav-item" href="../whatsapp-orders/" title="WhatsApp Orders">
-                    <span class="admin-store-nav-internet-icon" style="--admin-store-nav-icon: url(https://cdn.simpleicons.org/whatsapp);" aria-hidden="true"></span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5.2 19.3.9-3.3a7.7 7.7 0 1 1 3 2.2z"/><path d="M9.7 8.8c.2-.5.4-.5.8-.5h.6c.2 0 .4.1.5.4l.7 1.6c.1.3.1.5-.1.7l-.4.5c.5.9 1.2 1.6 2.2 2.1l.5-.5c.2-.2.4-.2.7-.1l1.5.7c.3.1.4.3.4.6v.5c0 .4-.2.7-.6.8-.8.2-2.5.1-4.4-1.3-1.9-1.4-3.1-3.3-3.2-4.5 0-.4.1-.7.3-1z"/></svg>
                     <span>WhatsApp Orders</span>
                 </a>
                 <a class="admin-store-nav-item" href="../invoice-records/" title="Invoice Records">
-                    <span class="admin-store-nav-internet-icon" style="--admin-store-nav-icon: url(https://api.iconify.design/material-symbols:receipt-long-outline.svg);" aria-hidden="true"></span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-2-1.2-2 1.2-2-1.2-2 1.2-2-1.2L6 21zM9 8h6M9 12h6M9 16h4"/></svg>
                     <span>Invoice Records</span>
                 </a>
                 <a class="admin-store-nav-item" href="../integrations/" title="Integrations">
@@ -126,6 +126,10 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
                     <article class="admin-store-stat">
                         <span>Listed</span>
                         <strong data-listed-count>0</strong>
+                    </article>
+                    <article class="admin-store-stat">
+                        <span>Products Left</span>
+                        <strong data-products-left-count>0</strong>
                     </article>
                     <article class="admin-store-stat">
                         <span>&lt;1h</span>
