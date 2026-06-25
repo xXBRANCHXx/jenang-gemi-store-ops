@@ -10,6 +10,8 @@ require_once dirname(__DIR__, 2) . '/website-orders-bootstrap.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
+const JG_STORE_OPS_ORDERS_CACHE_TTL_SECONDS = 300;
+
 function jg_store_ops_orders_fail(string $message, int $status = 422): void
 {
     http_response_code($status);
@@ -205,7 +207,26 @@ function jg_store_ops_orders_cache_read(string $url): ?string
         return null;
     }
     $raw = @file_get_contents($path);
-    return is_string($raw) && $raw !== '' ? $raw : null;
+    if (!is_string($raw) || $raw === '') {
+        return null;
+    }
+
+    $decoded = json_decode($raw, true);
+    if (is_array($decoded) && array_key_exists('cached_at', $decoded) && array_key_exists('body', $decoded)) {
+        $cachedAt = (int) ($decoded['cached_at'] ?? 0);
+        $body = is_string($decoded['body'] ?? null) ? $decoded['body'] : '';
+        if ($cachedAt > 0 && time() - $cachedAt <= JG_STORE_OPS_ORDERS_CACHE_TTL_SECONDS && $body !== '') {
+            return $body;
+        }
+        return null;
+    }
+
+    $fileMtime = @filemtime($path);
+    if (is_int($fileMtime) && time() - $fileMtime <= JG_STORE_OPS_ORDERS_CACHE_TTL_SECONDS) {
+        return $raw;
+    }
+
+    return null;
 }
 
 function jg_store_ops_orders_cache_write(string $url, string $raw): void
@@ -213,7 +234,14 @@ function jg_store_ops_orders_cache_write(string $url, string $raw): void
     if ($raw === '' || json_decode($raw, true) === null) {
         return;
     }
-    @file_put_contents(jg_store_ops_orders_cache_path($url), $raw, LOCK_EX);
+    $payload = json_encode([
+        'cached_at' => time(),
+        'body' => $raw,
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if (!is_string($payload)) {
+        return;
+    }
+    @file_put_contents(jg_store_ops_orders_cache_path($url), $payload, LOCK_EX);
 }
 
 function jg_store_ops_orders_proxy_file(string $url, string $fallbackFilename): void
@@ -917,7 +945,12 @@ if (isset($_GET['shipping_label'])) {
         $selectedSource = $source;
         break;
     }
-    $selectedSource ??= $sources[0];
+    if ($selectedSource === null) {
+        if ($requestedAccount !== '' || $requestedPlatform !== '') {
+            jg_store_ops_orders_fail('Requested marketplace order source is not configured.', 404);
+        }
+        $selectedSource = $sources[0];
+    }
     $account = (string) $selectedSource['account'];
     $platform = (string) $selectedSource['platform'];
 
