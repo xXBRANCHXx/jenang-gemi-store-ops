@@ -31,6 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let selectedScannerLabel = '';
   let selectedScannerVerified = false;
   let activeSettingsTab = 'scanner';
+  const scannerBarcodeWaitSeconds = 6;
+  const scannerBarcodeWaitMs = scannerBarcodeWaitSeconds * 1000;
 
   const escapeHtml = (value) => String(value)
     .replace(/&/g, '&amp;')
@@ -241,7 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const ports = await navigator.serial.getPorts();
     if (!ports.length) {
       setSelectedScannerPort(null);
-      setScannerHealth('ready', 'Find Scanner', 'Click Find Scanner, choose the USB-COM barcode scanner, then scan any barcode to pair it with Store Ops.');
+      setScannerHealth('ready', 'Find Scanner', `Click Find Scanner, choose the USB-COM barcode scanner, then scan any barcode within ${scannerBarcodeWaitSeconds} seconds to pair it with Store Ops.`);
       return false;
     }
 
@@ -300,16 +302,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (scannerSelectButton instanceof HTMLButtonElement) scannerSelectButton.disabled = true;
     try {
-      setScannerHealth('checking', 'Finding scanner', 'Choose the USB-COM barcode scanner, then scan any barcode when Store Ops starts listening.');
+      setScannerHealth('checking', 'Finding scanner', `Choose the USB-COM barcode scanner. Store Ops will then listen ${scannerBarcodeWaitSeconds} seconds for a barcode.`);
       const port = await navigator.serial.requestPort();
       setSelectedScannerPort(port);
-      setScannerHealth('checking', 'Waiting for pairing scan', `Scan any barcode now to pair ${selectedScannerLabel} with Store Ops.`);
+      setScannerHealth('checking', 'Waiting for barcode scan', `Scan any barcode within ${scannerBarcodeWaitSeconds} seconds to pair ${selectedScannerLabel} with Store Ops.`);
       const openedHere = await openBrowserSerialPort(port);
       try {
-        const codes = await readBrowserSerialCodes(port, 10000);
+        const codes = await readBrowserSerialCodes(port, scannerBarcodeWaitMs);
         const code = String(codes[0] || '');
         if (!code) {
-          setScannerHealth('ready', 'Scanner selected', `${selectedScannerLabel} is approved. Click Test and scan any barcode if pairing did not complete.`);
+          setScannerHealth('ready', 'Scanner selected', `${selectedScannerLabel} is approved, but no barcode arrived within ${scannerBarcodeWaitSeconds} seconds. Click Test and scan any barcode to finish checking it.`);
           return port;
         }
         selectedScannerVerified = true;
@@ -328,7 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const testScannerScan = async () => {
-    setScannerHealth('checking', 'Waiting for test scan', 'Scan any product barcode now.');
+    setScannerHealth('checking', 'Waiting for barcode scan', `Scan any product barcode within ${scannerBarcodeWaitSeconds} seconds.`);
     if (scannerTestScanButton instanceof HTMLButtonElement) scannerTestScanButton.disabled = true;
     try {
       if (browserSerialSupported()) {
@@ -342,7 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setSelectedScannerPort(port, { verified: selectedScannerVerified });
         const openedHere = await openBrowserSerialPort(port);
         try {
-          const codes = await readBrowserSerialCodes(port, 6000);
+          const codes = await readBrowserSerialCodes(port, scannerBarcodeWaitMs);
           const code = String(codes[0] || '');
           if (!code) {
             setScannerHealth('error', 'Scanner test failed', 'The browser opened the local USB-COM port, but no barcode data arrived within 6 seconds.');

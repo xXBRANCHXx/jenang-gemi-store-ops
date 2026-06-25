@@ -276,7 +276,7 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
                                 <i aria-hidden="true"></i>
                                 <div>
                                     <strong data-scanner-health-title>Scanner not checked</strong>
-                                    <span data-scanner-health-detail>Click Find Scanner, scan any barcode to pair it, then use Test to confirm barcode data is arriving.</span>
+                                    <span data-scanner-health-detail>Click Find Scanner, then scan any barcode within 6 seconds to pair it. Test uses the same 6-second barcode window.</span>
                                 </div>
                             </div>
 
