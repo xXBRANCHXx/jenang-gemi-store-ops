@@ -6199,13 +6199,13 @@ button.admin-store-sidebar-profile:hover {
 
 .admin-walkins-invoice-logo {
   display: block;
-  width: 78mm;
+  width: 54mm;
   height: auto;
 }
 
 .admin-walkins-invoice-logo-fallback {
   color: #000;
-  font-size: 18mm;
+  font-size: 12.5mm;
   font-weight: 950;
   letter-spacing: 0;
   line-height: 0.9;
