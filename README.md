@@ -1,12 +1,12 @@
 # Jenang Gemi Store Ops
 
 Website order ingestion starts disabled. The Executive Dashboard Hard Set activation webhook enables `zero_website` and `jenang_gemi_website` together. Configure `JG_STORE_OPS_WEBSITE_TOKEN` / `store_ops_website_token` to the same high-entropy value on both applications, or let both deployments derive it from their existing shared marketplace setup credential. Set `JG_EXECUTIVE_DASHBOARD_URL` / `executive_dashboard_url` when the dashboard is not at `https://admin.jenanggemi.com`.
-Keep deployment credentials outside Git by placing them in the ignored `.env`
-or `config.runtime.php`; `/public_html/config.runtime.php` is also loaded.
-Use `config.local.example.php` only as a template. The live `config.local.php`
-and `config.runtime.php` files are intentionally ignored and must stay on the
-server with the real database credentials, setup token, marketplace accounts,
-and optional `admin_code_hash`.
+Keep new deployment credentials outside Git by placing them in the ignored
+`.env` or `config.runtime.php`; `/public_html/config.runtime.php` is also
+loaded. The legacy Hostinger deployment still reads `config.local.php`, so do
+not remove it until the live server has been migrated to an ignored runtime
+file with the same values. Use `config.local.example.php` only as a template for
+new deployments.
 
 Store Ops persists website orders idempotently, re-verifies every order against the token-authenticated executive feed and cutover timestamp, resolves item SKUs through the existing SKU DB, and proxies the executive-uploaded PDF through authenticated endpoints.
 
