@@ -54,13 +54,15 @@ $walkInsJsVersion = (string) @filemtime(dirname(__DIR__) . '/walk-ins.js');
                             <span class="admin-status-badge" data-walkins-catalog-status>Loading SKUs</span>
                         </div>
                         <div class="admin-walkins-scan-row">
-                            <label class="admin-walkins-input-shell">
-                                <span class="admin-walkins-field-icon" aria-hidden="true">
+                            <button type="button" class="admin-walkins-scanner-action" data-walkins-scanner-action>
+                                <span class="admin-walkins-scanner-icon" aria-hidden="true">
                                     <svg viewBox="0 0 24 24"><path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3M7 12h10M8 9h1M11 9h2M15 9h1M8 15h2M12 15h1M15 15h1"/></svg>
                                 </span>
-                                <input type="text" data-walkins-sku-input placeholder="Scan barcode or type SKU/TAG" autocomplete="off">
-                            </label>
-                            <button type="button" class="admin-primary-btn admin-walkins-add-sku" data-walkins-add-sku>Add SKU</button>
+                                <span>
+                                    <strong data-walkins-scanner-title>Connect scanner</strong>
+                                    <small data-walkins-scanner-detail>No scanner selected</small>
+                                </span>
+                            </button>
                         </div>
                         <p class="admin-form-error" data-walkins-error hidden></p>
                     </article>
@@ -143,6 +145,7 @@ $walkInsJsVersion = (string) @filemtime(dirname(__DIR__) . '/walk-ins.js');
                         </div>
                         <dl class="admin-walkins-total-list">
                             <div><dt>Subtotal</dt><dd data-walkins-subtotal>Rp0</dd></div>
+                            <div><dt>Discount</dt><dd data-walkins-discount>Rp0</dd></div>
                             <div><dt>Tax</dt><dd data-walkins-tax>Rp0</dd></div>
                             <div><dt>Items</dt><dd data-walkins-total-items>0</dd></div>
                         </dl>
@@ -185,6 +188,8 @@ $walkInsJsVersion = (string) @filemtime(dirname(__DIR__) . '/walk-ins.js');
                     <strong data-walkins-complete-invoice>Invoice</strong>
                 </section>
             </div>
+
+            <section class="admin-walkins-print-stage" data-walkins-print-stage aria-hidden="true"></section>
 
     <?php jg_store_ops_shell_close(); ?>
     <script src="../store-shell.js?v=<?php echo urlencode($storeShellJsVersion ?: '1'); ?>" defer></script>

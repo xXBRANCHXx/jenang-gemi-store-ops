@@ -8,11 +8,27 @@ document.addEventListener('DOMContentLoaded', () => {
   const employeeProfileForm = document.querySelector('[data-employee-profile-form]');
   const employeeProfileError = document.querySelector('[data-employee-profile-error]');
   const employeeProfileList = document.querySelector('[data-employee-profile-list]');
+  const settingsModal = document.querySelector('[data-store-settings-modal]');
+  const settingsError = document.querySelector('[data-store-settings-error]');
+  const scannerTestScanButton = document.querySelector('[data-scanner-test-scan]');
+  const scannerSelectButton = document.querySelector('[data-scanner-select]');
+  const selectedScannerNode = document.querySelector('[data-selected-scanner]');
+  const scannerSummary = document.querySelector('[data-scanner-summary]');
+  const scannerSummaryDot = document.querySelector('[data-scanner-summary-dot]');
+  const settingsTitle = document.querySelector('[data-settings-title]');
   const compactSidebarQuery = window.matchMedia('(max-width: 760px)');
   const sidebarStorageKey = 'jg-store-sidebar-expanded';
   const employeeProfilesEndpoint = root.dataset.employeeProfilesEndpoint || '../api/employees-v2/';
+  const scanBridgeEndpoint = root.dataset.scanBridgeEndpoint || '../api/scan-bridge/';
+  const scanSerialEndpoint = root.dataset.scanSerialEndpoint || '../api/scan-serial/';
 
   let employeeProfiles = [];
+  let scannerSettings = {
+    baud_rate: 9600
+  };
+  let selectedScannerPort = null;
+  let selectedScannerLabel = '';
+  let activeSettingsTab = 'scanner';
 
   const escapeHtml = (value) => String(value)
     .replace(/&/g, '&amp;')
@@ -31,6 +47,334 @@ document.addEventListener('DOMContentLoaded', () => {
       const preview = text.replace(/\s+/g, ' ').trim().slice(0, 220);
       throw new Error(`${fallbackMessage} Expected JSON but got HTTP ${response.status}: ${preview || 'no response body'}`);
     }
+  };
+
+  const normalizeScannerSettings = (settings) => {
+    const baudRate = [9600, 19200, 38400, 57600, 115200].includes(Number(settings?.baud_rate)) ? Number(settings.baud_rate) : 9600;
+    return { baud_rate: baudRate };
+  };
+
+  const serverCanSeeLocalUsb = () => {
+    const host = window.location.hostname;
+    return host === ''
+      || host === 'localhost'
+      || host === '127.0.0.1'
+      || host === '::1'
+      || /^10\./.test(host)
+      || /^192\.168\./.test(host)
+      || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+  };
+
+  const parseScannerCodes = (buffer) => String(buffer || '').split(/\r\n|\r|\n|\t/)
+    .map((code) => code.trim().toUpperCase())
+    .filter(Boolean);
+
+  const notifyScannerStatus = (stateName, title = '') => {
+    try {
+      window.dispatchEvent(new CustomEvent('storeops:scanner-status', {
+        detail: {
+          state: stateName,
+          ready: stateName === 'ready' || stateName === 'ok',
+          label: selectedScannerLabel,
+          title
+        }
+      }));
+    } catch (_error) {
+      // The scanner status badge can remain local if CustomEvent is unavailable.
+    }
+  };
+
+  const readBrowserSerialCodes = async (port, timeoutMs = 6000) => {
+    if (!port?.readable) return [];
+    const reader = port.readable.getReader();
+    const decoder = new TextDecoder();
+    const deadline = Date.now() + timeoutMs;
+    let buffer = '';
+    try {
+      while (Date.now() < deadline) {
+        const remaining = Math.max(1, deadline - Date.now());
+        const result = await Promise.race([
+          reader.read(),
+          new Promise((resolve) => window.setTimeout(() => resolve({ timeout: true }), remaining))
+        ]);
+        if (result.timeout || result.done) break;
+        if (result.value) {
+          buffer += decoder.decode(result.value, { stream: true });
+          if (/[\r\n\t]/.test(buffer)) {
+            const codes = parseScannerCodes(buffer);
+            if (codes.length) return codes;
+          }
+        }
+      }
+      return parseScannerCodes(buffer);
+    } finally {
+      await reader.cancel().catch(() => {});
+      reader.releaseLock();
+    }
+  };
+
+  const openBrowserSerialPort = async (port) => {
+    if (!port.readable && !port.writable) {
+      await port.open({ baudRate: Number(scannerSettings.baud_rate || 9600) });
+      return true;
+    }
+    return false;
+  };
+
+  const scannerPortLabel = (port) => {
+    if (!port) return '';
+    const info = typeof port.getInfo === 'function' ? port.getInfo() : {};
+    const vendorId = Number(info.usbVendorId || 0);
+    const productId = Number(info.usbProductId || 0);
+    if (!vendorId && !productId) return 'USB-COM scanner';
+    return `USB-COM scanner (${[vendorId, productId]
+      .map((value) => value.toString(16).toUpperCase().padStart(4, '0'))
+      .join(':')})`;
+  };
+
+  const renderScannerSelection = () => {
+    const label = selectedScannerLabel || 'No scanner selected';
+    if (selectedScannerNode) selectedScannerNode.textContent = label;
+    if (scannerSummary && !scannerSummary.dataset.healthMessage) scannerSummary.textContent = label;
+    if (scannerSelectButton instanceof HTMLButtonElement) {
+      scannerSelectButton.classList.toggle('is-selected', Boolean(selectedScannerPort || selectedScannerLabel));
+    }
+  };
+
+  const setScannerHealth = (stateName, title, detail) => {
+    const card = document.querySelector('[data-scanner-health]');
+    const titleNode = document.querySelector('[data-scanner-health-title]');
+    const detailNode = document.querySelector('[data-scanner-health-detail]');
+    if (card) {
+      card.classList.toggle('is-ok', stateName === 'ok');
+      card.classList.toggle('is-error', stateName === 'error');
+      card.classList.toggle('is-checking', stateName === 'checking');
+      card.classList.toggle('is-ready', stateName === 'ready');
+    }
+    if (titleNode) titleNode.textContent = title;
+    if (detailNode) detailNode.textContent = detail;
+    if (scannerSummary) {
+      scannerSummary.dataset.healthMessage = title;
+      scannerSummary.textContent = stateName === 'ok' && selectedScannerLabel
+        ? `${selectedScannerLabel} working`
+        : title;
+    }
+    if (scannerSummaryDot) {
+      scannerSummaryDot.classList.toggle('is-ok', stateName === 'ok');
+      scannerSummaryDot.classList.toggle('is-error', stateName === 'error');
+      scannerSummaryDot.classList.toggle('is-checking', stateName === 'checking');
+      scannerSummaryDot.classList.toggle('is-ready', stateName === 'ready');
+    }
+    notifyScannerStatus(stateName, title);
+  };
+
+  const scannerHealthDetail = (payload) => {
+    const candidates = Array.isArray(payload.candidates) ? payload.candidates : [];
+    const firstExisting = candidates.find((candidate) => candidate.path === payload.device)
+      || candidates.find((candidate) => candidate.exists)
+      || candidates[0]
+      || {};
+    const checks = payload.checks || {};
+    if (!checks.device_exists) {
+      return `No scanner serial device was found. Checked: ${candidates.map((candidate) => candidate.path).filter(Boolean).join(', ') || 'no paths'}.`;
+    }
+    if (!checks.device_readable) {
+      const user = payload.web_user ? ` User: ${payload.web_user}.` : '';
+      return `Found ${payload.device}, but it is not readable. Permissions: ${firstExisting.permissions || 'unknown'}.${user} Add the web-server user to dialout or install a udev rule for the scanner.`;
+    }
+    if (!checks.configured) {
+      return `Found ${payload.device}, but stty configuration failed: ${payload.error || 'no command output'}`;
+    }
+    if (!checks.opened) {
+      const user = payload.web_user ? ` User: ${payload.web_user}.` : '';
+      return `Found ${payload.device}, but PHP could not open it. Permissions: ${firstExisting.permissions || 'unknown'}.${user} Add the web-server user to dialout or configure a udev rule.`;
+    }
+    return `Serial path is open on ${payload.device} at ${payload.baud_rate || scannerSettings.baud_rate} baud. Click Test and scan any barcode to prove data is arriving.`;
+  };
+
+  const checkBrowserScannerHealth = async () => {
+    if (!navigator.serial) {
+      setScannerHealth('error', 'Browser cannot access USB-COM', 'Open Store Ops in Chrome or Edge so the browser can talk to the local USB-COM scanner.');
+      return false;
+    }
+
+    const ports = await navigator.serial.getPorts();
+    if (!ports.length) {
+      selectedScannerPort = null;
+      selectedScannerLabel = '';
+      renderScannerSelection();
+      setScannerHealth('error', 'No scanner selected', 'Choose Select scanner, then select the USB-COM barcode scanner from the browser prompt.');
+      return false;
+    }
+
+    if (!selectedScannerPort || !ports.includes(selectedScannerPort)) {
+      selectedScannerPort = ports[0];
+      selectedScannerLabel = scannerPortLabel(selectedScannerPort);
+      renderScannerSelection();
+    }
+
+    setScannerHealth('ready', 'Scanner permission ready', `${selectedScannerLabel} is approved. Use Test and scan a real barcode to confirm data is arriving.`);
+    return true;
+  };
+
+  const checkScannerHealth = async () => {
+    setScannerHealth('checking', 'Checking scanner', 'Checking whether this browser can reach the local USB-COM scanner.');
+    try {
+      if (!serverCanSeeLocalUsb()) {
+        return await checkBrowserScannerHealth();
+      }
+
+      const query = new URLSearchParams({
+        status: '1',
+        baud_rate: String(scannerSettings.baud_rate || 9600)
+      });
+      const response = await fetch(`${scanSerialEndpoint}?${query.toString()}`, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await readJsonResponse(response, 'Unable to run USB-COM health check.');
+      if (!response.ok || !payload.ok) {
+        setScannerHealth('error', 'Scanner command path failed', scannerHealthDetail(payload));
+        return false;
+      }
+      selectedScannerLabel = payload.device || 'Local USB-COM scanner';
+      renderScannerSelection();
+      setScannerHealth('ready', 'Scanner path ready', scannerHealthDetail(payload));
+      return true;
+    } catch (error) {
+      setScannerHealth('error', 'Scanner health check failed', error instanceof Error ? error.message : 'Unable to run USB-COM health check.');
+      return false;
+    }
+  };
+
+  const selectScanner = async () => {
+    if (!navigator.serial) {
+      setScannerHealth('error', 'Scanner selection unavailable', 'Use Chrome or Edge to select a USB-COM scanner from this device.');
+      return null;
+    }
+    try {
+      const port = await navigator.serial.requestPort();
+      selectedScannerPort = port;
+      selectedScannerLabel = scannerPortLabel(port);
+      renderScannerSelection();
+      setScannerHealth('ready', 'Scanner selected', `${selectedScannerLabel} is approved for this browser. Use Test and scan any barcode.`);
+      return port;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'NotFoundError') return null;
+      setScannerHealth('error', 'Scanner selection failed', error instanceof Error ? error.message : 'Unable to select the USB-COM scanner.');
+      return null;
+    }
+  };
+
+  const testScannerScan = async () => {
+    setScannerHealth('checking', 'Waiting for test scan', 'Scan any product barcode now.');
+    if (scannerTestScanButton instanceof HTMLButtonElement) scannerTestScanButton.disabled = true;
+    try {
+      if (!serverCanSeeLocalUsb()) {
+        if (!navigator.serial) {
+          throw new Error('This browser cannot access USB-COM scanners from a hosted Store Ops site. Use Chrome or Edge.');
+        }
+        const approvedPorts = await navigator.serial.getPorts();
+        const port = selectedScannerPort || approvedPorts[0] || await selectScanner();
+        if (!port) return false;
+        selectedScannerPort = port;
+        selectedScannerLabel = scannerPortLabel(port);
+        renderScannerSelection();
+        const openedHere = await openBrowserSerialPort(port);
+        try {
+          const codes = await readBrowserSerialCodes(port, 6000);
+          const code = String(codes[0] || '');
+          if (!code) {
+            setScannerHealth('error', 'Scanner test failed', 'The browser opened the local USB-COM port, but no barcode data arrived within 6 seconds.');
+            return false;
+          }
+          setScannerHealth('ok', 'Scanner working', `Received ${code} from ${selectedScannerLabel} through this browser.`);
+          return true;
+        } finally {
+          if (openedHere) await port.close().catch(() => {});
+        }
+      }
+
+      const query = new URLSearchParams({
+        test: '1',
+        baud_rate: String(scannerSettings.baud_rate || 9600)
+      });
+      const response = await fetch(`${scanSerialEndpoint}?${query.toString()}`, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await readJsonResponse(response, 'Unable to run scanner test.');
+      const code = Array.isArray(payload.codes) ? String(payload.codes[0] || '') : '';
+      if (!response.ok || !payload.ok || !code) {
+        setScannerHealth('error', 'Scanner test failed', payload.error || 'No barcode data was received from USB-COM.');
+        return false;
+      }
+      selectedScannerLabel = payload.device || 'Local USB-COM scanner';
+      renderScannerSelection();
+      setScannerHealth('ok', 'Scanner working', `Received ${code} from ${payload.device || 'USB-COM scanner'} at ${payload.baud_rate || scannerSettings.baud_rate} baud.`);
+      return true;
+    } catch (error) {
+      setScannerHealth('error', 'Scanner test failed', error instanceof Error ? error.message : 'Unable to run scanner test.');
+      return false;
+    } finally {
+      if (scannerTestScanButton instanceof HTMLButtonElement) scannerTestScanButton.disabled = false;
+    }
+  };
+
+  const renderScannerSettings = () => {
+    scannerSettings = normalizeScannerSettings(scannerSettings);
+    renderScannerSelection();
+  };
+
+  const loadScannerSettings = async () => {
+    try {
+      const response = await fetch(scanBridgeEndpoint, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await readJsonResponse(response, 'Unable to load scanner settings.');
+      scannerSettings = normalizeScannerSettings(payload.settings || scannerSettings);
+    } catch (_error) {
+      scannerSettings = normalizeScannerSettings(scannerSettings);
+    }
+    renderScannerSettings();
+  };
+
+  const activateSettingsTab = (tab) => {
+    activeSettingsTab = tab === 'scanner' ? 'scanner' : 'scanner';
+    document.querySelectorAll('[data-settings-tab]').forEach((button) => {
+      const isActive = button.dataset.settingsTab === activeSettingsTab;
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-selected', String(isActive));
+    });
+    document.querySelectorAll('[data-settings-panel]').forEach((panel) => {
+      const isActive = panel.dataset.settingsPanel === activeSettingsTab;
+      panel.classList.toggle('is-active', isActive);
+      panel.hidden = !isActive;
+    });
+    if (settingsTitle) settingsTitle.textContent = 'Scanner setup';
+  };
+
+  const openSettingsModal = () => {
+    if (!settingsModal) return;
+    if (settingsError) {
+      settingsError.textContent = '';
+      settingsError.hidden = true;
+    }
+    activateSettingsTab('scanner');
+    renderScannerSettings();
+    settingsModal.hidden = false;
+    checkScannerHealth().catch(() => {});
+    if (scannerSelectButton instanceof HTMLButtonElement) {
+      window.setTimeout(() => scannerSelectButton.focus(), 40);
+    }
+  };
+
+  const closeSettingsModal = () => {
+    if (settingsModal) settingsModal.hidden = true;
   };
 
   const storedSidebarExpanded = () => {
@@ -230,6 +574,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const fields = employeeProfileFields();
     if (fields.displayName instanceof HTMLInputElement) fields.displayName.focus();
   });
+  document.querySelector('[data-open-store-settings]')?.addEventListener('click', () => {
+    if (compactSidebarQuery.matches) setSidebarExpanded(false, { persist: false });
+    openSettingsModal();
+  });
+  document.querySelectorAll('[data-close-store-settings]').forEach((button) => {
+    button.addEventListener('click', closeSettingsModal);
+  });
+  document.querySelectorAll('[data-settings-tab]').forEach((button) => {
+    button.addEventListener('click', () => activateSettingsTab(button.dataset.settingsTab || 'scanner'));
+  });
+  scannerSelectButton?.addEventListener('click', () => {
+    selectScanner().catch(() => {});
+  });
+  document.querySelector('[data-scanner-health-check]')?.addEventListener('click', () => {
+    checkScannerHealth().catch(() => {});
+  });
+  scannerTestScanButton?.addEventListener('click', () => {
+    testScannerScan().catch(() => {});
+  });
   employeeProfileList?.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
     const button = target?.closest('[data-edit-employee-profile]');
@@ -279,6 +642,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (event.key === 'Escape' && employeeProfilesModal?.hidden === false) {
       closeEmployeeProfilesModal();
+      return;
+    }
+    if (event.key === 'Escape' && settingsModal?.hidden === false) {
+      closeSettingsModal();
     }
   });
 
@@ -288,5 +655,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  window.JGStoreOpsScanner = {
+    openSettings: openSettingsModal,
+    check: checkScannerHealth,
+    getState: () => ({
+      ready: Boolean(selectedScannerPort || selectedScannerLabel),
+      label: selectedScannerLabel,
+      settings: { ...scannerSettings }
+    })
+  };
+
   syncSidebarForViewport();
+  loadScannerSettings()
+    .then(() => checkScannerHealth())
+    .catch(() => {});
 });

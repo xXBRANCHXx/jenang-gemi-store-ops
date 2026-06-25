@@ -34,6 +34,7 @@ function jg_store_ops_shell_svg(string $name): string
         'integrations' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12h8M9 7V3M15 7V3M7 7h10v3a5 5 0 0 1-10 0zM12 15v6"/></svg>',
         'sku-db' => '<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>',
         'reprint' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></svg>',
+        'settings' => '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1z"/></svg>',
         'panel' => '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 4v16"/></svg>',
     ];
 
@@ -83,6 +84,8 @@ function jg_store_ops_shell_open(array $options = []): void
         'data-employee-id' => $employee['id'],
         'data-employee-name' => $employee['name'],
         'data-employee-profiles-endpoint' => $rootPrefix . 'api/employees-v2/',
+        'data-scan-bridge-endpoint' => $rootPrefix . 'api/scan-bridge/',
+        'data-scan-serial-endpoint' => $rootPrefix . 'api/scan-serial/',
     ], $appAttributes);
     ?>
     <div class="admin-build-badge" aria-label="Store build version">Build 1.03.01</div>
@@ -135,6 +138,10 @@ function jg_store_ops_shell_open(array $options = []): void
                 <?php else: ?>
                     </div>
                 <?php endif; ?>
+                <button type="button" class="admin-store-nav-item admin-store-settings-launch" data-open-store-settings title="Settings">
+                    <?php echo jg_store_ops_shell_svg('settings'); ?>
+                    <span>Settings</span>
+                </button>
             </footer>
         </aside>
 
@@ -177,6 +184,99 @@ function jg_store_ops_shell_open(array $options = []): void
 function jg_store_ops_shell_close(): void
 {
     ?>
+        </div>
+
+        <div class="admin-modal-shell admin-store-settings-modal" data-store-settings-modal hidden>
+            <div class="admin-modal-backdrop" data-close-store-settings></div>
+            <section class="admin-modal-card admin-store-settings-card" data-store-settings-form role="dialog" aria-modal="true" aria-labelledby="store-settings-title">
+                <aside class="admin-settings-sidebar">
+                    <div class="admin-settings-brand">
+                        <span class="admin-settings-brand-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5z"/><path d="M8 10.5h8M8 14h8"/></svg>
+                        </span>
+                        <span>
+                            <strong>Store Ops</strong>
+                            <small>Workstation settings</small>
+                        </span>
+                    </div>
+
+                    <nav class="admin-settings-nav" aria-label="Settings sections">
+                        <button type="button" class="admin-settings-tab is-active" data-settings-tab="scanner" aria-selected="true">
+                            <span class="admin-settings-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3M7 12h10M8 9h1M11 9h2M15 9h1M8 15h2M12 15h1M15 15h1"/></svg></span>
+                            <span><strong>Scanner</strong><small>USB-COM setup</small></span>
+                            <svg class="admin-settings-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                        </button>
+                    </nav>
+
+                    <div class="admin-settings-scanner-summary">
+                        <i data-scanner-summary-dot aria-hidden="true"></i>
+                        <span>
+                            <strong>Scanner status</strong>
+                            <small data-scanner-summary>No scanner selected</small>
+                        </span>
+                    </div>
+                </aside>
+
+                <main class="admin-settings-main">
+                    <header class="admin-settings-header">
+                        <div>
+                            <span class="admin-settings-kicker">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1z"/></svg>
+                                Store Ops Settings
+                            </span>
+                            <h3 id="store-settings-title" data-settings-title>Scanner setup</h3>
+                            <p>Configure the scanner used by this Store Ops station.</p>
+                        </div>
+                        <div class="admin-settings-header-actions">
+                            <button type="button" class="admin-settings-close" data-close-store-settings aria-label="Close settings" title="Close settings">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+                            </button>
+                        </div>
+                    </header>
+
+                    <p class="admin-form-error" data-store-settings-error hidden></p>
+
+                    <div class="admin-settings-panels">
+                        <section class="admin-settings-panel is-active" data-settings-panel="scanner">
+                            <div class="admin-settings-section-head">
+                                <span class="admin-settings-section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3v5M17 3v5M5 8h14v4a7 7 0 0 1-14 0zM12 19v2"/><path d="M9 5h6"/></svg></span>
+                                <div>
+                                    <h4>USB-COM scanner connection</h4>
+                                    <p>Select the barcode scanner connected to this Store Ops station.</p>
+                                </div>
+                            </div>
+
+                            <button type="button" class="admin-scanner-select" data-scanner-select>
+                                <span class="admin-scanner-select-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m13 2-2 8h7l-7 12 2-8H6z"/></svg></span>
+                                <span>
+                                    <small>Selected scanner</small>
+                                    <strong data-selected-scanner>No scanner selected</strong>
+                                </span>
+                                <span class="admin-scanner-select-action">Select scanner</span>
+                            </button>
+
+                            <div class="admin-scanner-health-card" data-scanner-health>
+                                <i aria-hidden="true"></i>
+                                <div>
+                                    <strong data-scanner-health-title>Scanner not checked</strong>
+                                    <span data-scanner-health-detail>Select a scanner, then use Test to confirm barcode data is arriving.</span>
+                                </div>
+                            </div>
+
+                            <div class="admin-scanner-health-actions">
+                                <button type="button" class="admin-ghost-btn" data-scanner-health-check>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>
+                                    Recheck
+                                </button>
+                                <button type="button" class="admin-primary-btn" data-scanner-test-scan>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3M7 12h10"/></svg>
+                                    Test
+                                </button>
+                            </div>
+                        </section>
+                    </div>
+                </main>
+            </section>
         </div>
 
         <div class="admin-modal-shell admin-employee-profiles-modal" data-employee-profiles-modal hidden>

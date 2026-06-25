@@ -3,11 +3,17 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!root) return;
 
   const endpoint = root.dataset.walkInsEndpoint || '../api/walk-ins/';
+  const scanBridgeEndpoint = root.dataset.scanBridgeEndpoint || '../api/scan-bridge/';
+  const scanSerialEndpoint = root.dataset.scanSerialEndpoint || '../api/scan-serial/';
+  const firstPageItemLimit = 7;
+  const continuationItemLimit = 9;
+
   const refs = {
     catalogStatus: document.querySelector('[data-walkins-catalog-status]'),
     invoiceNumber: document.querySelector('[data-walkins-invoice-number]'),
-    skuInput: document.querySelector('[data-walkins-sku-input]'),
-    addSku: document.querySelector('[data-walkins-add-sku]'),
+    scannerAction: document.querySelector('[data-walkins-scanner-action]'),
+    scannerTitle: document.querySelector('[data-walkins-scanner-title]'),
+    scannerDetail: document.querySelector('[data-walkins-scanner-detail]'),
     error: document.querySelector('[data-walkins-error]'),
     customerName: document.querySelector('[data-walkins-customer-name]'),
     customerPhone: document.querySelector('[data-walkins-customer-phone]'),
@@ -20,11 +26,13 @@ document.addEventListener('DOMContentLoaded', () => {
     summaryCustomer: document.querySelector('[data-walkins-summary-customer]'),
     summaryContact: document.querySelector('[data-walkins-summary-contact]'),
     subtotal: document.querySelector('[data-walkins-subtotal]'),
+    discount: document.querySelector('[data-walkins-discount]'),
     tax: document.querySelector('[data-walkins-tax]'),
     totalItems: document.querySelector('[data-walkins-total-items]'),
     total: document.querySelector('[data-walkins-total]'),
     complete: document.querySelector('[data-walkins-complete]'),
     print: document.querySelector('[data-walkins-print]'),
+    printStage: document.querySelector('[data-walkins-print-stage]'),
     newInvoice: document.querySelector('[data-walkins-new-invoice]'),
     completeModal: document.querySelector('[data-walkins-complete-modal]'),
     completeInvoice: document.querySelector('[data-walkins-complete-invoice]'),
@@ -39,25 +47,62 @@ document.addEventListener('DOMContentLoaded', () => {
     cart: [],
     paymentMethod: 'Cash',
     recent: [],
-    busy: false
+    busy: false,
+    scannerReady: false,
+    scannerLabel: '',
+    scannerSettings: { baud_rate: 9600 }
   };
 
-  const escapeHtml = (value) => String(value)
+  let scanBuffer = '';
+  let scanBufferTimer = 0;
+  let serialPort = null;
+  let serialReader = null;
+  let serialReadBuffer = '';
+  let serverSerialTimer = 0;
+  let serverSerialErrorShown = false;
+  let lastScanKey = '';
+  let lastScanAt = 0;
+
+  const escapeHtml = (value) => String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 
   const normalizeCode = (value) => String(value || '').trim().toUpperCase();
+  const normalizeScannerSettings = (settings) => {
+    const baudRate = [9600, 19200, 38400, 57600, 115200].includes(Number(settings?.baud_rate)) ? Number(settings.baud_rate) : 9600;
+    return { baud_rate: baudRate };
+  };
   const moneyValue = (value) => {
     const number = Number(value || 0);
     return Number.isFinite(number) ? number : 0;
   };
+  const discountRateForItem = (item) => Math.max(0, Math.min(100, moneyValue(item.discount_rate)));
+  const lineGross = (item) => moneyValue(item.sale_price) * Number(item.qty || 0);
+  const lineDiscount = (item) => Math.round(lineGross(item) * discountRateForItem(item)) / 100;
+  const lineTotal = (item) => Math.max(0, lineGross(item) - lineDiscount(item));
+
   const formatRupiah = (value) => new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
     maximumFractionDigits: 0
   }).format(moneyValue(value));
+  const formatPrintNumber = (value) => new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(moneyValue(value));
+  const formatPrintAmount = (value) => `Rp ${formatPrintNumber(value)}`;
+  const formatPrintTotal = (value) => `Rp ${new Intl.NumberFormat('id-ID', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(moneyValue(value))}`;
+  const formatPrintDate = (date = new Date()) => [
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+    String(date.getFullYear())
+  ].join('/');
 
   const setError = (message = '') => {
     if (!refs.error) return;
@@ -69,6 +114,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!refs.catalogStatus) return;
     refs.catalogStatus.textContent = message;
     refs.catalogStatus.classList.toggle('admin-status-badge-warn', tone === 'warn');
+  };
+
+  const setScannerStatus = (ready, label = '', detail = '') => {
+    state.scannerReady = Boolean(ready);
+    state.scannerLabel = state.scannerReady ? (label || state.scannerLabel || '') : '';
+    if (refs.scannerAction) {
+      refs.scannerAction.classList.toggle('is-ready', state.scannerReady);
+      refs.scannerAction.setAttribute('aria-label', state.scannerReady ? 'Scanner ready' : 'Connect scanner');
+    }
+    if (refs.scannerTitle) refs.scannerTitle.textContent = state.scannerReady ? 'Scanner ready' : 'Connect scanner';
+    if (refs.scannerDetail) {
+      refs.scannerDetail.textContent = detail || (state.scannerReady ? (state.scannerLabel || 'Ready for scans') : 'No scanner selected');
+    }
   };
 
   const readJsonResponse = async (response, fallbackMessage) => {
@@ -87,7 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const requestJson = async (options = {}) => {
     const response = await fetch(endpoint, {
       credentials: 'same-origin',
-      cache: options.method === 'POST' ? 'no-store' : 'no-store',
+      cache: 'no-store',
       headers: {
         Accept: 'application/json',
         ...(options.body ? { 'Content-Type': 'application/json' } : {})
@@ -99,6 +157,53 @@ document.addEventListener('DOMContentLoaded', () => {
       throw new Error(payload.error || `HTTP ${response.status}`);
     }
     return payload;
+  };
+
+  const serverCanSeeLocalUsb = () => {
+    const host = window.location.hostname;
+    return host === ''
+      || host === 'localhost'
+      || host === '127.0.0.1'
+      || host === '::1'
+      || /^10\./.test(host)
+      || /^192\.168\./.test(host)
+      || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+  };
+
+  const parseScannerCodes = (buffer) => String(buffer || '').split(/\r\n|\r|\n|\t/)
+    .map((code) => normalizeCode(code))
+    .filter(Boolean);
+
+  const skuFromBarcode = (value) => {
+    const barcode = normalizeCode(value).replace(/[^A-Z0-9]/g, '');
+    const withoutChecksum = barcode.slice(0, -1);
+    return /^\d{11}$/.test(withoutChecksum) ? `0${withoutChecksum}` : withoutChecksum;
+  };
+
+  const findProductByScan = (value) => {
+    const code = normalizeCode(value);
+    const candidates = [...new Set([
+      code,
+      skuFromBarcode(code),
+      code.replace(/[^A-Z0-9-]/g, ''),
+      code.replace(/[^A-Z0-9]/g, '')
+    ].filter(Boolean))];
+    for (const candidate of candidates) {
+      const product = state.productBySku.get(candidate) || state.productByTag.get(candidate);
+      if (product) return product;
+    }
+    return null;
+  };
+
+  const scannerPortLabel = (port) => {
+    if (!port) return '';
+    const info = typeof port.getInfo === 'function' ? port.getInfo() : {};
+    const vendorId = Number(info.usbVendorId || 0);
+    const productId = Number(info.usbProductId || 0);
+    if (!vendorId && !productId) return 'USB-COM scanner';
+    return `USB-COM scanner (${[vendorId, productId]
+      .map((value) => value.toString(16).toUpperCase().padStart(4, '0'))
+      .join(':')})`;
   };
 
   const hydrateCatalog = (catalog) => {
@@ -115,10 +220,11 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const totals = () => {
-    const subtotal = state.cart.reduce((sum, item) => sum + moneyValue(item.sale_price) * Number(item.qty || 0), 0);
+    const subtotal = state.cart.reduce((sum, item) => sum + lineGross(item), 0);
+    const discount = state.cart.reduce((sum, item) => sum + lineDiscount(item), 0);
     const tax = 0;
     const itemCount = state.cart.reduce((sum, item) => sum + Number(item.qty || 0), 0);
-    return { subtotal, tax, total: subtotal + tax, itemCount };
+    return { subtotal, discount, tax, total: subtotal - discount + tax, itemCount };
   };
 
   const renderInvoiceNumber = () => {
@@ -137,10 +243,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const summary = totals();
     if (refs.itemCount) refs.itemCount.textContent = `${summary.itemCount} item${summary.itemCount === 1 ? '' : 's'} in cart`;
     if (refs.subtotal) refs.subtotal.textContent = formatRupiah(summary.subtotal);
+    if (refs.discount) refs.discount.textContent = formatRupiah(summary.discount);
     if (refs.tax) refs.tax.textContent = formatRupiah(summary.tax);
     if (refs.totalItems) refs.totalItems.textContent = String(summary.itemCount);
     if (refs.total) refs.total.textContent = formatRupiah(summary.total);
     if (refs.complete instanceof HTMLButtonElement) refs.complete.disabled = state.busy || state.cart.length === 0;
+    if (refs.print instanceof HTMLButtonElement) refs.print.disabled = state.cart.length === 0;
   };
 
   const renderCart = () => {
@@ -152,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <svg viewBox="0 0 24 24"><path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3M7 12h10M8 9h1M11 9h2M15 9h1M8 15h2M12 15h1M15 15h1"/></svg>
           </span>
           <strong>No products added</strong>
-          <small>Scan a SKU or quick-add a skip-scan product.</small>
+          <small>Scan a product or quick-add a skip-scan product.</small>
         </div>
       `;
       renderTotals();
@@ -162,6 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
     refs.cartList.innerHTML = state.cart.map((item) => {
       const unitPrice = moneyValue(item.sale_price);
       const qty = Number(item.qty || 0);
+      const discountRate = discountRateForItem(item);
       return `
         <article class="admin-walkins-cart-row" data-cart-sku="${escapeHtml(item.sku)}">
           <span class="admin-walkins-row-icon ${item.scanned ? 'is-scanned' : ''}" aria-hidden="true">
@@ -174,12 +283,13 @@ document.addEventListener('DOMContentLoaded', () => {
             <small>
               <code>${escapeHtml(item.sku)}</code>
               <i>${item.scanned ? 'Scanned' : 'Skip-scan'}</i>
+              ${discountRate > 0 ? `<i>${formatPrintNumber(discountRate)}% off</i>` : ''}
               ${unitPrice <= 0 ? '<b>No sale price</b>' : ''}
             </small>
           </span>
           <span class="admin-walkins-row-price">
             <strong>${formatRupiah(unitPrice)}</strong>
-            <small>${formatRupiah(unitPrice * qty)}</small>
+            <small>${formatRupiah(lineTotal(item))}</small>
           </span>
           <span class="admin-walkins-qty">
             <button type="button" data-cart-decrease="${escapeHtml(item.sku)}" aria-label="Decrease ${escapeHtml(item.sku)}">-</button>
@@ -266,6 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tag: product.tag || '',
         name: product.name || product.sku,
         sale_price: product.sale_price || '0.00',
+        discount_rate: product.discount_rate || 0,
         qty: 1,
         scanned: Boolean(scanned),
         skip_scan: Boolean(product.skip_scan)
@@ -274,19 +385,142 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCart();
   };
 
-  const scanSku = () => {
-    const code = normalizeCode(refs.skuInput?.value || '');
-    if (!code) return;
-    const product = state.productBySku.get(code) || state.productByTag.get(code);
+  const handleScan = (value) => {
+    const code = normalizeCode(value);
+    if (!code) return false;
+    const now = Date.now();
+    if (lastScanKey === code && now - lastScanAt < 350) return false;
+    lastScanKey = code;
+    lastScanAt = now;
+    const product = findProductByScan(code);
     if (!product) {
-      setError(`SKU or TAG "${code}" was not found in the live SKU database.`);
-      return;
+      setError(`Barcode "${code}" was not found in the live SKU database.`);
+      return false;
     }
     addToCart(product, true);
-    if (refs.skuInput instanceof HTMLInputElement) {
-      refs.skuInput.value = '';
-      refs.skuInput.focus();
+    setScannerStatus(true, state.scannerLabel, `Received ${code}`);
+    return true;
+  };
+
+  const submitScanBuffer = () => {
+    const value = scanBuffer;
+    scanBuffer = '';
+    window.clearTimeout(scanBufferTimer);
+    handleScan(value);
+  };
+
+  const pushSerialChunk = (chunk) => {
+    serialReadBuffer += chunk;
+    const parts = serialReadBuffer.split(/\r\n|\r|\n|\t/);
+    serialReadBuffer = parts.pop() || '';
+    parts.forEach((part) => handleScan(part));
+    window.clearTimeout(scanBufferTimer);
+    scanBufferTimer = window.setTimeout(() => {
+      if (!serialReadBuffer.trim()) return;
+      const value = serialReadBuffer;
+      serialReadBuffer = '';
+      handleScan(value);
+    }, 160);
+  };
+
+  const readSerialLoop = async () => {
+    if (!serialPort?.readable) return;
+    const decoder = new TextDecoderStream();
+    const closed = serialPort.readable.pipeTo(decoder.writable);
+    serialReader = decoder.readable.getReader();
+    try {
+      while (true) {
+        const { value, done } = await serialReader.read();
+        if (done) break;
+        if (value) pushSerialChunk(value);
+      }
+    } catch (_error) {
+      setScannerStatus(false, state.scannerLabel, 'Scanner disconnected');
+    } finally {
+      serialReader?.releaseLock();
+      serialReader = null;
+      await closed.catch(() => {});
     }
+  };
+
+  const openSerialPort = async (port) => {
+    serialPort = port;
+    window.clearInterval(serverSerialTimer);
+    serverSerialTimer = 0;
+    if (!serialPort.readable && !serialPort.writable) {
+      await serialPort.open({ baudRate: Number(state.scannerSettings.baud_rate || 9600) });
+    }
+    setScannerStatus(true, scannerPortLabel(port), scannerPortLabel(port));
+    readSerialLoop().catch(() => {});
+  };
+
+  const pollServerSerialScanner = async () => {
+    if (serialPort?.readable || serialPort?.writable) return;
+    if (!serverCanSeeLocalUsb()) {
+      window.clearInterval(serverSerialTimer);
+      serverSerialTimer = 0;
+      setScannerStatus(false, '', 'No scanner selected');
+      return;
+    }
+    try {
+      const query = new URLSearchParams({ baud_rate: String(state.scannerSettings.baud_rate || 9600) });
+      const response = await fetch(`${scanSerialEndpoint}?${query.toString()}`, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await readJsonResponse(response, 'Unable to read USB-COM scanner.');
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || 'Unable to read USB-COM scanner.');
+      }
+      serverSerialErrorShown = false;
+      const label = payload.device || 'Local USB-COM scanner';
+      setScannerStatus(true, label, label);
+      (Array.isArray(payload.codes) ? payload.codes : []).forEach((code) => handleScan(code));
+    } catch (error) {
+      if (serverSerialErrorShown) return;
+      serverSerialErrorShown = true;
+      setScannerStatus(false, '', error instanceof Error ? error.message : 'Connect scanner');
+    }
+  };
+
+  const startServerSerialPolling = () => {
+    if (serverSerialTimer) return;
+    pollServerSerialScanner();
+    serverSerialTimer = window.setInterval(pollServerSerialScanner, 280);
+  };
+
+  const connectApprovedScanner = async () => {
+    if (navigator.serial) {
+      try {
+        const ports = await navigator.serial.getPorts();
+        if (ports.length) {
+          await openSerialPort(ports[0]);
+          return true;
+        }
+      } catch (_error) {
+        setScannerStatus(false, '', 'Connect scanner');
+        return false;
+      }
+      setScannerStatus(false, '', 'No scanner selected');
+      return false;
+    }
+
+    if (serverCanSeeLocalUsb()) {
+      startServerSerialPolling();
+      return true;
+    }
+
+    setScannerStatus(false, '', 'No scanner selected');
+    return false;
+  };
+
+  const openScannerSettings = () => {
+    if (window.JGStoreOpsScanner && typeof window.JGStoreOpsScanner.openSettings === 'function') {
+      window.JGStoreOpsScanner.openSettings();
+      return;
+    }
+    window.location.href = '../dashboard/?settings=scanner';
   };
 
   const changeQuantity = (sku, delta) => {
@@ -314,6 +548,7 @@ document.addEventListener('DOMContentLoaded', () => {
       button.classList.toggle('is-active', button.dataset.walkinsPayment === 'Cash');
     });
     setError('');
+    if (refs.printStage) refs.printStage.innerHTML = '';
     renderAll();
   };
 
@@ -324,6 +559,127 @@ document.addEventListener('DOMContentLoaded', () => {
     window.setTimeout(() => {
       refs.completeModal.hidden = true;
     }, 1600);
+  };
+
+  const customerDetails = () => ({
+    name: String(refs.customerName?.value || '').trim() || 'Walk-in customer',
+    phone: String(refs.customerPhone?.value || '').trim() || '-',
+    email: String(refs.customerEmail?.value || '').trim() || '-'
+  });
+
+  const printItemRow = (item) => `
+    <div class="admin-walkins-invoice-row">
+      <span>${escapeHtml(item.name || item.sku)}</span>
+      <span>${formatPrintNumber(item.qty)} Units</span>
+      <span>${formatPrintNumber(item.sale_price)}</span>
+      <span>${formatPrintNumber(discountRateForItem(item))}</span>
+      <span>${formatPrintAmount(lineTotal(item))}</span>
+    </div>
+  `;
+
+  const invoiceFooterHtml = (pageNumber, pageCount) => `
+    <footer class="admin-walkins-invoice-footer">
+      <div class="admin-walkins-invoice-footer-rule"></div>
+      <strong>#BeHealthy #BeWealthy #BeHappy</strong>
+      <div class="admin-walkins-invoice-footer-bottom">
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg> zerofoods.id</span>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 11.2 19a19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.8a2 2 0 0 1-.4 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg> +62 858-4283-3973</span>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg> zerofoods.id@gmail.com</span>
+        <b>Page ${pageNumber}/${pageCount}</b>
+      </div>
+    </footer>
+  `;
+
+  const invoicePageHtml = (items, pageIndex, pageCount, summary) => {
+    const pageNumber = pageIndex + 1;
+    const isFirstPage = pageIndex === 0;
+    const isLastPage = pageNumber === pageCount;
+    const customer = customerDetails();
+    const invoiceDate = formatPrintDate();
+    const invoiceNumber = state.invoiceNumber || 'New invoice';
+    return `
+      <article class="admin-walkins-invoice-page">
+        <header class="admin-walkins-invoice-header">
+          <div class="admin-walkins-invoice-promise">
+            <strong>Global Health Innovation</strong>
+            <span>0 sugar, 0 calorie, 0 carb</span>
+          </div>
+          <div class="admin-walkins-invoice-brand">
+            <span>zerofoods.id</span>
+            <strong>ZERO</strong>
+            <p>PT. Zero Foods Indonesia<br>Jl. Jombor Tegal No.124 A, Jombor Lor, Sinduadi, Kec. Mlati<br>Sleman YO 55284, Indonesia</p>
+          </div>
+        </header>
+        <section class="admin-walkins-invoice-title">
+          <strong>ZERO Customer [Walk In]</strong>
+          <div>
+            <span>BCA - 03-788-688-18 [PT. ZERO FOODS INDONESIA]</span>
+            <h2>Invoice ${escapeHtml(invoiceNumber)}</h2>
+          </div>
+        </section>
+        <section class="admin-walkins-invoice-dates">
+          <div><span>Invoice Date</span><strong>${escapeHtml(invoiceDate)}</strong></div>
+          <div><span>Due Date</span><strong>${escapeHtml(invoiceDate)}</strong></div>
+        </section>
+        <section class="admin-walkins-invoice-table">
+          <div class="admin-walkins-invoice-table-head">
+            <span>Description</span>
+            <span>Quantity</span>
+            <span>Unit Price</span>
+            <span>Disc.%</span>
+            <span>Amount</span>
+          </div>
+          ${isFirstPage ? `
+            <div class="admin-walkins-invoice-customer">
+              <span>name : ${escapeHtml(customer.name)}</span>
+              <span>phone : ${escapeHtml(customer.phone)}</span>
+              <span>email : ${escapeHtml(customer.email)}</span>
+            </div>
+          ` : ''}
+          <div class="admin-walkins-invoice-rows">
+            ${items.length ? items.map(printItemRow).join('') : '<div class="admin-walkins-invoice-row"><span>No products added</span><span>0.00 Units</span><span>0.00</span><span>0.00</span><span>Rp 0.00</span></div>'}
+          </div>
+        </section>
+        ${isLastPage ? `
+          <section class="admin-walkins-invoice-total">
+            <strong>Total</strong>
+            <span>${formatPrintTotal(summary.total)}</span>
+          </section>
+          <section class="admin-walkins-invoice-terms">
+            <strong>Payment Communication: ${escapeHtml(invoiceNumber)}</strong>
+            <span>Terms &amp; Conditions: https://royal-production.odoo.com/terms</span>
+          </section>
+        ` : '<section class="admin-walkins-invoice-spacer"></section>'}
+        ${invoiceFooterHtml(pageNumber, pageCount)}
+      </article>
+    `;
+  };
+
+  const buildPrintableInvoice = () => {
+    if (!refs.printStage) return;
+    const items = state.cart.map((item) => ({ ...item }));
+    const pages = [];
+    let remaining = items.slice();
+    if (!remaining.length) {
+      pages.push([]);
+    } else {
+      while (remaining.length) {
+        const limit = pages.length === 0 ? firstPageItemLimit : continuationItemLimit;
+        pages.push(remaining.splice(0, limit));
+      }
+    }
+    const summary = totals();
+    refs.printStage.innerHTML = pages.map((pageItems, index) => invoicePageHtml(pageItems, index, pages.length, summary)).join('');
+  };
+
+  const printInvoice = () => {
+    if (!state.cart.length) {
+      setError('Add at least one product before printing the invoice.');
+      return;
+    }
+    setError('');
+    buildPrintableInvoice();
+    window.setTimeout(() => window.print(), 50);
   };
 
   const completeSale = async () => {
@@ -348,6 +704,7 @@ document.addEventListener('DOMContentLoaded', () => {
           items: state.cart.map((item) => ({
             sku: item.sku,
             qty: item.qty,
+            discount_rate: discountRateForItem(item),
             scanned: Boolean(item.scanned)
           }))
         })
@@ -368,6 +725,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  const loadScannerSettings = async () => {
+    try {
+      const response = await fetch(scanBridgeEndpoint, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await readJsonResponse(response, 'Unable to load scanner settings.');
+      state.scannerSettings = normalizeScannerSettings(payload.settings || state.scannerSettings);
+    } catch (_error) {
+      state.scannerSettings = normalizeScannerSettings(state.scannerSettings);
+    }
+  };
+
   const loadInitialState = async () => {
     setCatalogStatus('Loading SKUs', 'warn');
     const payload = await requestJson();
@@ -377,12 +748,12 @@ document.addEventListener('DOMContentLoaded', () => {
     renderAll();
   };
 
-  refs.addSku?.addEventListener('click', scanSku);
-  refs.skuInput?.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      scanSku();
+  refs.scannerAction?.addEventListener('click', () => {
+    if (state.scannerReady) {
+      connectApprovedScanner().catch(() => {});
+      return;
     }
+    openScannerSettings();
   });
   refs.skipSearch?.addEventListener('input', renderSkipScan);
   refs.skipList?.addEventListener('click', (event) => {
@@ -403,6 +774,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   refs.clearCart?.addEventListener('click', () => {
     state.cart = [];
+    if (refs.printStage) refs.printStage.innerHTML = '';
     renderCart();
   });
   [refs.customerName, refs.customerPhone, refs.customerEmail].forEach((input) => {
@@ -417,7 +789,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
   refs.complete?.addEventListener('click', completeSale);
-  refs.print?.addEventListener('click', () => window.print());
+  refs.print?.addEventListener('click', printInvoice);
   refs.newInvoice?.addEventListener('click', async () => {
     if (state.cart.length && !window.confirm('Clear this invoice and start a new one?')) return;
     try {
@@ -431,8 +803,54 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  loadInitialState().catch((error) => {
-    setCatalogStatus('SKU load failed', 'warn');
-    setError(error instanceof Error ? error.message : 'Unable to load Walk Ins.');
+  document.addEventListener('keydown', (event) => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest('input, textarea, select, [contenteditable="true"], [data-store-settings-modal]')) return;
+
+    if (event.key === 'Enter' || event.key === 'Tab') {
+      event.preventDefault();
+      submitScanBuffer();
+      return;
+    }
+
+    if (event.key.length !== 1) return;
+    event.preventDefault();
+    scanBuffer += event.key;
+    window.clearTimeout(scanBufferTimer);
+    scanBufferTimer = window.setTimeout(submitScanBuffer, 260);
   });
+
+  window.addEventListener('storeops:scanner-status', (event) => {
+    const detail = event instanceof CustomEvent && event.detail ? event.detail : {};
+    if (detail.ready) {
+      setScannerStatus(true, detail.label || '', detail.label || 'Ready for scans');
+      connectApprovedScanner().catch(() => {});
+      return;
+    }
+    setScannerStatus(false, '', detail.title || 'No scanner selected');
+  });
+
+  window.addEventListener('focus', () => {
+    connectApprovedScanner().catch(() => {});
+  });
+
+  window.addEventListener('beforeprint', buildPrintableInvoice);
+  window.addEventListener('pagehide', () => {
+    window.clearInterval(serverSerialTimer);
+    window.clearTimeout(scanBufferTimer);
+    if (serialReader) serialReader.cancel().catch(() => {});
+    if (serialPort?.readable || serialPort?.writable) serialPort.close().catch(() => {});
+  });
+
+  setScannerStatus(false, '', 'No scanner selected');
+  Promise.all([
+    loadScannerSettings(),
+    loadInitialState()
+  ])
+    .then(() => connectApprovedScanner())
+    .catch((error) => {
+      setCatalogStatus('SKU load failed', 'warn');
+      setError(error instanceof Error ? error.message : 'Unable to load Walk Ins.');
+    });
 });

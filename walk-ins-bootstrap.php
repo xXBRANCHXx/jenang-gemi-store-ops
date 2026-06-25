@@ -50,6 +50,10 @@ function jg_store_ops_walkins_ensure_schema(PDO $pdo): void
                 ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
+
+    jg_store_ops_sku_ensure_column($pdo, 'store_ops_walkin_invoices', 'discount_total', 'DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER subtotal');
+    jg_store_ops_sku_ensure_column($pdo, 'store_ops_walkin_invoice_items', 'discount_rate', 'DECIMAL(6,2) NOT NULL DEFAULT 0.00 AFTER quantity');
+    jg_store_ops_sku_ensure_column($pdo, 'store_ops_walkin_invoice_items', 'discount_total', 'DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER discount_rate');
 }
 
 function jg_store_ops_walkins_invoice_number(): string
@@ -77,6 +81,15 @@ function jg_store_ops_walkins_money(mixed $value): string
     }
 
     return number_format(max(0, round((float) $value, 2)), 2, '.', '');
+}
+
+function jg_store_ops_walkins_discount_rate(mixed $value): float
+{
+    if ($value === '' || $value === null || !is_numeric($value)) {
+        return 0.0;
+    }
+
+    return max(0.0, min(100.0, round((float) $value, 2)));
 }
 
 function jg_store_ops_walkins_display_name(array $row): string
@@ -214,12 +227,14 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
         }
         $sku = strtoupper(trim((string) ($item['sku'] ?? '')));
         $quantity = (int) ($item['qty'] ?? $item['quantity'] ?? 0);
+        $discountRate = jg_store_ops_walkins_discount_rate($item['discount_rate'] ?? $item['discountRate'] ?? 0);
         if ($sku === '' || $quantity < 1) {
             continue;
         }
         $requestedItems[$sku] = [
             'sku' => $sku,
             'quantity' => ($requestedItems[$sku]['quantity'] ?? 0) + min($quantity, 999),
+            'discount_rate' => max((float) ($requestedItems[$sku]['discount_rate'] ?? 0), $discountRate),
             'scanned' => !empty($item['scanned']),
         ];
     }
@@ -231,6 +246,7 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
     $now = jg_store_ops_walkins_now();
     $savedItems = [];
     $subtotal = 0.0;
+    $discountTotal = 0.0;
     $itemCount = 0;
 
     $pdo->beginTransaction();
@@ -266,10 +282,10 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
         $updateStock = $pdo->prepare('UPDATE sku_skus SET current_stock = :current_stock, updated_at = :updated_at WHERE sku = :sku');
         $insertItem = $pdo->prepare(
             'INSERT INTO store_ops_walkin_invoice_items (
-                invoice_number, sku, tag, product_name, unit_price, quantity, line_total,
+                invoice_number, sku, tag, product_name, unit_price, quantity, discount_rate, discount_total, line_total,
                 scanned, skip_scan, created_at
              ) VALUES (
-                :invoice_number, :sku, :tag, :product_name, :unit_price, :quantity, :line_total,
+                :invoice_number, :sku, :tag, :product_name, :unit_price, :quantity, :discount_rate, :discount_total, :line_total,
                 :scanned, :skip_scan, :created_at
              )'
         );
@@ -283,7 +299,10 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
 
             $quantity = (int) $requestedItem['quantity'];
             $unitPrice = (float) ($row['sale_price'] ?? 0);
-            $lineTotal = round($unitPrice * $quantity, 2);
+            $discountRate = jg_store_ops_walkins_discount_rate($requestedItem['discount_rate'] ?? 0);
+            $grossLineTotal = round($unitPrice * $quantity, 2);
+            $lineDiscount = round($grossLineTotal * ($discountRate / 100), 2);
+            $lineTotal = round(max(0, $grossLineTotal - $lineDiscount), 2);
             $currentStock = max(0, (int) ($row['current_stock'] ?? 0) - $quantity);
             $skipScan = (int) ($row['skip_scan'] ?? 0) === 1;
             $name = jg_store_ops_walkins_display_name($row);
@@ -294,7 +313,8 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
                 ':sku' => (string) $row['sku'],
             ]);
 
-            $subtotal += $lineTotal;
+            $subtotal += $grossLineTotal;
+            $discountTotal += $lineDiscount;
             $itemCount += $quantity;
             $savedItems[] = [
                 'sku' => (string) $row['sku'],
@@ -302,6 +322,8 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
                 'name' => $name,
                 'sale_price' => number_format($unitPrice, 2, '.', ''),
                 'qty' => $quantity,
+                'discount_rate' => number_format($discountRate, 2, '.', ''),
+                'discount_total' => number_format($lineDiscount, 2, '.', ''),
                 'line_total' => number_format($lineTotal, 2, '.', ''),
                 'scanned' => $requestedItem['scanned'],
                 'skip_scan' => $skipScan,
@@ -309,14 +331,14 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
         }
 
         $tax = 0.0;
-        $total = round($subtotal + $tax, 2);
+        $total = round($subtotal - $discountTotal + $tax, 2);
         $insertInvoice = $pdo->prepare(
             'INSERT INTO store_ops_walkin_invoices (
                 invoice_number, customer_name, customer_phone, customer_email, payment_method,
-                subtotal, tax, total, item_count, created_by, created_at
+                subtotal, discount_total, tax, total, item_count, created_by, created_at
              ) VALUES (
                 :invoice_number, :customer_name, :customer_phone, :customer_email, :payment_method,
-                :subtotal, :tax, :total, :item_count, :created_by, :created_at
+                :subtotal, :discount_total, :tax, :total, :item_count, :created_by, :created_at
              )'
         );
         $insertInvoice->execute([
@@ -326,6 +348,7 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
             ':customer_email' => $customerEmail,
             ':payment_method' => $paymentMethod,
             ':subtotal' => number_format($subtotal, 2, '.', ''),
+            ':discount_total' => number_format($discountTotal, 2, '.', ''),
             ':tax' => number_format($tax, 2, '.', ''),
             ':total' => number_format($total, 2, '.', ''),
             ':item_count' => $itemCount,
@@ -341,6 +364,8 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
                 ':product_name' => $savedItem['name'],
                 ':unit_price' => $savedItem['sale_price'],
                 ':quantity' => $savedItem['qty'],
+                ':discount_rate' => $savedItem['discount_rate'],
+                ':discount_total' => $savedItem['discount_total'],
                 ':line_total' => $savedItem['line_total'],
                 ':scanned' => $savedItem['scanned'] ? 1 : 0,
                 ':skip_scan' => $savedItem['skip_scan'] ? 1 : 0,
@@ -358,6 +383,7 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
                 'customer_email' => $customerEmail,
                 'payment_method' => $paymentMethod,
                 'subtotal' => number_format($subtotal, 2, '.', ''),
+                'discount_total' => number_format($discountTotal, 2, '.', ''),
                 'tax' => number_format($tax, 2, '.', ''),
                 'total' => number_format($total, 2, '.', ''),
                 'item_count' => $itemCount,
