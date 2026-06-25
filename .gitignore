@@ -1,2 +1,5 @@
 .env
+.env.*
+!.env.example
+config.local.php
 config.runtime.php

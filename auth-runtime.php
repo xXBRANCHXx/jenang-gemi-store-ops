@@ -5,6 +5,49 @@ const JG_ADMIN_CODE_HASH = 'ba7e42d060466c149e331452cc58339e64b62a3b61ed953e90f3
 
 require_once __DIR__ . '/store-ops-fulfillment-runtime.php';
 
+function jg_admin_fallback_code_hash(): string
+{
+    if (function_exists('jg_store_ops_env_value')) {
+        $envValue = jg_store_ops_env_value('JG_ADMIN_CODE_HASH');
+        if (preg_match('/^[a-f0-9]{64}$/i', $envValue) === 1) {
+            return strtolower($envValue);
+        }
+    }
+
+    if (function_exists('jg_store_ops_load_local_config')) {
+        $config = jg_store_ops_load_local_config();
+        $configValue = is_string($config['admin_code_hash'] ?? null) ? trim($config['admin_code_hash']) : '';
+        if (preg_match('/^[a-f0-9]{64}$/i', $configValue) === 1) {
+            return strtolower($configValue);
+        }
+    }
+
+    foreach (['JG_ADMIN_CODE_HASH'] as $key) {
+        $value = getenv($key);
+        if (!is_string($value) || trim($value) === '') {
+            $value = $_SERVER[$key] ?? $_ENV[$key] ?? '';
+        }
+
+        $value = trim((string) $value);
+        if (preg_match('/^[a-f0-9]{64}$/i', $value) === 1) {
+            return strtolower($value);
+        }
+    }
+
+    return JG_ADMIN_CODE_HASH;
+}
+
+function jg_admin_employee_profiles_load_failed(?bool $failed = null): bool
+{
+    static $loadFailed = false;
+
+    if ($failed !== null) {
+        $loadFailed = $failed;
+    }
+
+    return $loadFailed;
+}
+
 function jg_admin_start_session(): void
 {
     if (session_status() === PHP_SESSION_ACTIVE) {
@@ -33,6 +76,10 @@ function jg_admin_is_authenticated(): bool
     $employeeId = trim((string) ($_SESSION['jg_admin_employee_id'] ?? ''));
     $employeeProfiles = jg_admin_employee_profiles_for_login();
     if ($employeeProfiles === []) {
+        if (jg_admin_employee_profiles_load_failed()) {
+            jg_admin_clear_authenticated_session();
+            return false;
+        }
         return true;
     }
 
@@ -143,15 +190,18 @@ function jg_admin_employee_profiles_for_login(): array
     try {
         $pdo = jg_store_ops_fulfillment_db();
         $employees = jg_store_ops_fulfillment_active_employees($pdo);
+        jg_admin_employee_profiles_load_failed(false);
         if ($employees !== []) {
             $profiles = $employees;
             return $profiles;
         }
     } catch (Throwable) {
+        jg_admin_employee_profiles_load_failed(true);
         $profiles = [];
         return $profiles;
     }
 
+    jg_admin_employee_profiles_load_failed(false);
     $profiles = [];
     return $profiles;
 }
@@ -195,7 +245,7 @@ function jg_admin_attempt_login(string $code): bool
 {
     jg_admin_start_session();
 
-    if (jg_admin_employee_profiles_for_login() !== []) {
+    if (jg_admin_employee_profiles_for_login() !== [] || jg_admin_employee_profiles_load_failed()) {
         jg_admin_clear_authenticated_session();
         return false;
     }
@@ -203,7 +253,7 @@ function jg_admin_attempt_login(string $code): bool
     $normalized = trim($code);
     $candidateHash = hash('sha256', $normalized);
 
-    if (!hash_equals(JG_ADMIN_CODE_HASH, $candidateHash)) {
+    if (!hash_equals(jg_admin_fallback_code_hash(), $candidateHash)) {
         jg_admin_clear_authenticated_session();
         return false;
     }

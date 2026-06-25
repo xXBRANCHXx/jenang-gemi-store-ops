@@ -1097,7 +1097,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const printableOrderId = order?.id || orderId;
     const account = order?.sourceAccountKey || '';
     const platform = String(order?.platform || '').toLowerCase();
-    openStorePage(`./print-label/?order=${encodeURIComponent(printableOrderId)}${account ? `&account=${encodeURIComponent(account)}` : ''}${platform ? `&platform=${encodeURIComponent(platform)}` : ''}${reprint ? '&reprint=1' : ''}`);
+    const packageNumber = String(order?.packageNumber || order?.package_number || '').trim();
+    openStorePage(`./print-label/?order=${encodeURIComponent(printableOrderId)}${account ? `&account=${encodeURIComponent(account)}` : ''}${platform ? `&platform=${encodeURIComponent(platform)}` : ''}${packageNumber ? `&package=${encodeURIComponent(packageNumber)}` : ''}${reprint ? '&reprint=1' : ''}`);
   };
 
   const settingsTabTitles = {
