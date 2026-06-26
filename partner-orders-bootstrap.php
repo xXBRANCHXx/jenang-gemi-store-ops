@@ -111,6 +111,35 @@ function jg_store_ops_partner_orders_db(): ?PDO
     return $pdo instanceof PDO ? $pdo : null;
 }
 
+function jg_store_ops_partner_orders_table_columns(PDO $pdo): array
+{
+    static $columns = null;
+
+    if (is_array($columns)) {
+        return $columns;
+    }
+
+    $columns = [];
+    try {
+        $stmt = $pdo->query('SHOW COLUMNS FROM partner_orders');
+        foreach ($stmt->fetchAll() as $row) {
+            $field = (string) ($row['Field'] ?? '');
+            if ($field !== '') {
+                $columns[$field] = true;
+            }
+        }
+    } catch (Throwable) {
+        $columns = [];
+    }
+
+    return $columns;
+}
+
+function jg_store_ops_partner_orders_select_column(array $columns, string $column, string $fallback): string
+{
+    return isset($columns[$column]) ? $column : $fallback . ' AS ' . $column;
+}
+
 function jg_store_ops_partner_orders_feed_url(): string
 {
     $configured = jg_store_ops_partner_orders_config('JG_PARTNER_ORDERS_FEED_URL', 'partner_orders_feed_url');
@@ -447,13 +476,23 @@ function jg_store_ops_partner_orders_display_id(string $orderId): string
 
 function jg_store_ops_partner_orders_deadline_at(array $row): int
 {
+    $deadlineRaw = trim((string) ($row['deadline_at'] ?? ''));
+    if ($deadlineRaw !== '') {
+        $deadlineSource = preg_match('/(?:Z|[+-]\d{2}:?\d{2})$/', $deadlineRaw) ? $deadlineRaw : $deadlineRaw . ' UTC';
+        $deadlineTimestamp = strtotime($deadlineSource);
+        if ($deadlineTimestamp !== false) {
+            return $deadlineTimestamp * 1000;
+        }
+    }
+
     $raw = (string) ($row['order_timestamp'] ?? $row['created_at'] ?? $row['updated_at'] ?? '');
     $timestamp = $raw !== '' ? strtotime($raw . ' UTC') : false;
     if ($timestamp === false) {
         $timestamp = time();
     }
 
-    return ($timestamp + 86400) * 1000;
+    $deadlineHours = max(1, min(48, (int) ($row['deadline_hours'] ?? 24)));
+    return ($timestamp + ($deadlineHours * 3600)) * 1000;
 }
 
 function jg_store_ops_partner_orders_items(array $row): array
@@ -486,6 +525,9 @@ function jg_store_ops_partner_orders_items(array $row): array
             'productName' => $productName !== '' ? $productName : ($sku !== '' ? $sku : 'Partner item'),
             'quantity' => max(1, (int) ($item['quantity'] ?? 1)),
             'sourcePlatform' => 'Partner',
+            'unitRevenue' => (float) ($item['unit_revenue'] ?? $item['partner_price'] ?? 0),
+            'lineRevenue' => (float) ($item['line_revenue'] ?? 0),
+            'matchConfidence' => (float) ($item['match_confidence'] ?? 0),
         ];
     }
 
@@ -543,13 +585,16 @@ function jg_store_ops_partner_orders_normalize(array $row, array $labels): array
         'partnerName' => jg_store_ops_partner_orders_partner_name((string) ($row['partner_code'] ?? '')),
         'sourceAccountKey' => jg_store_ops_partner_orders_source_key((string) ($row['partner_code'] ?? '')),
         'status' => $status !== '' ? $status : 'IS_LISTED',
-        'marketplaceStatus' => 'PARTNER_ORDER',
+        'marketplaceStatus' => trim((string) ($row['marketplace_platform'] ?? '')) !== '' ? 'PARTNER_' . strtoupper(preg_replace('/[^A-Z0-9]+/', '_', (string) ($row['marketplace_platform'] ?? ''))) : 'PARTNER_ORDER',
+        'marketplacePlatform' => (string) ($row['marketplace_platform'] ?? ''),
+        'deadlineHours' => (int) ($row['deadline_hours'] ?? 24),
         'instant' => false,
         'deadlineAt' => jg_store_ops_partner_orders_deadline_at($row),
         'createdAt' => $createdAt !== '' ? gmdate(DATE_ATOM, strtotime($createdAt . ' UTC') ?: time()) : null,
         'updatedAt' => $updatedAt !== '' ? gmdate(DATE_ATOM, strtotime($updatedAt . ' UTC') ?: time()) : null,
         'customerName' => (string) ($row['customer_name'] ?? ''),
         'notes' => (string) ($row['notes'] ?? ''),
+        'revenueTotal' => (float) ($row['revenue_total'] ?? 0),
         'items' => jg_store_ops_partner_orders_items($row),
         'labels' => $labels,
     ];
@@ -593,8 +638,29 @@ function jg_store_ops_partner_orders_list(): array
     }
 
     try {
+        $columns = jg_store_ops_partner_orders_table_columns($pdo);
+        $select = [
+            'id',
+            'partner_code',
+            'customer_name',
+            'brand_name',
+            'product_name',
+            'sku_code',
+            'sku_label',
+            'quantity',
+            'notes',
+            'status',
+            'order_timestamp',
+            jg_store_ops_partner_orders_select_column($columns, 'marketplace_platform', "''"),
+            jg_store_ops_partner_orders_select_column($columns, 'deadline_hours', '24'),
+            jg_store_ops_partner_orders_select_column($columns, 'deadline_at', 'NULL'),
+            jg_store_ops_partner_orders_select_column($columns, 'revenue_total', '0'),
+            'items_json',
+            'created_at',
+            'updated_at',
+        ];
         $stmt = $pdo->query(
-            'SELECT id, partner_code, customer_name, brand_name, product_name, sku_code, sku_label, quantity, notes, status, order_timestamp, items_json, created_at, updated_at
+            'SELECT ' . implode(', ', $select) . '
              FROM partner_orders
              ORDER BY COALESCE(order_timestamp, created_at) ASC, id ASC'
         );
