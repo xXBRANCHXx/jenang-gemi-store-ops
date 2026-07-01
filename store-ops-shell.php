@@ -29,6 +29,7 @@ function jg_store_ops_shell_svg(string $name): string
     $remoteIcons = [
         'whatsapp-orders' => 'https://cdn.simpleicons.org/whatsapp',
         'invoice-records' => 'https://api.iconify.design/material-symbols:receipt-long-outline.svg',
+        'invoice-printer' => 'https://api.iconify.design/material-symbols:print-outline.svg',
     ];
     if (isset($remoteIcons[$name])) {
         return sprintf(
@@ -58,6 +59,7 @@ function jg_store_ops_shell_nav_items(string $rootPrefix): array
         ['key' => 'inventory', 'label' => 'Inventory', 'href' => $rootPrefix . 'inventory/', 'title' => 'Inventory'],
         ['key' => 'walk-ins', 'label' => 'Walk Ins', 'href' => $rootPrefix . 'walk-ins/', 'title' => 'Walk Ins'],
         ['key' => 'whatsapp-orders', 'label' => 'WhatsApp Orders', 'href' => $rootPrefix . 'whatsapp-orders/', 'title' => 'WhatsApp Orders'],
+        ['key' => 'invoice-printer', 'label' => 'Invoice Printer', 'href' => $rootPrefix . 'invoice-printer/', 'title' => 'Invoice Printer'],
         ['key' => 'invoice-records', 'label' => 'Invoice Records', 'href' => $rootPrefix . 'invoice-records/', 'title' => 'Invoice Records'],
         ['key' => 'integrations', 'label' => 'Integrations', 'href' => $rootPrefix . 'integrations/', 'title' => 'Integrations'],
         ['key' => 'sku-db', 'label' => 'SKU catalog', 'href' => $rootPrefix . 'sku-db/', 'title' => 'SKU catalog'],

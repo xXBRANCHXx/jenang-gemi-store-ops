@@ -411,6 +411,17 @@ function jg_store_ops_partner_orders_status_is_visible(string $status): bool
     return in_array($normalized, ['', 'DRAFT', 'READY', 'SUBMITTED', 'LISTED', 'IS_LISTED'], true);
 }
 
+function jg_store_ops_partner_orders_has_labels(array $order): bool
+{
+    foreach ((array) ($order['labels'] ?? []) as $label) {
+        if (is_array($label) && trim((string) ($label['path'] ?? $label['url'] ?? '')) !== '') {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 function jg_store_ops_partner_orders_update_status(string $displayId, string $status): bool
 {
     $normalizedStatus = strtoupper(trim($status));
@@ -604,12 +615,16 @@ function jg_store_ops_partner_orders_list(): array
 {
     $feed = jg_store_ops_partner_orders_fetch_feed();
     if (is_array($feed)) {
-        $orders = array_map(
-            static fn (array $order): array => jg_store_ops_partner_orders_enrich_order($order),
-            array_values(array_filter($feed['orders'] ?? [], static function ($order): bool {
-                return is_array($order) && jg_store_ops_partner_orders_status_is_visible((string) ($order['status'] ?? ''));
-            }))
-        );
+        $orders = [];
+        foreach ((array) ($feed['orders'] ?? []) as $order) {
+            if (!is_array($order)) {
+                continue;
+            }
+            $order = jg_store_ops_partner_orders_enrich_order($order);
+            if (jg_store_ops_partner_orders_status_is_visible((string) ($order['status'] ?? '')) && jg_store_ops_partner_orders_has_labels($order)) {
+                $orders[] = $order;
+            }
+        }
         return [
             'orders' => $orders,
             'meta' => [
@@ -676,6 +691,7 @@ function jg_store_ops_partner_orders_list(): array
             static fn (array $row): array => jg_store_ops_partner_orders_normalize($row, $labelsByOrder[(string) ($row['id'] ?? '')] ?? []),
             $rows
         );
+        $orders = array_values(array_filter($orders, 'jg_store_ops_partner_orders_has_labels'));
     } catch (Throwable $exception) {
         return [
             'orders' => [],

@@ -73,6 +73,10 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
                     <span class="admin-store-nav-internet-icon" style="--admin-store-nav-icon: url(https://cdn.simpleicons.org/whatsapp);" aria-hidden="true"></span>
                     <span>WhatsApp Orders</span>
                 </a>
+                <a class="admin-store-nav-item" href="../invoice-printer/" title="Invoice Printer">
+                    <span class="admin-store-nav-internet-icon" style="--admin-store-nav-icon: url(https://api.iconify.design/material-symbols:print-outline.svg);" aria-hidden="true"></span>
+                    <span>Invoice Printer</span>
+                </a>
                 <a class="admin-store-nav-item" href="../invoice-records/" title="Invoice Records">
                     <span class="admin-store-nav-internet-icon" style="--admin-store-nav-icon: url(https://api.iconify.design/material-symbols:receipt-long-outline.svg);" aria-hidden="true"></span>
                     <span>Invoice Records</span>
