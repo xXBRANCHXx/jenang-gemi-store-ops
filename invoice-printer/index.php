@@ -11,6 +11,7 @@ if (!jg_admin_is_authenticated()) {
 
 $adminCssVersion = (string) @filemtime(dirname(__DIR__) . '/admin.css');
 $storeShellJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-shell.js');
+$invoicePrintLayoutJsVersion = (string) @filemtime(dirname(__DIR__) . '/invoice-print-layout.js');
 $invoicePrinterJsVersion = (string) @filemtime(dirname(__DIR__) . '/invoice-printer.js');
 ?>
 <!DOCTYPE html>
@@ -33,12 +34,11 @@ $invoicePrinterJsVersion = (string) @filemtime(dirname(__DIR__) . '/invoice-prin
         'active' => 'invoice-printer',
         'title' => 'Invoice Printer',
         'eyebrow' => 'Store Ops',
-        'description' => 'Generate customer invoice PDFs from current order data by Order ID.',
+        'description' => 'Print customer invoices from current order data by Order ID.',
         'indicator' => 'No write printer',
         'app_attributes' => [
             'data-invoice-printer' => true,
             'data-order-lookup-endpoint' => '../api/order-lookup/',
-            'data-invoice-pdf-endpoint' => '../api/invoices/',
         ],
     ]);
     ?>
@@ -85,8 +85,11 @@ $invoicePrinterJsVersion = (string) @filemtime(dirname(__DIR__) . '/invoice-prin
                 </section>
             </main>
 
+            <section class="admin-walkins-print-stage" data-universal-invoice-print-stage aria-hidden="true"></section>
+
     <?php jg_store_ops_shell_close(); ?>
     <script src="../store-shell.js?v=<?php echo urlencode($storeShellJsVersion ?: '1'); ?>" defer></script>
+    <script src="../invoice-print-layout.js?v=<?php echo urlencode($invoicePrintLayoutJsVersion ?: '1'); ?>" defer></script>
     <script src="../invoice-printer.js?v=<?php echo urlencode($invoicePrinterJsVersion ?: '1'); ?>" defer></script>
 </body>
 </html>

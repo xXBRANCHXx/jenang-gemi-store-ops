@@ -2,7 +2,6 @@
 declare(strict_types=1);
 
 require dirname(__DIR__) . '/order-resolver.php';
-require dirname(__DIR__) . '/invoice-pdf.php';
 
 function order_resolver_expect(mixed $expected, mixed $actual, string $message): void
 {
@@ -42,10 +41,5 @@ order_resolver_expect('partner', $order['source']['key'], 'Feed partner orders s
 order_resolver_expect('Ayu', $order['customer']['name'], 'Feed orders should normalize customer names.');
 order_resolver_expect(40000.0, $order['revenue']['total'], 'Feed orders should normalize revenue totals.');
 order_resolver_expect(2.0, $order['items'][0]['quantity'], 'Feed items should normalize quantity.');
-
-$pdf = jg_store_ops_invoice_pdf_document($order);
-order_resolver_expect('%PDF-1.4', substr($pdf, 0, 8), 'Invoice renderer should produce a PDF document.');
-order_resolver_expect(true, str_contains($pdf, 'xref'), 'Invoice PDF should include an xref table.');
-order_resolver_expect(true, str_contains($pdf, '%%EOF'), 'Invoice PDF should include EOF marker.');
 
 echo "order-resolver-test: ok\n";

@@ -36,7 +36,6 @@ Operational backend for `store.jenanggemi.com`.
 - `/logout/`
 - `/api/orders/`
 - `/api/order-lookup/`
-- `/api/invoices/`
 - `/api/walk-ins/`
 - `/api/invoice-records/`
 
@@ -45,7 +44,7 @@ Operational backend for `store.jenanggemi.com`.
 - Store ops now treats `/sku-db/` as a read-only mirror of the live shared SKU MySQL database.
 - New SKU creation and approvals have moved to the executive dashboard.
 - `/sku-db/new/` now redirects back to `/sku-db/`.
-- `/invoice-printer/` resolves any supported Order ID across walk-in, WhatsApp, website, partner, Shopee, and TikTok sources, then generates a PDF invoice from current order data. Invoice generation is read-only and does not update metrics, stock, profiles, order status, or print history.
+- `/invoice-printer/` resolves any supported Order ID across walk-in, WhatsApp, website, partner, Shopee, and TikTok sources, then prints through the same invoice layout used by Invoice Records. Invoice printing is read-only and does not update metrics, stock, profiles, order status, or print history.
 - The fulfillment dashboard reads Shopee and TikTok queue rows through `/api/orders/`, which proxies API Ingest without exposing marketplace tokens. While Executive Hard/Big Set is off, Store Ops shows the live marketplace ready-to-ship queue. After Hard/Big Set is active, API Ingest returns the stored-label queue backed by shipment arrangement and private label storage.
 - `/api/orders/` also merges partner orders from the Partner Portal feed when `store_ops_orders_token` / `JG_STORE_OPS_ORDERS_TOKEN` is configured. Override the feed URL with `partner_orders_feed_url` / `JG_PARTNER_ORDERS_FEED_URL` if needed. Partner display names are resolved from `partner_registry_url` / `JG_PARTNER_REGISTRY_URL`, which defaults to the executive dashboard public partner registry. Direct partner database access remains an optional fallback through `partner_db_*` / `JG_PARTNER_DB_*`.
 - Partner shipping labels are proxied from the Partner Portal feed or `partner_portal_base_url` / `JG_PARTNER_PORTAL_BASE_URL` when uploaded by the partner portal.

@@ -11,6 +11,7 @@ if (!jg_admin_is_authenticated()) {
 
 $adminCssVersion = (string) @filemtime(dirname(__DIR__) . '/admin.css');
 $storeShellJsVersion = (string) @filemtime(dirname(__DIR__) . '/store-shell.js');
+$invoicePrintLayoutJsVersion = (string) @filemtime(dirname(__DIR__) . '/invoice-print-layout.js');
 $invoiceRecordsJsVersion = (string) @filemtime(dirname(__DIR__) . '/invoice-records.js');
 ?>
 <!DOCTYPE html>
@@ -101,6 +102,7 @@ $invoiceRecordsJsVersion = (string) @filemtime(dirname(__DIR__) . '/invoice-reco
 
     <?php jg_store_ops_shell_close(); ?>
     <script src="../store-shell.js?v=<?php echo urlencode($storeShellJsVersion ?: '1'); ?>" defer></script>
+    <script src="../invoice-print-layout.js?v=<?php echo urlencode($invoicePrintLayoutJsVersion ?: '1'); ?>" defer></script>
     <script src="../invoice-records.js?v=<?php echo urlencode($invoiceRecordsJsVersion ?: '1'); ?>" defer></script>
 </body>
 </html>

@@ -3,15 +3,17 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!root) return;
 
   const lookupEndpoint = root.dataset.orderLookupEndpoint || '../api/order-lookup/';
-  const pdfEndpoint = root.dataset.invoicePdfEndpoint || '../api/invoices/';
+  const invoiceLayout = window.JGInvoicePrintLayout;
   const orderForm = document.querySelector('[data-invoice-order-form]');
   const profileForm = document.querySelector('[data-profile-search-form]');
   const orderPreview = document.querySelector('[data-invoice-order-preview]');
   const profileResults = document.querySelector('[data-profile-search-results]');
+  const printStage = document.querySelector('[data-universal-invoice-print-stage]');
   const orderError = document.querySelector('[data-invoice-printer-error]');
   const profileError = document.querySelector('[data-profile-search-error]');
 
   let activeOrder = null;
+  let printCleanupTimer = 0;
 
   const escapeHtml = (value) => String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -63,11 +65,34 @@ document.addEventListener('DOMContentLoaded', () => {
     return readJsonResponse(response, fallbackMessage);
   };
 
-  const pdfUrl = (orderId) => `${pdfEndpoint}?${new URLSearchParams({ order_id: orderId }).toString()}`;
-
   const orderCustomerLabel = (order) => {
     const customer = order?.customer || {};
     return customer.name || customer.username || customer.phone || customer.email || customer.address || 'Customer';
+  };
+
+  const finishInvoicePrint = () => {
+    window.clearTimeout(printCleanupTimer);
+    printCleanupTimer = 0;
+    document.body.classList.remove('is-walkins-printing');
+  };
+
+  const printActiveOrder = async () => {
+    if (!activeOrder || !invoiceLayout || !printStage) {
+      setError(orderError, 'Invoice print layout is not available.');
+      return;
+    }
+    setError(orderError, '');
+    try {
+      invoiceLayout.renderInvoice(printStage, invoiceLayout.saleFromUniversalOrder(activeOrder), { logoRoot: '../' });
+      await invoiceLayout.waitForAssets(printStage);
+      document.body.classList.add('is-walkins-printing');
+      window.focus();
+      window.print();
+      printCleanupTimer = window.setTimeout(finishInvoicePrint, 10000);
+    } catch (error) {
+      finishInvoicePrint();
+      setError(orderError, error instanceof Error ? error.message : 'Unable to print invoice.');
+    }
   };
 
   const renderOrder = (order) => {
@@ -94,10 +119,10 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>${escapeHtml(source.label || 'Order')}</span>
             <h3>${escapeHtml(order.order_id || '')}</h3>
           </div>
-          <a class="admin-primary-btn" href="${escapeHtml(pdfUrl(order.order_id || ''))}" target="_blank" rel="noopener" data-open-invoice-pdf>
+          <button type="button" class="admin-primary-btn" data-print-universal-invoice>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8V4h10v4M7 18H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 14h10v6H7zM17 12h.01"/></svg>
-            <span>Open PDF</span>
-          </a>
+            <span>Print Invoice</span>
+          </button>
         </header>
         <section class="admin-invoice-order-meta">
           <div><span>Customer</span><strong>${escapeHtml(orderCustomerLabel(order))}</strong></div>
@@ -189,8 +214,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   orderPreview?.addEventListener('click', (event) => {
-    const link = event.target instanceof Element ? event.target.closest('[data-open-invoice-pdf]') : null;
-    if (!link || activeOrder?.order_id) return;
-    event.preventDefault();
+    const button = event.target instanceof Element ? event.target.closest('[data-print-universal-invoice]') : null;
+    if (!(button instanceof HTMLButtonElement)) return;
+    printActiveOrder();
+  });
+
+  window.addEventListener('afterprint', finishInvoicePrint);
+  window.addEventListener('focus', () => {
+    if (!window.matchMedia || !window.matchMedia('print').matches) finishInvoicePrint();
   });
 });

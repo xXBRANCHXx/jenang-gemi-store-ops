@@ -5,22 +5,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const endpoint = root.dataset.walkInsEndpoint || '../api/walk-ins/';
   const scanBridgeEndpoint = root.dataset.scanBridgeEndpoint || '../api/scan-bridge/';
   const scanSerialEndpoint = root.dataset.scanSerialEndpoint || '../api/scan-serial/';
-  const zeroLogoMarkup = '<img class="admin-walkins-invoice-logo" src="../assets/zero-logo-cropped.png" alt="ZERO" decoding="sync">';
+  const invoiceLayout = window.JGInvoicePrintLayout;
   const invoiceType = String(root.dataset.walkInsInvoiceType || 'walk_in').trim() === 'whatsapp' ? 'whatsapp' : 'walk_in';
   const isWhatsappInvoice = invoiceType === 'whatsapp';
   const defaultCustomerName = root.dataset.walkInsDefaultCustomer || (isWhatsappInvoice ? 'WhatsApp customer' : 'Walk-in customer');
   const contactKind = root.dataset.walkInsContactKind || (isWhatsappInvoice ? 'address' : 'email');
   const contactFallback = contactKind === 'address' ? 'No address' : 'No email';
-  const contactPrintLabel = contactKind === 'address' ? 'address' : 'email';
   const requiresSaleType = root.dataset.walkInsRequiresSaleType === 'true';
   const saleTypePrintLabels = {
     Whatsapp: 'Whatsapp',
     Website: 'Whatsapp (from site)',
     Partner: 'Whatsapp (from partner)'
   };
-  const firstPageItemLimit = 7;
-  const continuationItemLimit = 9;
-
   const refs = {
     catalogStatus: document.querySelector('[data-walkins-catalog-status]'),
     invoiceNumber: document.querySelector('[data-walkins-invoice-number]'),
@@ -112,16 +108,6 @@ document.addEventListener('DOMContentLoaded', () => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(moneyValue(value));
-  const formatPrintAmount = (value) => `Rp ${formatPrintNumber(value)}`;
-  const formatPrintTotal = (value) => `Rp ${new Intl.NumberFormat('id-ID', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(moneyValue(value))}`;
-  const formatPrintDate = (date = new Date()) => [
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-    String(date.getFullYear())
-  ].join('/');
 
   const setError = (message = '') => {
     if (!refs.error) return;
@@ -630,127 +616,34 @@ document.addEventListener('DOMContentLoaded', () => {
     contact: String(refs.customerEmail?.value || '').trim() || '-'
   });
 
-  const printItemRow = (item) => `
-    <div class="admin-walkins-invoice-row">
-      <span>${escapeHtml(item.name || item.sku)}</span>
-      <span>${formatPrintNumber(item.qty)} Units</span>
-      <span>${formatPrintNumber(item.sale_price)}</span>
-      <span>${formatPrintNumber(discountRateForItem(item))}</span>
-      <span>${formatPrintAmount(lineTotal(item))}</span>
-    </div>
-  `;
-
-  const invoiceFooterHtml = (pageNumber, pageCount) => `
-    <footer class="admin-walkins-invoice-footer">
-      <div class="admin-walkins-invoice-footer-rule"></div>
-      <strong>#BeHealthy #BeWealthy #BeHappy</strong>
-      <div class="admin-walkins-invoice-footer-bottom">
-        <span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg> zerofoods.id</span>
-        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 11.2 19a19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.8a2 2 0 0 1-.4 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg> +62 858-4283-3973</span>
-        <span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg> zerofoods.id@gmail.com</span>
-        <b>Page ${pageNumber}/${pageCount}</b>
-      </div>
-    </footer>
-  `;
-
-  const invoicePageHtml = (items, pageIndex, pageCount, summary) => {
-    const pageNumber = pageIndex + 1;
-    const isFirstPage = pageIndex === 0;
-    const isLastPage = pageNumber === pageCount;
+  const currentInvoiceSale = () => {
     const customer = customerDetails();
-    const invoiceDate = formatPrintDate();
-    const invoiceNumber = state.invoiceNumber || 'New invoice';
-    return `
-      <article class="admin-walkins-invoice-page">
-        <header class="admin-walkins-invoice-header">
-          <div class="admin-walkins-invoice-promise">
-            <strong>Global Health Innovation</strong>
-            <span>0 sugar, 0 calorie, 0 carb</span>
-          </div>
-          <div class="admin-walkins-invoice-brand">
-            ${zeroLogoMarkup}
-            <p>PT. Zero Foods Indonesia<br>Jl. Jombor Tegal No.124 A, Jombor Lor, Sinduadi, Kec. Mlati<br>Sleman YO 55284, Indonesia</p>
-          </div>
-        </header>
-        <section class="admin-walkins-invoice-title">
-          <div class="admin-walkins-invoice-title-main">
-            <strong>ZERO Customer [${escapeHtml(invoiceCustomerLabel())}]</strong>
-            ${isFirstPage ? `
-              <div class="admin-walkins-invoice-customer">
-                <span>name : ${escapeHtml(customer.name)}</span>
-                <span>phone : ${escapeHtml(customer.phone)}</span>
-                <span>${escapeHtml(contactPrintLabel)} : ${escapeHtml(customer.contact)}</span>
-              </div>
-            ` : ''}
-          </div>
-          <div class="admin-walkins-invoice-number">
-            <h2>Invoice ${escapeHtml(invoiceNumber)}</h2>
-          </div>
-        </section>
-        <section class="admin-walkins-invoice-dates">
-          <div><span>Invoice Date</span><strong>${escapeHtml(invoiceDate)}</strong></div>
-          <div><span>Due Date</span><strong>${escapeHtml(invoiceDate)}</strong></div>
-        </section>
-        <section class="admin-walkins-invoice-table">
-          <div class="admin-walkins-invoice-table-head">
-            <span>Description</span>
-            <span>Quantity</span>
-            <span>Unit Price</span>
-            <span>Disc.%</span>
-            <span>Amount</span>
-          </div>
-          <div class="admin-walkins-invoice-rows">
-            ${items.length ? items.map(printItemRow).join('') : '<div class="admin-walkins-invoice-row"><span>No products added</span><span>0.00 Units</span><span>0.00</span><span>0.00</span><span>Rp 0.00</span></div>'}
-          </div>
-        </section>
-        ${isLastPage ? `
-          <section class="admin-walkins-invoice-total">
-            <div>
-              <strong>Amount Due</strong>
-              <small>*tax included.</small>
-            </div>
-            <span>${formatPrintTotal(summary.total)}</span>
-          </section>
-          <section class="admin-walkins-invoice-terms">
-            <strong>Payment Communication: ${escapeHtml(invoiceNumber)}</strong>
-            <div class="admin-walkins-invoice-payment-details">
-              <span>Payment Details</span>
-              <b>BCA - 03-788-688-18 [PT. ZERO FOODS INDONESIA]</b>
-            </div>
-            <span>Terms &amp; Conditions: https://royal-production.odoo.com/terms</span>
-          </section>
-        ` : '<section class="admin-walkins-invoice-spacer"></section>'}
-        ${invoiceFooterHtml(pageNumber, pageCount)}
-      </article>
-    `;
+    const summary = totals();
+    return {
+      invoice: {
+        invoice_number: state.invoiceNumber || 'New invoice',
+        invoice_type: invoiceType,
+        invoice_label: invoiceCustomerLabel(),
+        customer_name: customer.name,
+        customer_phone: customer.phone,
+        customer_email: contactKind === 'email' ? customer.contact : '-',
+        customer_address: contactKind === 'address' ? customer.contact : '-',
+        created_at: new Date().toISOString(),
+        total: summary.total
+      },
+      items: state.cart.map((item) => ({
+        ...item,
+        line_total: lineTotal(item)
+      }))
+    };
   };
 
   const buildPrintableInvoice = () => {
-    if (!refs.printStage) return;
-    const items = state.cart.map((item) => ({ ...item }));
-    const pages = [];
-    let remaining = items.slice();
-    if (!remaining.length) {
-      pages.push([]);
-    } else {
-      while (remaining.length) {
-        const limit = pages.length === 0 ? firstPageItemLimit : continuationItemLimit;
-        pages.push(remaining.splice(0, limit));
-      }
-    }
-    const summary = totals();
-    refs.printStage.innerHTML = pages.map((pageItems, index) => invoicePageHtml(pageItems, index, pages.length, summary)).join('');
+    invoiceLayout.renderInvoice(refs.printStage, currentInvoiceSale(), { logoRoot: '../' });
   };
 
   const waitForPrintAssets = async () => {
-    const images = Array.from(refs.printStage?.querySelectorAll('img') || []);
-    await Promise.all(images.map((image) => {
-      if (image.complete) return Promise.resolve();
-      return new Promise((resolve) => {
-        image.addEventListener('load', resolve, { once: true });
-        image.addEventListener('error', resolve, { once: true });
-      });
-    }));
+    await invoiceLayout.waitForAssets(refs.printStage);
   };
 
   const prepareInvoicePrint = () => {
@@ -760,6 +653,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (missingSaleType()) {
       setError('Choose a sale type before printing this invoice.');
+      return false;
+    }
+    if (!invoiceLayout) {
+      setError('Invoice print layout is not available.');
       return false;
     }
     setError('');
