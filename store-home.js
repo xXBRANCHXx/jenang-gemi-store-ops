@@ -65,7 +65,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const boardColumnGap = 7;
   const ordersRefreshIntervalMs = 15000;
   const ordersRefreshMinGapMs = 3500;
-  const cachedStartupRefreshDelayMs = 30000;
+  const cachedStartupRefreshDelayMs = 0;
+  const ordersStartupCacheMaxAgeMs = 60000;
   const clientCacheDbName = 'jg-store-ops-client-cache';
   const clientCacheStoreName = 'entries';
   const currentEmployee = {
@@ -94,6 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let ordersRefreshPromise = null;
   let lastOrdersRefreshAt = 0;
   let ordersEtag = '';
+  let emptyOrdersRefreshCount = 0;
   let skuCatalogRefreshPromise = null;
   let boardResizeTimer = 0;
   let clientCacheDbPromise = null;
@@ -1037,6 +1039,10 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const hydrateOrdersFromCache = () => {
+    const cachedAt = Number(readStoredOrdersMeta().savedAt || 0);
+    if (!Number.isFinite(cachedAt) || cachedAt <= 0 || Date.now() - cachedAt > ordersStartupCacheMaxAgeMs) {
+      return false;
+    }
     const cachedOrders = normalizeCachedOrders();
     if (!cachedOrders.length) return false;
     ordersEtag = String(readStoredOrdersMeta().etag || '');
@@ -1049,6 +1055,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const hydrateOrdersFromDurableCache = async () => {
     if (state.orders.length) return false;
     const cached = await readClientCache(ordersStorageKey);
+    const cachedAt = Number(cached?.savedAt || 0);
+    if (!Number.isFinite(cachedAt) || cachedAt <= 0 || Date.now() - cachedAt > ordersStartupCacheMaxAgeMs) {
+      return false;
+    }
     const rows = Array.isArray(cached) ? cached : (Array.isArray(cached?.orders) ? cached.orders : []);
     const cachedOrders = normalizeCachedOrders(rows);
     if (!cachedOrders.length) return false;
@@ -1076,6 +1086,15 @@ document.addEventListener('DOMContentLoaded', () => {
       throw new Error(payload.error || 'Unable to load orders.');
     }
     ordersEtag = response.headers.get('ETag') || response.headers.get('etag') || ordersEtag;
+    const meta = payload.meta && typeof payload.meta === 'object' ? payload.meta : {};
+    const refreshErrors = Array.isArray(meta.errors) ? meta.errors : [];
+    const configuredSources = Number(meta.configured_sources || 0);
+    const successfulAccounts = Number(meta.successful_accounts || 0);
+    const partnerOrdersMeta = meta.partner_orders && typeof meta.partner_orders === 'object' ? meta.partner_orders : {};
+    const degradedRefresh = refreshErrors.length > 0
+      || Number(meta.stale_account_count || 0) > 0
+      || Boolean(partnerOrdersMeta.stale)
+      || (configuredSources > 0 && successfulAccounts === 0);
 
     partnerOrderSources = (Array.isArray(payload.meta?.partner_orders?.sources) ? payload.meta.partner_orders.sources : [])
       .map((source) => ({
@@ -1087,9 +1106,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const stored = readStoredOrders();
     const storedById = new Map(stored.map((order) => [String(order.id || ''), order]));
     const catalogRows = catalogLookup();
-    return (Array.isArray(payload.orders) ? payload.orders : [])
+    const nextOrders = (Array.isArray(payload.orders) ? payload.orders : [])
       .map((order) => normalizeOrder(order, catalogRows, storedById))
       .filter((order) => order.id);
+    if (!nextOrders.length && state.orders.length) {
+      if (degradedRefresh) {
+        throw new Error('Order refresh was incomplete; keeping the current board.');
+      }
+      emptyOrdersRefreshCount += 1;
+      if (emptyOrdersRefreshCount < 2) {
+        throw new Error('Order refresh returned empty once; waiting for confirmation.');
+      }
+    } else {
+      emptyOrdersRefreshCount = 0;
+    }
+
+    return nextOrders;
   };
 
   const saveOrders = () => {

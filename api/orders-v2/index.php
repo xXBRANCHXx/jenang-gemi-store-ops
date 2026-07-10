@@ -244,6 +244,21 @@ function jg_store_ops_orders_cache_write(string $url, string $raw): void
     @file_put_contents(jg_store_ops_orders_cache_path($url), $payload, LOCK_EX);
 }
 
+function jg_store_ops_orders_cached_payload(string $url): ?array
+{
+    $cached = jg_store_ops_orders_cache_read($url);
+    if ($cached === null) {
+        return null;
+    }
+
+    $decoded = json_decode($cached, true);
+    if (!is_array($decoded) || empty($decoded['ok'])) {
+        return null;
+    }
+
+    return $decoded;
+}
+
 function jg_store_ops_orders_status_token(mixed $value): string
 {
     if (!is_scalar($value)) {
@@ -738,6 +753,70 @@ function jg_store_ops_orders_refresh_partner_orders(array $partnerOrders): array
     return $partnerOrders;
 }
 
+function jg_store_ops_orders_partner_cache_key(): string
+{
+    return 'partner-orders-v2';
+}
+
+function jg_store_ops_orders_partner_source_unavailable(array $partnerOrders): bool
+{
+    $meta = is_array($partnerOrders['meta'] ?? null) ? $partnerOrders['meta'] : [];
+    $error = trim((string) ($meta['error'] ?? ''));
+    $configured = $meta['configured'] ?? true;
+
+    return $error !== '' || $configured === false;
+}
+
+function jg_store_ops_orders_read_cached_partner_orders(): ?array
+{
+    $cached = jg_store_ops_orders_cache_read(jg_store_ops_orders_partner_cache_key());
+    if ($cached === null) {
+        return null;
+    }
+
+    $decoded = json_decode($cached, true);
+    if (!is_array($decoded) || !is_array($decoded['orders'] ?? null)) {
+        return null;
+    }
+
+    return $decoded;
+}
+
+function jg_store_ops_orders_write_cached_partner_orders(array $partnerOrders): void
+{
+    $encoded = json_encode($partnerOrders, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if (!is_string($encoded)) {
+        return;
+    }
+
+    jg_store_ops_orders_cache_write(jg_store_ops_orders_partner_cache_key(), $encoded);
+}
+
+function jg_store_ops_orders_partner_orders_resilient(): array
+{
+    $fresh = jg_store_ops_orders_refresh_partner_orders(jg_store_ops_partner_orders_list());
+    if (!jg_store_ops_orders_partner_source_unavailable($fresh)) {
+        jg_store_ops_orders_write_cached_partner_orders($fresh);
+        return $fresh;
+    }
+
+    $cached = jg_store_ops_orders_read_cached_partner_orders();
+    if (!is_array($cached)) {
+        return $fresh;
+    }
+
+    $freshMeta = is_array($fresh['meta'] ?? null) ? $fresh['meta'] : [];
+    $cachedMeta = is_array($cached['meta'] ?? null) ? $cached['meta'] : [];
+    $cached['meta'] = array_merge($cachedMeta, [
+        'stale' => true,
+        'stale_reason' => (string) ($freshMeta['error'] ?? 'Partner order source is temporarily unavailable.'),
+        'live_source' => $freshMeta,
+        'count' => count((array) ($cached['orders'] ?? [])),
+    ]);
+
+    return $cached;
+}
+
 function jg_store_ops_orders_sku_lookup(): array
 {
     try {
@@ -1086,6 +1165,7 @@ $decoded = [
 ];
 $errors = [];
 $successfulAccounts = 0;
+$staleMarketplaceAccounts = 0;
 $processedCollectionOrders = 0;
 
 foreach ($sources as $source) {
@@ -1101,18 +1181,31 @@ foreach ($sources as $source) {
     $url = $baseUrl . '/' . rawurlencode($platform) . '/orders/listed?' . $query;
     [$status, $raw] = jg_store_ops_orders_fetch($url);
     $accountPayload = json_decode($raw, true);
+    $accountError = '';
+    $usedStaleMarketplaceCache = false;
 
     if (!is_array($accountPayload)) {
-        $errors[] = $platform . ':' . $account . ': invalid JSON';
-        continue;
+        $accountError = $platform . ':' . $account . ': invalid JSON';
+    } elseif ($status >= 400 || empty($accountPayload['ok'])) {
+        $accountError = $platform . ':' . $account . ': ' . (string) ($accountPayload['error'] ?? 'Unable to load marketplace orders.');
     }
 
-    if ($status >= 400 || empty($accountPayload['ok'])) {
-        $errors[] = $platform . ':' . $account . ': ' . (string) ($accountPayload['error'] ?? 'Unable to load marketplace orders.');
-        continue;
+    if ($accountError !== '') {
+        $cachedPayload = jg_store_ops_orders_cached_payload($url);
+        if (!is_array($cachedPayload)) {
+            $errors[] = $accountError;
+            continue;
+        }
+
+        $accountPayload = $cachedPayload;
+        $usedStaleMarketplaceCache = true;
+        $staleMarketplaceAccounts++;
+        $errors[] = $accountError . ' (showing cached orders)';
     }
 
-    jg_store_ops_orders_cache_write($url, $raw);
+    if (!$usedStaleMarketplaceCache) {
+        jg_store_ops_orders_cache_write($url, $raw);
+    }
     $accountOrders = is_array($accountPayload['orders'] ?? null) ? $accountPayload['orders'] : [];
     $accountProcessedCollectionOrders = 0;
     $accountOrders = jg_store_ops_orders_filter_marketplace_queue($accountOrders, $platform, $accountProcessedCollectionOrders);
@@ -1127,11 +1220,12 @@ foreach ($sources as $source) {
         'shop_id' => (string) ($accountPayload['meta']['shop_id'] ?? ''),
         'label_backed_only' => !empty($accountPayload['meta']['label_backed_only']),
         'hard_set_enabled' => !empty($accountPayload['meta']['hard_set']['enabled']),
+        'stale' => $usedStaleMarketplaceCache,
     ];
 }
 
 $decoded = jg_store_ops_orders_map_item_skus($decoded);
-$partnerOrders = jg_store_ops_orders_refresh_partner_orders(jg_store_ops_partner_orders_list());
+$partnerOrders = jg_store_ops_orders_partner_orders_resilient();
 $websiteOrders = [];
 $websiteIngestionState = ['enabled' => false];
 try {
@@ -1154,6 +1248,9 @@ $decoded['meta']['website_orders'] = [
     'sources' => JG_STORE_OPS_WEBSITE_PLATFORMS,
 ];
 $decoded['meta']['errors'] = $errors;
+$decoded['meta']['configured_sources'] = count($sources);
+$decoded['meta']['successful_accounts'] = $successfulAccounts;
+$decoded['meta']['stale_account_count'] = $staleMarketplaceAccounts;
 $decoded['meta']['processed_collection_count'] = $processedCollectionOrders;
 $decoded['meta']['count'] = count($decoded['orders']);
 $decoded['meta']['current_employee'] = [
