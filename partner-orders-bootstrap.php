@@ -437,8 +437,7 @@ function jg_store_ops_partner_orders_update_status(string $displayId, string $st
     $token = jg_store_ops_partner_orders_feed_token();
     if ($token !== '') {
         $feedUrl = jg_store_ops_partner_orders_feed_url();
-        $separator = str_contains($feedUrl, '?') ? '&' : '?';
-        $response = jg_store_ops_partner_orders_request_json('POST', $feedUrl . $separator . 'token=' . rawurlencode($token), [
+        $response = jg_store_ops_partner_orders_request_json('POST', $feedUrl, [
             'X-Store-Ops-Token: ' . $token,
         ], [
             'action' => 'update_status',

@@ -640,8 +640,7 @@ function jg_store_ops_orders_partner_set_status_feed(string $orderId, string $st
     }
 
     $feedUrl = jg_store_ops_orders_partner_feed_url();
-    $separator = str_contains($feedUrl, '?') ? '&' : '?';
-    $response = jg_store_ops_orders_partner_request_json('POST', $feedUrl . $separator . 'token=' . rawurlencode($token), [
+    $response = jg_store_ops_orders_partner_request_json('POST', $feedUrl, [
         'X-Store-Ops-Token: ' . $token,
     ], [
         'action' => 'update_status',
