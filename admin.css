@@ -2053,19 +2053,11 @@ button, input {
 }
 
 .admin-reprint-order-option.is-unavailable {
-  cursor: not-allowed;
-  opacity: .72;
+  cursor: pointer;
 }
 
-.admin-reprint-order-option.is-unavailable:hover {
-  border-color: var(--admin-border);
-  background: var(--admin-surface);
-  transform: none;
-}
-
-.admin-reprint-order-option.is-unavailable em,
-.admin-reprint-unavailable-reason {
-  color: #f59e0b !important;
+.admin-reprint-order-option .admin-reprint-available {
+  color: #22c55e;
 }
 
 .admin-reprint-profile-avatar {

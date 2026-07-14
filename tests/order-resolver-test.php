@@ -84,6 +84,7 @@ $aliasedMarketplaceOrder = jg_store_ops_order_resolver_order_from_marketplace_ro
     'order_id' => 'SHP-ALIAS-1',
     'platform' => 'shopee',
     'account_key' => 'zero-shopee',
+    'status' => 'SHIPPED',
     'username' => 'C*****a',
     'profile_values' => ['claud__claud', 'BUYER-99'],
     'label_reprint_available' => false,
@@ -96,5 +97,6 @@ order_resolver_expect(false, jg_store_ops_order_resolver_order_matches_query($al
 $unavailableLabel = jg_store_ops_order_resolver_shipping_label($aliasedMarketplaceOrder);
 order_resolver_expect(false, $unavailableLabel['available'], 'Historical marketplace orders without a saved or live label must be marked unavailable.');
 order_resolver_expect('unavailable', $unavailableLabel['availability_source'], 'Label availability should preserve its source state.');
+order_resolver_expect('This order has already been shipped. The shipping label no longer exists.', $unavailableLabel['unavailable_reason'], 'Shipped orders should explain that their temporary label no longer exists.');
 
 echo "order-resolver-test: ok\n";

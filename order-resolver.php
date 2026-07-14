@@ -725,6 +725,9 @@ function jg_store_ops_order_resolver_shipping_label(array $order): array
             $available = $supported && (bool) $marketplaceRow['label_reprint_available'];
             $availabilitySource = jg_store_ops_order_resolver_string($marketplaceRow['label_reprint_source'] ?? '', 40);
             $unavailableReason = jg_store_ops_order_resolver_string($marketplaceRow['label_reprint_reason'] ?? '', 240);
+            if (!$available && preg_match('/SHIPPED|COMPLETED|DELIVERED|TO_CONFIRM_RECEIVE/i', $status) === 1) {
+                $unavailableReason = 'This order has already been shipped. The shipping label no longer exists.';
+            }
         }
     }
     $package = jg_store_ops_order_resolver_recursive_string($raw, [

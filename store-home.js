@@ -1376,16 +1376,14 @@ document.addEventListener('DOMContentLoaded', () => {
             type="button"
             class="admin-reprint-order-option${labelAvailable ? '' : ' is-unavailable'}"
             data-reprint-order-index="${index}"
-            ${labelAvailable ? '' : 'disabled'}
             ${labelAvailable ? '' : `title="${escapeHtml(unavailableReason)}"`}
           >
             <time>${escapeHtml(formatReprintDate(order?.created_at))}</time>
             <span>
               <strong>${escapeHtml(order?.order_id || 'Order')}</strong>
               <small>${escapeHtml(order?.source?.label || 'Shipping label')}</small>
-              ${labelAvailable ? '' : `<small class="admin-reprint-unavailable-reason">${escapeHtml(unavailableReason)}</small>`}
             </span>
-            <em>${labelAvailable ? 'Open label' : 'Unavailable'}</em>
+            ${labelAvailable ? '<em class="admin-reprint-available">Available</em>' : ''}
           </button>
         `;
         }).join('') : '<p class="admin-empty">No shipping-label orders were found for this customer.</p>'}
