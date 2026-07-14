@@ -525,7 +525,14 @@ function jg_store_ops_order_resolver_order_from_marketplace_rows(array $rows): ?
 
     $first = $rows[0];
     $items = [];
+    $profileValues = [];
     foreach ($rows as $row) {
+        foreach ((array) ($row['profile_values'] ?? []) as $profileValue) {
+            $profileValue = jg_store_ops_order_resolver_string($profileValue, 200);
+            if ($profileValue !== '') {
+                $profileValues[$profileValue] = true;
+            }
+        }
         $quantity = max(0, (float) ($row['quantity'] ?? 0));
         if ($quantity <= 0 && (int) ($row['item_row_id'] ?? 0) <= 0 && $items !== []) {
             continue;
@@ -565,6 +572,7 @@ function jg_store_ops_order_resolver_order_from_marketplace_rows(array $rows): ?
             'phone' => jg_store_ops_order_resolver_string($first['phone'] ?? '', 80),
             'email' => '',
             'address' => jg_store_ops_order_resolver_string($first['address'] ?? '', 255),
+            'profile_values' => array_slice(array_keys($profileValues), 0, 40),
         ],
         'items' => $items,
         'revenue' => [
@@ -686,11 +694,16 @@ function jg_store_ops_order_resolver_order_matches_query(array $order, string $q
         return false;
     }
     $customer = is_array($order['customer'] ?? null) ? $order['customer'] : [];
+    $profileValues = array_values(array_filter(array_map(
+        static fn (mixed $value): string => jg_store_ops_order_resolver_string($value, 200),
+        (array) ($customer['profile_values'] ?? [])
+    )));
     $haystack = jg_store_ops_order_resolver_text_key(implode(' ', [
         (string) ($customer['name'] ?? ''),
         (string) ($customer['username'] ?? ''),
         (string) ($customer['phone'] ?? ''),
         (string) ($customer['email'] ?? ''),
+        implode(' ', $profileValues),
     ]));
     return str_contains($haystack, $needle);
 }
@@ -820,6 +833,12 @@ function jg_store_ops_order_resolver_customer_profile_key(array $order): string
     $customer = is_array($order['customer'] ?? null) ? $order['customer'] : [];
     foreach (['username', 'name', 'phone', 'email'] as $key) {
         $value = jg_store_ops_order_resolver_text_key($customer[$key] ?? '');
+        if ($value !== '') {
+            return $value;
+        }
+    }
+    foreach ((array) ($customer['profile_values'] ?? []) as $profileValue) {
+        $value = jg_store_ops_order_resolver_text_key($profileValue);
         if ($value !== '') {
             return $value;
         }

@@ -80,4 +80,15 @@ $activeMarketplaceOrder = jg_store_ops_order_resolver_order_from_feed_order([
 order_resolver_expect('jenang-gemi-shopee', $activeMarketplaceOrder['source']['account'], 'Active marketplace orders must route labels with the canonical account key.');
 order_resolver_expect('Shopee - Jenang Gemi Shopee', $activeMarketplaceOrder['source']['label'], 'Marketplace source labels may retain the friendly account name.');
 
+$aliasedMarketplaceOrder = jg_store_ops_order_resolver_order_from_marketplace_rows([[
+    'order_id' => 'SHP-ALIAS-1',
+    'platform' => 'shopee',
+    'account_key' => 'zero-shopee',
+    'username' => 'C*****a',
+    'profile_values' => ['claud__claud', 'BUYER-99'],
+    'order_create_time' => '2026-07-01 12:00:00',
+]]);
+order_resolver_expect(true, jg_store_ops_order_resolver_order_matches_query($aliasedMarketplaceOrder, 'claud__claud'), 'Profile search must match preserved marketplace username aliases.');
+order_resolver_expect(false, jg_store_ops_order_resolver_order_matches_query($aliasedMarketplaceOrder, 'Private Road'), 'Profile aliases must not reintroduce address matching.');
+
 echo "order-resolver-test: ok\n";
