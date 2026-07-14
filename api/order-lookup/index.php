@@ -31,6 +31,7 @@ try {
         if (!is_array($order)) {
             jg_store_ops_order_lookup_fail('Order was not found.', 404);
         }
+        $order['shipping_label'] = jg_store_ops_order_resolver_shipping_label($order);
         echo json_encode(['ok' => true, 'order' => $order], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         exit;
     }
@@ -43,7 +44,11 @@ try {
         echo json_encode([
             'ok' => true,
             'query' => $query,
-            'profiles' => jg_store_ops_search_customer_profiles($query, (int) ($_GET['limit'] ?? 100)),
+            'profiles' => jg_store_ops_search_customer_profiles(
+                $query,
+                (int) ($_GET['limit'] ?? 100),
+                in_array(strtolower(trim((string) ($_GET['label_only'] ?? ''))), ['1', 'true', 'yes', 'on'], true)
+            ),
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         exit;
     }

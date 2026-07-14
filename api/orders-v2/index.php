@@ -1145,6 +1145,7 @@ if (isset($_GET['shipping_label'])) {
         'setup_token' => $setupToken,
         'order' => $orderSn,
         'package' => trim((string) ($_GET['package'] ?? $_GET['package_id'] ?? '')),
+        'reprint' => in_array(strtolower(trim((string) ($_GET['reprint'] ?? ''))), ['1', 'true', 'yes', 'on'], true) ? '1' : '0',
     ]);
     $url = $baseUrl . '/' . rawurlencode($platform) . '/orders/shipping-label?' . $query;
     jg_store_ops_orders_proxy_file($url, $platform . '-label-' . preg_replace('/[^A-Za-z0-9_-]+/', '-', $orderSn) . '.pdf');

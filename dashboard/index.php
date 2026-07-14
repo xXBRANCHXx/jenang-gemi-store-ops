@@ -34,7 +34,7 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
     <link rel="stylesheet" href="../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
 <body class="admin-body is-dashboard is-store-home">
-    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.01</div>
+    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.02</div>
     <div
         class="admin-app admin-store-home"
         data-store-home
@@ -384,21 +384,34 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
 
         <div class="admin-modal-shell admin-reprint-modal" data-reprint-modal hidden>
             <div class="admin-modal-backdrop" data-close-reprint-modal></div>
-            <form class="admin-modal-card admin-reprint-card" data-reprint-form>
+            <form class="admin-modal-card admin-reprint-card" data-reprint-form role="dialog" aria-modal="true" aria-labelledby="reprint-title">
                 <div class="admin-modal-head">
                     <div>
-                        <span class="admin-panel-kicker">Reprint</span>
-                        <h3>Find Order</h3>
+                        <span class="admin-panel-kicker">Shipping labels</span>
+                        <h3 id="reprint-title">Reprint a label</h3>
                     </div>
                     <button type="button" class="admin-ghost-btn" data-close-reprint-modal>Close</button>
                 </div>
+                <p class="admin-reprint-intro">Enter an exact Order ID, or search by a customer username, name, phone, or email.</p>
                 <label class="admin-reprint-field">
-                    <span>Order ID</span>
-                    <input class="admin-settings-input" name="order_id" autocomplete="off" placeholder="SPX-250504-8801" required>
+                    <span>Order or customer</span>
+                    <input
+                        class="admin-settings-input"
+                        name="order_id"
+                        autocomplete="off"
+                        placeholder="Order ID, username, or customer name"
+                        aria-controls="reprint-search-results"
+                        aria-describedby="reprint-search-help"
+                        required
+                    >
                 </label>
+                <small class="admin-reprint-help" id="reprint-search-help">Customer matches appear automatically as you type.</small>
                 <p class="admin-form-error" data-reprint-error hidden></p>
+                <div class="admin-reprint-results" id="reprint-search-results" data-reprint-results aria-live="polite">
+                    <p class="admin-empty">Start typing to find a customer, or enter the full Order ID.</p>
+                </div>
                 <div class="admin-modal-actions">
-                    <button type="submit" class="admin-primary-btn">Open Shopee Label</button>
+                    <button type="submit" class="admin-primary-btn" data-reprint-submit>Open exact Order ID</button>
                 </div>
             </form>
         </div>

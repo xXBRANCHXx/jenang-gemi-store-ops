@@ -28,6 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const reprintModal = document.querySelector('[data-reprint-modal]');
   const reprintForm = document.querySelector('[data-reprint-form]');
   const reprintError = document.querySelector('[data-reprint-error]');
+  const reprintResults = document.querySelector('[data-reprint-results]');
+  const reprintSubmit = document.querySelector('[data-reprint-submit]');
   const settingsModal = document.querySelector('[data-store-settings-modal]');
   const settingsForm = document.querySelector('[data-store-settings-form]');
   const settingsError = document.querySelector('[data-store-settings-error]');
@@ -56,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const sidebarStorageKey = 'jg-store-sidebar-expanded';
   const skuDbEndpoint = '../api/sku-db/';
   const ordersEndpoint = '../api/orders-v2/';
+  const orderLookupEndpoint = '../api/order-lookup/';
   const employeeProfilesEndpoint = '../api/employees-v2/';
   const profileSettingsEndpoint = '../api/profile-settings/';
   const scanBridgeEndpoint = '../api/scan-bridge/';
@@ -104,6 +107,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let skuCatalogRefreshPromise = null;
   let boardResizeTimer = 0;
   let clientCacheDbPromise = null;
+  let reprintSearchTimer = 0;
+  let reprintSearchController = null;
+  let reprintSearchSequence = 0;
+  let reprintProfiles = [];
+  let selectedReprintProfile = null;
 
   const sourceColorOptions = [
     { value: 'none', label: 'No color' },
@@ -1277,14 +1285,143 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const normalizeOrderId = (value) => String(value || '').trim().toUpperCase();
 
+  const reprintInput = () => reprintForm?.querySelector('input[name="order_id"]');
+
+  const clearReprintError = () => {
+    if (!reprintError) return;
+    reprintError.textContent = '';
+    reprintError.hidden = true;
+  };
+
+  const reprintCustomerLabel = (customer) => String(
+    customer?.username || customer?.name || customer?.phone || customer?.email || 'Customer'
+  ).trim();
+
+  const reprintCustomerDetails = (customer) => {
+    const primary = reprintCustomerLabel(customer);
+    return [customer?.name, customer?.username, customer?.phone, customer?.email]
+      .map((value) => String(value || '').trim())
+      .filter((value, index, values) => value && value !== primary && values.indexOf(value) === index)
+      .slice(0, 2)
+      .join(' · ');
+  };
+
+  const formatReprintDate = (value) => {
+    const date = new Date(value || '');
+    if (Number.isNaN(date.getTime())) return 'Order date unavailable';
+    return new Intl.DateTimeFormat('en-GB', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'Asia/Jakarta'
+    }).format(date);
+  };
+
+  const renderReprintPrompt = (message = 'Start typing to find a customer, or enter the full Order ID.') => {
+    if (!reprintResults) return;
+    reprintResults.innerHTML = `<p class="admin-empty">${escapeHtml(message)}</p>`;
+  };
+
+  const renderReprintProfiles = (profiles) => {
+    if (!reprintResults) return;
+    reprintProfiles = Array.isArray(profiles) ? profiles : [];
+    selectedReprintProfile = null;
+    if (!reprintProfiles.length) {
+      renderReprintPrompt('No matching customers. You can still open an exact Order ID.');
+      return;
+    }
+    reprintResults.innerHTML = `
+      <div class="admin-reprint-result-heading">
+        <strong>Matching customers</strong>
+        <small>Select a person to see every matching label order.</small>
+      </div>
+      <div class="admin-reprint-profile-list">
+        ${reprintProfiles.map((profile, index) => {
+          const customer = profile?.customer || {};
+          const details = reprintCustomerDetails(customer);
+          const orderCount = Number(profile?.order_count || profile?.orders?.length || 0);
+          return `
+            <button type="button" class="admin-reprint-profile-option" data-reprint-profile-index="${index}">
+              <span class="admin-reprint-profile-avatar" aria-hidden="true">${escapeHtml(reprintCustomerLabel(customer).charAt(0).toUpperCase() || '?')}</span>
+              <span>
+                <strong>${escapeHtml(reprintCustomerLabel(customer))}</strong>
+                <small>${escapeHtml(details || `${orderCount} label order${orderCount === 1 ? '' : 's'}`)}</small>
+              </span>
+              <em>${escapeHtml(orderCount)}</em>
+            </button>
+          `;
+        }).join('')}
+      </div>
+    `;
+  };
+
+  const renderReprintProfileOrders = (profile) => {
+    if (!reprintResults) return;
+    selectedReprintProfile = profile;
+    const customer = profile?.customer || {};
+    const orders = Array.isArray(profile?.orders) ? profile.orders : [];
+    reprintResults.innerHTML = `
+      <div class="admin-reprint-selected-head">
+        <button type="button" class="admin-ghost-btn admin-reprint-back" data-reprint-profile-back aria-label="Back to matching customers">Back</button>
+        <span>
+          <strong>${escapeHtml(reprintCustomerLabel(customer))}</strong>
+          <small>${escapeHtml(reprintCustomerDetails(customer) || `${orders.length} label order${orders.length === 1 ? '' : 's'}`)}</small>
+        </span>
+      </div>
+      <div class="admin-reprint-order-list">
+        ${orders.length ? orders.map((order, index) => `
+          <button type="button" class="admin-reprint-order-option" data-reprint-order-index="${index}">
+            <time>${escapeHtml(formatReprintDate(order?.created_at))}</time>
+            <span>
+              <strong>${escapeHtml(order?.order_id || 'Order')}</strong>
+              <small>${escapeHtml(order?.source?.label || 'Shipping label')}</small>
+            </span>
+            <em>Open label</em>
+          </button>
+        `).join('') : '<p class="admin-empty">No printable label orders were found for this customer.</p>'}
+      </div>
+    `;
+  };
+
+  const searchReprintProfiles = async (query) => {
+    const sequence = ++reprintSearchSequence;
+    reprintSearchController?.abort();
+    reprintSearchController = new AbortController();
+    renderReprintPrompt('Searching customer profiles…');
+    clearReprintError();
+    try {
+      const params = new URLSearchParams({
+        action: 'profile_search',
+        query,
+        label_only: '1',
+        limit: '100'
+      });
+      const response = await fetch(`${orderLookupEndpoint}?${params.toString()}`, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+        signal: reprintSearchController.signal
+      });
+      const payload = await readJsonResponse(response, 'Customer search failed.');
+      if (!response.ok || payload.ok === false) {
+        throw new Error(payload.error || 'Customer search failed.');
+      }
+      if (sequence !== reprintSearchSequence) return;
+      renderReprintProfiles(payload.profiles || []);
+    } catch (error) {
+      if (error?.name === 'AbortError' || sequence !== reprintSearchSequence) return;
+      renderReprintPrompt('Customer search is temporarily unavailable. Exact Order ID lookup still works.');
+      showReprintError(error instanceof Error ? error.message : 'Customer search failed.');
+    }
+  };
+
   const openReprintModal = () => {
     if (!reprintModal) return;
     reprintModal.hidden = false;
-    if (reprintError) {
-      reprintError.textContent = '';
-      reprintError.hidden = true;
-    }
-    const input = reprintModal.querySelector('input[name="order_id"]');
+    clearReprintError();
+    reprintProfiles = [];
+    selectedReprintProfile = null;
+    renderReprintPrompt();
+    const input = reprintInput();
     if (input instanceof HTMLInputElement) {
       input.value = '';
       window.setTimeout(() => input.focus(), 40);
@@ -1292,6 +1429,10 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const closeReprintModal = () => {
+    window.clearTimeout(reprintSearchTimer);
+    reprintSearchController?.abort();
+    reprintSearchController = null;
+    reprintSearchSequence += 1;
     if (reprintModal) reprintModal.hidden = true;
   };
 
@@ -1350,13 +1491,54 @@ document.addEventListener('DOMContentLoaded', () => {
     order.started = Boolean(order.claimedBy && order.currentEmployeeCanWork && order.fulfillmentStatus !== 'FULFILLED');
   };
 
-  const openPrintLabelPage = (orderId, { reprint = false } = {}) => {
-    const order = state.orders.find((item) => normalizeOrderId(item.id) === orderId);
-    const printableOrderId = order?.id || orderId;
-    const account = order?.sourceAccountKey || '';
-    const platform = String(order?.platform || '').toLowerCase();
-    const packageNumber = String(order?.packageNumber || order?.package_number || '').trim();
+  const openPrintLabelPage = (orderValue, { reprint = false } = {}) => {
+    const requestedId = typeof orderValue === 'object' ? String(orderValue?.order_id || orderValue?.id || '') : String(orderValue || '');
+    const queueOrder = state.orders.find((item) => normalizeOrderId(item.id) === normalizeOrderId(requestedId));
+    const order = typeof orderValue === 'object' ? orderValue : (queueOrder || {});
+    const label = order?.shipping_label || {};
+    const source = order?.source || {};
+    const printableOrderId = order?.order_id || order?.id || requestedId;
+    const account = label.account || source.account || order?.sourceAccountKey || '';
+    const platform = String(label.platform || source.platform || source.key || order?.platform || '').toLowerCase();
+    const packageNumber = String(label.package || order?.packageNumber || order?.package_number || '').trim();
     openStorePage(`./print-label/?order=${encodeURIComponent(printableOrderId)}${account ? `&account=${encodeURIComponent(account)}` : ''}${platform ? `&platform=${encodeURIComponent(platform)}` : ''}${packageNumber ? `&package=${encodeURIComponent(packageNumber)}` : ''}${reprint ? '&reprint=1' : ''}`);
+  };
+
+  const openResolvedReprintOrder = (order) => {
+    const label = order?.shipping_label || {};
+    if (label.supported === false) {
+      showReprintError('This order does not have a shipping label to reprint.');
+      return;
+    }
+    openPrintLabelPage(order, { reprint: true });
+  };
+
+  const lookupExactReprintOrder = async (orderId) => {
+    if (reprintSubmit instanceof HTMLButtonElement) {
+      reprintSubmit.disabled = true;
+      reprintSubmit.textContent = 'Finding order…';
+    }
+    clearReprintError();
+    try {
+      const params = new URLSearchParams({ action: 'order', order_id: orderId });
+      const response = await fetch(`${orderLookupEndpoint}?${params.toString()}`, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await readJsonResponse(response, 'Order lookup failed.');
+      if (!response.ok || payload.ok === false) {
+        throw new Error(payload.error || 'Order lookup failed.');
+      }
+      openResolvedReprintOrder(payload.order || {});
+    } catch (error) {
+      showReprintError(error instanceof Error ? error.message : 'Order lookup failed.');
+    } finally {
+      if (reprintSubmit instanceof HTMLButtonElement) {
+        reprintSubmit.disabled = false;
+        reprintSubmit.textContent = 'Open exact Order ID';
+      }
+    }
   };
 
   const settingsTabTitles = {
@@ -2049,20 +2231,59 @@ document.addEventListener('DOMContentLoaded', () => {
     button.addEventListener('click', closeReprintModal);
   });
 
-  reprintForm?.addEventListener('submit', (event) => {
+  reprintInput()?.addEventListener('input', (event) => {
+    window.clearTimeout(reprintSearchTimer);
+    clearReprintError();
+    const query = String(event.target?.value || '').trim();
+    if (query.length < 2) {
+      reprintSearchController?.abort();
+      reprintSearchSequence += 1;
+      reprintProfiles = [];
+      selectedReprintProfile = null;
+      renderReprintPrompt(query ? 'Type at least 2 characters to search customers.' : undefined);
+      return;
+    }
+    reprintSearchTimer = window.setTimeout(() => searchReprintProfiles(query), 280);
+  });
+
+  reprintResults?.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const profileButton = target?.closest('[data-reprint-profile-index]');
+    if (profileButton instanceof HTMLButtonElement) {
+      const profile = reprintProfiles[Number(profileButton.dataset.reprintProfileIndex || -1)];
+      if (profile) renderReprintProfileOrders(profile);
+      return;
+    }
+    const backButton = target?.closest('[data-reprint-profile-back]');
+    if (backButton instanceof HTMLButtonElement) {
+      renderReprintProfiles(reprintProfiles);
+      return;
+    }
+    const orderButton = target?.closest('[data-reprint-order-index]');
+    if (!(orderButton instanceof HTMLButtonElement) || !selectedReprintProfile) return;
+    const orders = Array.isArray(selectedReprintProfile.orders) ? selectedReprintProfile.orders : [];
+    const order = orders[Number(orderButton.dataset.reprintOrderIndex || -1)];
+    if (order) openResolvedReprintOrder(order);
+  });
+
+  reprintForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const formData = new FormData(reprintForm);
-    const orderId = normalizeOrderId(formData.get('order_id'));
+    const orderId = String(formData.get('order_id') || '').trim();
     if (!orderId) {
       showReprintError('Enter an order ID.');
       return;
     }
-    openPrintLabelPage(orderId, { reprint: true });
+    await lookupExactReprintOrder(orderId);
   });
 
   document.addEventListener('pointerdown', unlockAudio, { once: true });
   document.addEventListener('keydown', unlockAudio, { once: true });
   document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && reprintModal && !reprintModal.hidden) {
+      closeReprintModal();
+      return;
+    }
     if (event.key === 'Escape' && compactSidebarQuery.matches && root.classList.contains('is-sidebar-expanded')) {
       setSidebarExpanded(false, { persist: false });
     }

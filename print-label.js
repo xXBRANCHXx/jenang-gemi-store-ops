@@ -323,10 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const platform = platformLabel(order.platform);
     if (statusNode) statusNode.textContent = `Fetching ${platform} label`;
     const sourcePlatform = normalizeSourceKey(order?.platform || 'shopee');
-    if (sourcePlatform === 'tiktok' && !packageNumber) {
-      throw new Error('TikTok package number is required to load this shipping label.');
-    }
-    const response = await fetch(`../../api/orders-v2/?shipping_label=1&order=${encodeURIComponent(order.id)}&platform=${encodeURIComponent(sourcePlatform)}${sourceAccount ? `&account=${encodeURIComponent(sourceAccount)}` : ''}${packageNumber ? `&package=${encodeURIComponent(packageNumber)}` : ''}`, {
+    const response = await fetch(`../../api/orders-v2/?shipping_label=1&order=${encodeURIComponent(order.id)}&platform=${encodeURIComponent(sourcePlatform)}${sourceAccount ? `&account=${encodeURIComponent(sourceAccount)}` : ''}${packageNumber ? `&package=${encodeURIComponent(packageNumber)}` : ''}${isReprint ? '&reprint=1' : ''}`, {
       cache: 'no-store',
       credentials: 'same-origin',
       headers: { Accept: 'application/pdf,application/octet-stream,*/*' }

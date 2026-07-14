@@ -237,7 +237,8 @@ function jg_store_ops_order_resolver_order_from_feed_order(array $order, string 
 {
     $orderId = jg_store_ops_order_resolver_string($order['id'] ?? $order['order_id'] ?? '', 160);
     $sourceKey = jg_store_ops_order_resolver_platform_key((string) ($order['platform'] ?? $fallbackSource));
-    $account = jg_store_ops_order_resolver_string($order['account'] ?? $order['sourceAccountKey'] ?? $order['account_key'] ?? '', 120);
+    $account = jg_store_ops_order_resolver_string($order['sourceAccountKey'] ?? $order['account_key'] ?? $order['account'] ?? '', 120);
+    $accountLabel = jg_store_ops_order_resolver_string($order['account'] ?? $account, 120);
     $items = array_map('jg_store_ops_order_resolver_item', array_values(array_filter((array) ($order['items'] ?? []), 'is_array')));
     $lineTotal = array_reduce($items, static fn (float $sum, array $item): float => $sum + (float) ($item['line_total'] ?? 0), 0.0);
     $financials = is_array($order['financials'] ?? null) ? $order['financials'] : [];
@@ -249,7 +250,7 @@ function jg_store_ops_order_resolver_order_from_feed_order(array $order, string 
         'order_id' => $orderId,
         'source' => [
             'key' => $sourceKey,
-            'label' => jg_store_ops_order_resolver_source_label($sourceKey, $account),
+            'label' => jg_store_ops_order_resolver_source_label($sourceKey, $accountLabel),
             'account' => $account,
             'platform' => $sourceKey,
         ],
@@ -686,15 +687,36 @@ function jg_store_ops_order_resolver_order_matches_query(array $order, string $q
     }
     $customer = is_array($order['customer'] ?? null) ? $order['customer'] : [];
     $haystack = jg_store_ops_order_resolver_text_key(implode(' ', [
-        (string) ($order['order_id'] ?? ''),
-        (string) ($order['source']['label'] ?? ''),
         (string) ($customer['name'] ?? ''),
         (string) ($customer['username'] ?? ''),
         (string) ($customer['phone'] ?? ''),
         (string) ($customer['email'] ?? ''),
-        (string) ($customer['address'] ?? ''),
     ]));
     return str_contains($haystack, $needle);
+}
+
+function jg_store_ops_order_resolver_shipping_label(array $order): array
+{
+    $source = is_array($order['source'] ?? null) ? $order['source'] : [];
+    $platform = jg_store_ops_order_resolver_platform_key((string) ($source['platform'] ?? $source['key'] ?? ''));
+    $status = (string) ($order['status'] ?? '');
+    $cancelled = preg_match('/CANCEL|REFUND|RETURN|REJECT|FAILED|EXPIRED|CLOSED/i', $status) === 1;
+    $supported = !$cancelled && in_array($platform, ['shopee', 'tiktok', 'partner', 'zero_website', 'jenang_gemi_website'], true);
+    $raw = is_array($order['raw'] ?? null) ? $order['raw'] : [];
+    $package = jg_store_ops_order_resolver_recursive_string($raw, [
+        'packageNumber',
+        'package_number',
+        'package_id',
+        'packageId',
+        'shipment_id',
+    ]);
+
+    return [
+        'supported' => $supported,
+        'platform' => $platform,
+        'account' => jg_store_ops_order_resolver_string($source['account'] ?? '', 120),
+        'package' => jg_store_ops_order_resolver_string($package, 160),
+    ];
 }
 
 function jg_store_ops_order_resolver_search_walkins(string $query, int $limit): array
@@ -796,7 +818,7 @@ function jg_store_ops_order_resolver_search_marketplace(string $query, int $limi
 function jg_store_ops_order_resolver_customer_profile_key(array $order): string
 {
     $customer = is_array($order['customer'] ?? null) ? $order['customer'] : [];
-    foreach (['username', 'name', 'phone', 'email', 'address'] as $key) {
+    foreach (['username', 'name', 'phone', 'email'] as $key) {
         $value = jg_store_ops_order_resolver_text_key($customer[$key] ?? '');
         if ($value !== '') {
             return $value;
@@ -805,7 +827,7 @@ function jg_store_ops_order_resolver_customer_profile_key(array $order): string
     return jg_store_ops_order_resolver_text_key($order['order_id'] ?? '');
 }
 
-function jg_store_ops_search_customer_profiles(string $query, int $limit = 100): array
+function jg_store_ops_search_customer_profiles(string $query, int $limit = 100, bool $labelOnly = false): array
 {
     $query = trim($query);
     if ($query === '') {
@@ -820,7 +842,11 @@ function jg_store_ops_search_customer_profiles(string $query, int $limit = 100):
         jg_store_ops_order_resolver_search_marketplace($query, $limit),
     ] as $sourceOrders) {
         foreach ($sourceOrders as $order) {
-            if (is_array($order) && jg_store_ops_order_resolver_order_matches_query($order, $query)) {
+            if (
+                is_array($order)
+                && jg_store_ops_order_resolver_order_matches_query($order, $query)
+                && (!$labelOnly || !empty(jg_store_ops_order_resolver_shipping_label($order)['supported']))
+            ) {
                 $orders[(string) ($order['source']['key'] ?? '') . ':' . (string) ($order['order_id'] ?? '')] = $order;
             }
         }
@@ -833,6 +859,7 @@ function jg_store_ops_search_customer_profiles(string $query, int $limit = 100):
             continue;
         }
         $customer = is_array($order['customer'] ?? null) ? $order['customer'] : [];
+        unset($customer['address']);
         if (!isset($profiles[$key])) {
             $profiles[$key] = [
                 'profile_key' => $key,
@@ -841,6 +868,15 @@ function jg_store_ops_search_customer_profiles(string $query, int $limit = 100):
                 'order_count' => 0,
                 'total_revenue' => 0.0,
             ];
+        } else {
+            foreach (['username', 'name', 'phone', 'email'] as $customerField) {
+                if (
+                    trim((string) ($profiles[$key]['customer'][$customerField] ?? '')) === ''
+                    && trim((string) ($customer[$customerField] ?? '')) !== ''
+                ) {
+                    $profiles[$key]['customer'][$customerField] = $customer[$customerField];
+                }
+            }
         }
         $summary = [
             'order_id' => (string) ($order['order_id'] ?? ''),
@@ -850,6 +886,7 @@ function jg_store_ops_search_customer_profiles(string $query, int $limit = 100):
             'item_count' => array_reduce((array) ($order['items'] ?? []), static fn (float $sum, array $item): float => $sum + (float) ($item['quantity'] ?? 0), 0.0),
             'total' => (float) ($order['revenue']['total'] ?? 0),
             'currency' => (string) ($order['revenue']['currency'] ?? 'IDR'),
+            'shipping_label' => jg_store_ops_order_resolver_shipping_label($order),
         ];
         $profiles[$key]['orders'][] = $summary;
         $profiles[$key]['order_count']++;
@@ -857,6 +894,13 @@ function jg_store_ops_search_customer_profiles(string $query, int $limit = 100):
     }
 
     $rows = array_values($profiles);
+    foreach ($rows as &$profile) {
+        usort($profile['orders'], static fn (array $left, array $right): int => strcmp(
+            (string) ($right['created_at'] ?? ''),
+            (string) ($left['created_at'] ?? '')
+        ));
+    }
+    unset($profile);
     usort($rows, static fn (array $left, array $right): int => ((int) ($right['order_count'] ?? 0) <=> (int) ($left['order_count'] ?? 0)));
     return $rows;
 }

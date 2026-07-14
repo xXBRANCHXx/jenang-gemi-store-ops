@@ -1954,6 +1954,189 @@ button, input {
   text-transform: uppercase;
 }
 
+.admin-reprint-card {
+  display: grid;
+  gap: 14px;
+  width: min(720px, 100%);
+  max-height: min(88svh, 820px);
+  overflow: hidden;
+}
+
+.admin-reprint-card .admin-modal-head {
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+.admin-reprint-intro,
+.admin-reprint-help {
+  margin: 0;
+  color: var(--admin-muted);
+  font-size: .86rem;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.admin-reprint-help {
+  margin-top: -8px;
+}
+
+.admin-reprint-results {
+  display: grid;
+  gap: 10px;
+  min-height: 120px;
+  max-height: min(48svh, 430px);
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 18px;
+  background: var(--admin-surface-soft);
+  scrollbar-gutter: stable;
+}
+
+.admin-reprint-results > .admin-empty {
+  align-self: center;
+  margin: 0;
+}
+
+.admin-reprint-result-heading {
+  display: grid;
+  gap: 3px;
+}
+
+.admin-reprint-result-heading strong,
+.admin-reprint-selected-head strong {
+  color: var(--admin-text);
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+.admin-reprint-result-heading small,
+.admin-reprint-selected-head small {
+  color: var(--admin-muted);
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.admin-reprint-profile-list,
+.admin-reprint-order-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-reprint-profile-option,
+.admin-reprint-order-option {
+  width: 100%;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.admin-reprint-profile-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: 16px;
+}
+
+.admin-reprint-profile-option:hover,
+.admin-reprint-profile-option:focus-visible,
+.admin-reprint-order-option:hover,
+.admin-reprint-order-option:focus-visible {
+  border-color: color-mix(in srgb, var(--admin-accent-primary) 60%, var(--admin-border));
+  background: color-mix(in srgb, var(--admin-accent-primary) 6%, var(--admin-surface));
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.admin-reprint-profile-avatar {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--admin-accent-primary) 16%, var(--admin-surface));
+  color: var(--admin-accent-primary);
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 900;
+}
+
+.admin-reprint-profile-option > span:not(.admin-reprint-profile-avatar),
+.admin-reprint-order-option > span,
+.admin-reprint-selected-head > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-reprint-profile-option strong,
+.admin-reprint-order-option strong {
+  overflow-wrap: anywhere;
+}
+
+.admin-reprint-profile-option small,
+.admin-reprint-order-option small,
+.admin-reprint-order-option time {
+  color: var(--admin-muted);
+  font-size: .76rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.admin-reprint-profile-option em,
+.admin-reprint-order-option em {
+  color: var(--admin-accent-primary);
+  font-size: .76rem;
+  font-style: normal;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.admin-reprint-selected-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-reprint-back {
+  min-height: 36px;
+  padding: 0 13px;
+}
+
+.admin-reprint-order-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 16px;
+}
+
+.admin-reprint-order-option time {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 640px) {
+  .admin-reprint-modal {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .admin-reprint-card {
+    max-height: calc(100svh - 20px);
+    padding: 20px;
+  }
+
+  .admin-reprint-results {
+    max-height: 46svh;
+  }
+
+}
+
 .admin-scanner-settings-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

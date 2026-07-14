@@ -42,4 +42,42 @@ order_resolver_expect('Ayu', $order['customer']['name'], 'Feed orders should nor
 order_resolver_expect(40000.0, $order['revenue']['total'], 'Feed orders should normalize revenue totals.');
 order_resolver_expect(2.0, $order['items'][0]['quantity'], 'Feed items should normalize quantity.');
 
+$tiktokOrder = jg_store_ops_order_resolver_order_from_feed_order([
+    'id' => 'TT-ORDER-9',
+    'platform' => 'TikTok Shop',
+    'account_key' => 'zero-tiktok',
+    'username' => 'ayu_store',
+    'customerAddress' => 'Do not index this address',
+    'packageNumber' => 'PKG-9',
+    'items' => [],
+], 'tiktok');
+$tiktokLabel = jg_store_ops_order_resolver_shipping_label($tiktokOrder);
+
+order_resolver_expect(true, $tiktokLabel['supported'], 'TikTok orders should support shipping-label reprints.');
+order_resolver_expect('tiktok', $tiktokLabel['platform'], 'Shipping-label metadata should preserve the normalized platform.');
+order_resolver_expect('zero-tiktok', $tiktokLabel['account'], 'Shipping-label metadata should preserve the source account.');
+order_resolver_expect('PKG-9', $tiktokLabel['package'], 'Shipping-label metadata should preserve package identifiers.');
+order_resolver_expect(true, jg_store_ops_order_resolver_order_matches_query($tiktokOrder, 'ayu_store'), 'Profile search should match usernames.');
+order_resolver_expect(false, jg_store_ops_order_resolver_order_matches_query($tiktokOrder, 'Do not index'), 'Profile search must not match addresses.');
+
+$addressOnlyOrder = $tiktokOrder;
+$addressOnlyOrder['order_id'] = 'ADDRESS-ONLY-1';
+$addressOnlyOrder['customer'] = ['name' => '', 'username' => '', 'phone' => '', 'email' => '', 'address' => 'Private Street'];
+order_resolver_expect('ADDRESS ONLY 1', jg_store_ops_order_resolver_customer_profile_key($addressOnlyOrder), 'Addresses must not become customer profile keys.');
+
+$walkInLabel = jg_store_ops_order_resolver_shipping_label([
+    'source' => ['key' => 'walk_in', 'platform' => 'walk_in'],
+]);
+order_resolver_expect(false, $walkInLabel['supported'], 'Orders without shipping labels must be excluded from reprint profile search.');
+
+$activeMarketplaceOrder = jg_store_ops_order_resolver_order_from_feed_order([
+    'id' => 'SHP-ACTIVE-1',
+    'platform' => 'shopee',
+    'account' => 'Jenang Gemi Shopee',
+    'sourceAccountKey' => 'jenang-gemi-shopee',
+    'username' => 'buyer_one',
+], 'shopee');
+order_resolver_expect('jenang-gemi-shopee', $activeMarketplaceOrder['source']['account'], 'Active marketplace orders must route labels with the canonical account key.');
+order_resolver_expect('Shopee - Jenang Gemi Shopee', $activeMarketplaceOrder['source']['label'], 'Marketplace source labels may retain the friendly account name.');
+
 echo "order-resolver-test: ok\n";
