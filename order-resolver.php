@@ -863,6 +863,44 @@ function jg_store_ops_order_resolver_customer_profile_key(array $order): string
     return jg_store_ops_order_resolver_text_key($order['order_id'] ?? '');
 }
 
+function jg_store_ops_order_resolver_customer_prefix_match(array $customer, string $query): bool
+{
+    $needle = jg_store_ops_order_resolver_text_key($query);
+    if ($needle === '') {
+        return false;
+    }
+
+    $values = [];
+    foreach (['username', 'name', 'phone', 'email'] as $field) {
+        $values[] = $customer[$field] ?? '';
+    }
+    foreach ((array) ($customer['profile_values'] ?? []) as $profileValue) {
+        $values[] = $profileValue;
+    }
+
+    foreach ($values as $value) {
+        $normalized = jg_store_ops_order_resolver_text_key(jg_store_ops_order_resolver_string($value, 200));
+        if ($normalized !== '' && str_starts_with($normalized, $needle)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function jg_store_ops_order_resolver_sort_customer_profiles(array &$profiles, string $query): void
+{
+    usort($profiles, static function (array $left, array $right) use ($query): int {
+        $leftCustomer = is_array($left['customer'] ?? null) ? $left['customer'] : [];
+        $rightCustomer = is_array($right['customer'] ?? null) ? $right['customer'] : [];
+        $prefixComparison = (int) jg_store_ops_order_resolver_customer_prefix_match($rightCustomer, $query)
+            <=> (int) jg_store_ops_order_resolver_customer_prefix_match($leftCustomer, $query);
+        if ($prefixComparison !== 0) {
+            return $prefixComparison;
+        }
+        return (int) ($right['order_count'] ?? 0) <=> (int) ($left['order_count'] ?? 0);
+    });
+}
+
 function jg_store_ops_search_customer_profiles(string $query, int $limit = 100, bool $labelOnly = false): array
 {
     $query = trim($query);
@@ -937,6 +975,6 @@ function jg_store_ops_search_customer_profiles(string $query, int $limit = 100, 
         ));
     }
     unset($profile);
-    usort($rows, static fn (array $left, array $right): int => ((int) ($right['order_count'] ?? 0) <=> (int) ($left['order_count'] ?? 0)));
+    jg_store_ops_order_resolver_sort_customer_profiles($rows, $query);
     return $rows;
 }

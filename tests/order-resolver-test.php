@@ -99,4 +99,16 @@ order_resolver_expect(false, $unavailableLabel['available'], 'Historical marketp
 order_resolver_expect('unavailable', $unavailableLabel['availability_source'], 'Label availability should preserve its source state.');
 order_resolver_expect('This order has already been shipped. The shipping label no longer exists.', $unavailableLabel['unavailable_reason'], 'Shipped orders should explain that their temporary label no longer exists.');
 
+$profiles = [
+    ['customer' => ['username' => 'coral_shop'], 'order_count' => 8],
+    ['customer' => ['username' => 'alice_store'], 'order_count' => 2],
+    ['customer' => ['name' => 'Central Market'], 'order_count' => 5],
+    ['customer' => ['username' => 'masked', 'profile_values' => ['albert_original']], 'order_count' => 1],
+];
+jg_store_ops_order_resolver_sort_customer_profiles($profiles, 'al');
+order_resolver_expect('alice_store', $profiles[0]['customer']['username'], 'Customer profiles whose visible identifiers start with the query should rank first.');
+order_resolver_expect('masked', $profiles[1]['customer']['username'], 'Preserved marketplace aliases that start with the query should also receive prefix priority.');
+order_resolver_expect('coral_shop', $profiles[2]['customer']['username'], 'Substring matches should remain after every prefix match.');
+order_resolver_expect('Central Market', $profiles[3]['customer']['name'], 'Substring matches should retain order-count ordering within their rank.');
+
 echo "order-resolver-test: ok\n";
