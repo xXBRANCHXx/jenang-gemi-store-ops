@@ -1368,16 +1368,27 @@ document.addEventListener('DOMContentLoaded', () => {
         </span>
       </div>
       <div class="admin-reprint-order-list">
-        ${orders.length ? orders.map((order, index) => `
-          <button type="button" class="admin-reprint-order-option" data-reprint-order-index="${index}">
+        ${orders.length ? orders.map((order, index) => {
+          const labelAvailable = order?.shipping_label?.available !== false;
+          const unavailableReason = String(order?.shipping_label?.unavailable_reason || 'This shipping label is not available for reprint.');
+          return `
+          <button
+            type="button"
+            class="admin-reprint-order-option${labelAvailable ? '' : ' is-unavailable'}"
+            data-reprint-order-index="${index}"
+            ${labelAvailable ? '' : 'disabled'}
+            ${labelAvailable ? '' : `title="${escapeHtml(unavailableReason)}"`}
+          >
             <time>${escapeHtml(formatReprintDate(order?.created_at))}</time>
             <span>
               <strong>${escapeHtml(order?.order_id || 'Order')}</strong>
               <small>${escapeHtml(order?.source?.label || 'Shipping label')}</small>
+              ${labelAvailable ? '' : `<small class="admin-reprint-unavailable-reason">${escapeHtml(unavailableReason)}</small>`}
             </span>
-            <em>Open label</em>
+            <em>${labelAvailable ? 'Open label' : 'Unavailable'}</em>
           </button>
-        `).join('') : '<p class="admin-empty">No printable label orders were found for this customer.</p>'}
+        `;
+        }).join('') : '<p class="admin-empty">No shipping-label orders were found for this customer.</p>'}
       </div>
     `;
   };
@@ -1508,6 +1519,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const label = order?.shipping_label || {};
     if (label.supported === false) {
       showReprintError('This order does not have a shipping label to reprint.');
+      return;
+    }
+    if (label.available === false) {
+      showReprintError(label.unavailable_reason || 'This shipping label is not available for reprint.');
       return;
     }
     openPrintLabelPage(order, { reprint: true });

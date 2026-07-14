@@ -716,6 +716,17 @@ function jg_store_ops_order_resolver_shipping_label(array $order): array
     $cancelled = preg_match('/CANCEL|REFUND|RETURN|REJECT|FAILED|EXPIRED|CLOSED/i', $status) === 1;
     $supported = !$cancelled && in_array($platform, ['shopee', 'tiktok', 'partner', 'zero_website', 'jenang_gemi_website'], true);
     $raw = is_array($order['raw'] ?? null) ? $order['raw'] : [];
+    $available = $supported;
+    $availabilitySource = $supported ? 'source' : 'unavailable';
+    $unavailableReason = '';
+    if (in_array($platform, ['shopee', 'tiktok'], true)) {
+        $marketplaceRow = is_array($raw['marketplace_rows'][0] ?? null) ? $raw['marketplace_rows'][0] : [];
+        if (array_key_exists('label_reprint_available', $marketplaceRow)) {
+            $available = $supported && (bool) $marketplaceRow['label_reprint_available'];
+            $availabilitySource = jg_store_ops_order_resolver_string($marketplaceRow['label_reprint_source'] ?? '', 40);
+            $unavailableReason = jg_store_ops_order_resolver_string($marketplaceRow['label_reprint_reason'] ?? '', 240);
+        }
+    }
     $package = jg_store_ops_order_resolver_recursive_string($raw, [
         'packageNumber',
         'package_number',
@@ -726,6 +737,9 @@ function jg_store_ops_order_resolver_shipping_label(array $order): array
 
     return [
         'supported' => $supported,
+        'available' => $available,
+        'availability_source' => $availabilitySource,
+        'unavailable_reason' => $unavailableReason,
         'platform' => $platform,
         'account' => jg_store_ops_order_resolver_string($source['account'] ?? '', 120),
         'package' => jg_store_ops_order_resolver_string($package, 160),

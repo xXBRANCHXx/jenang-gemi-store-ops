@@ -86,9 +86,15 @@ $aliasedMarketplaceOrder = jg_store_ops_order_resolver_order_from_marketplace_ro
     'account_key' => 'zero-shopee',
     'username' => 'C*****a',
     'profile_values' => ['claud__claud', 'BUYER-99'],
+    'label_reprint_available' => false,
+    'label_reprint_source' => 'unavailable',
+    'label_reprint_reason' => 'Shopee no longer provides this shipped label, and Store Ops does not have a saved copy.',
     'order_create_time' => '2026-07-01 12:00:00',
 ]]);
 order_resolver_expect(true, jg_store_ops_order_resolver_order_matches_query($aliasedMarketplaceOrder, 'claud__claud'), 'Profile search must match preserved marketplace username aliases.');
 order_resolver_expect(false, jg_store_ops_order_resolver_order_matches_query($aliasedMarketplaceOrder, 'Private Road'), 'Profile aliases must not reintroduce address matching.');
+$unavailableLabel = jg_store_ops_order_resolver_shipping_label($aliasedMarketplaceOrder);
+order_resolver_expect(false, $unavailableLabel['available'], 'Historical marketplace orders without a saved or live label must be marked unavailable.');
+order_resolver_expect('unavailable', $unavailableLabel['availability_source'], 'Label availability should preserve its source state.');
 
 echo "order-resolver-test: ok\n";

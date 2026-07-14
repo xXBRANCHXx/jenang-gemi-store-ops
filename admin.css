@@ -2052,6 +2052,22 @@ button, input {
   transform: translateY(-1px);
 }
 
+.admin-reprint-order-option.is-unavailable {
+  cursor: not-allowed;
+  opacity: .72;
+}
+
+.admin-reprint-order-option.is-unavailable:hover {
+  border-color: var(--admin-border);
+  background: var(--admin-surface);
+  transform: none;
+}
+
+.admin-reprint-order-option.is-unavailable em,
+.admin-reprint-unavailable-reason {
+  color: #f59e0b !important;
+}
+
 .admin-reprint-profile-avatar {
   display: grid;
   place-items: center;
