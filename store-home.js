@@ -52,11 +52,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const themeStorageKey = 'jg-admin-theme';
-  const sourceColorStorageKey = 'jg-store-source-colors';
+  const legacySourceColorStorageKey = 'jg-store-source-colors';
   const sidebarStorageKey = 'jg-store-sidebar-expanded';
   const skuDbEndpoint = '../api/sku-db/';
   const ordersEndpoint = '../api/orders-v2/';
   const employeeProfilesEndpoint = '../api/employees-v2/';
+  const profileSettingsEndpoint = '../api/profile-settings/';
   const scanBridgeEndpoint = '../api/scan-bridge/';
   const scanSerialEndpoint = '../api/scan-serial/';
   const boardBaseRows = 6;
@@ -73,11 +74,15 @@ document.addEventListener('DOMContentLoaded', () => {
     id: String(root.dataset.employeeId || 'shared-admin'),
     name: String(root.dataset.employeeName || 'Admin')
   };
+  const sourceColorStorageKey = `${legacySourceColorStorageKey}:${currentEmployee.id}`;
 
   let skuCatalog = [];
   let partnerOrderSources = [];
   let employeeProfiles = [];
   let sourceColorMap = {};
+  let sourceColorRevision = 0;
+  let sourceColorSavesPending = 0;
+  let sourceColorSaveChain = Promise.resolve();
   let scannerSettings = {
     baud_rate: 9600
   };
@@ -181,21 +186,115 @@ document.addEventListener('DOMContentLoaded', () => {
     .replace(/^[._-]+|[._-]+$/g, '')
     .slice(0, 80);
 
+  const normalizeSourceColorMap = (value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return Object.entries(value).reduce((colors, [sourceKey, color]) => {
+      const key = normalizeSourceKey(sourceKey);
+      const normalizedColor = String(color || '').trim();
+      const namedColor = normalizedColor.toLowerCase();
+      if (!key) return colors;
+      if (sourceColorOptions.some((option) => option.value === namedColor)) {
+        colors[key] = namedColor;
+      } else if (/^#[0-9a-f]{6}$/i.test(normalizedColor)) {
+        colors[key] = normalizedColor.toUpperCase();
+      }
+      return colors;
+    }, {});
+  };
+
   const readSourceColorMap = () => {
     try {
-      const parsed = JSON.parse(window.localStorage.getItem(sourceColorStorageKey) || '{}');
-      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+      const profileColors = window.localStorage.getItem(sourceColorStorageKey);
+      const encoded = profileColors === null
+        ? window.localStorage.getItem(legacySourceColorStorageKey)
+        : profileColors;
+      return normalizeSourceColorMap(JSON.parse(encoded || '{}'));
     } catch (_error) {
       return {};
     }
   };
 
-  const saveSourceColorMap = () => {
+  const cacheSourceColorMap = () => {
     try {
       window.localStorage.setItem(sourceColorStorageKey, JSON.stringify(sourceColorMap));
+      window.localStorage.removeItem(legacySourceColorStorageKey);
     } catch (_error) {
       // Source colors are optional; keep fulfillment usable if storage is blocked.
     }
+  };
+
+  const reportSourceColorError = (error) => {
+    if (!settingsError) return;
+    const detail = error instanceof Error ? error.message : 'Unable to save platform colors.';
+    settingsError.textContent = `Unable to sync platform colors for ${currentEmployee.name}. ${detail}`;
+    settingsError.hidden = false;
+  };
+
+  const clearSourceColorError = () => {
+    if (!settingsError || !settingsError.textContent.startsWith('Unable to sync platform colors')) return;
+    settingsError.textContent = '';
+    settingsError.hidden = true;
+  };
+
+  const saveSourceColorMap = () => {
+    cacheSourceColorMap();
+    const snapshot = { ...sourceColorMap };
+    sourceColorSavesPending += 1;
+    sourceColorSaveChain = sourceColorSaveChain
+      .catch(() => {})
+      .then(async () => {
+        const response = await fetch(profileSettingsEndpoint, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            action: 'save_source_colors',
+            source_colors: snapshot
+          })
+        });
+        const payload = await readJsonResponse(response, 'Unable to save platform colors.');
+        if (!response.ok || payload.ok === false) {
+          throw new Error(payload.error || 'Unable to save platform colors.');
+        }
+        clearSourceColorError();
+        return payload;
+      })
+      .finally(() => {
+        sourceColorSavesPending = Math.max(0, sourceColorSavesPending - 1);
+      });
+    return sourceColorSaveChain;
+  };
+
+  const loadSourceColorMap = async () => {
+    if (sourceColorSavesPending > 0) return sourceColorMap;
+    const requestedAtRevision = sourceColorRevision;
+    const response = await fetch(profileSettingsEndpoint, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' }
+    });
+    const payload = await readJsonResponse(response, 'Unable to load platform colors.');
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.error || 'Unable to load platform colors.');
+    }
+    if (sourceColorSavesPending > 0 || requestedAtRevision !== sourceColorRevision) {
+      return sourceColorMap;
+    }
+
+    if (payload.has_preferences) {
+      sourceColorMap = normalizeSourceColorMap(payload.source_colors);
+      cacheSourceColorMap();
+      renderSourceColorList();
+      renderBoard();
+      clearSourceColorError();
+      return sourceColorMap;
+    }
+
+    // Migrate this profile's existing browser-only colors on its first global load.
+    if (Object.keys(sourceColorMap).length > 0) {
+      await saveSourceColorMap();
+    }
+    return sourceColorMap;
   };
 
   const sourceKeyFromOrder = (order) => {
@@ -206,8 +305,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const partnerCode = normalizeSourceKey(order?.partnerCode || order?.partner_code || order?.account || '');
       return `partner-${partnerCode || 'unknown'}`;
     }
-    if (platform === 'zero_website') return 'ZERO Website';
-    if (platform === 'jenang_gemi_website') return 'Jenang Gemi Website';
+    if (platform === 'zero_website') return 'zero_website';
+    if (platform === 'jenang_gemi_website') return 'jenang_gemi_website';
     const account = normalizeSourceKey(order?.account || '');
     return account || platform || 'unknown';
   };
@@ -1871,7 +1970,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const color = String(button.dataset.sourceColorValue || '').trim();
     if (!sourceKey || !sourceColorOptions.some((option) => option.value === color)) return;
     sourceColorMap[sourceKey] = color;
-    saveSourceColorMap();
+    sourceColorRevision += 1;
+    saveSourceColorMap().catch(reportSourceColorError);
     renderSourceColorList();
     renderBoard();
   });
@@ -1883,7 +1983,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const color = String(input.value || '').trim().toUpperCase();
     if (!sourceKey || !isCustomSourceColor(color)) return;
     sourceColorMap[sourceKey] = color;
-    saveSourceColorMap();
+    sourceColorRevision += 1;
+    saveSourceColorMap().catch(reportSourceColorError);
     renderSourceColorList();
     renderBoard();
   });
@@ -1929,13 +2030,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  settingsForm?.addEventListener('submit', (event) => {
+  settingsForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (settingsError) settingsError.hidden = true;
-    if (settingsSaveLabel) settingsSaveLabel.textContent = 'Saved';
-    window.setTimeout(() => {
-      if (settingsSaveLabel) settingsSaveLabel.textContent = 'Save';
-    }, 1600);
+    try {
+      await saveSourceColorMap();
+      clearSourceColorError();
+      if (settingsSaveLabel) settingsSaveLabel.textContent = 'Saved';
+      window.setTimeout(() => {
+        if (settingsSaveLabel) settingsSaveLabel.textContent = 'Save';
+      }, 1600);
+    } catch (error) {
+      reportSourceColorError(error);
+      if (settingsSaveLabel) settingsSaveLabel.textContent = 'Retry';
+    }
   });
 
   document.querySelectorAll('[data-close-reprint-modal]').forEach((button) => {
@@ -1974,6 +2081,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (event.key === sourceColorStorageKey) {
       sourceColorMap = readSourceColorMap();
+      sourceColorRevision += 1;
       renderSourceColorList();
       renderBoard();
       return;
@@ -2049,6 +2157,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   window.addEventListener('focus', () => {
+    loadSourceColorMap().catch(() => {});
     refreshOrders(false).catch(() => {});
   });
 
@@ -2068,6 +2177,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     formatClock();
     loadScannerSettings().catch(() => {});
+    loadSourceColorMap().catch(reportSourceColorError);
 
     window.setTimeout(() => {
       refreshOrders(true, { force: true }).catch(() => {});

@@ -25,6 +25,16 @@ function jg_store_ops_fulfillment_ensure_schema(PDO $pdo): void
     );
 
     $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS store_ops_employee_preferences_v1 (
+            employee_id VARCHAR(64) NOT NULL PRIMARY KEY,
+            source_colors_json LONGTEXT NOT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            KEY idx_store_ops_employee_preferences_updated (updated_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+
+    $pdo->exec(
         'CREATE TABLE IF NOT EXISTS store_ops_order_fulfillment_v2 (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             source_platform VARCHAR(32) NOT NULL,

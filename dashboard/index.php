@@ -34,7 +34,7 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
     <link rel="stylesheet" href="../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
 <body class="admin-body is-dashboard is-store-home">
-    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.00</div>
+    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.01</div>
     <div
         class="admin-app admin-store-home"
         data-store-home
@@ -331,7 +331,7 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
                                 <span class="admin-settings-section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10h16M5 10v10h14V10M3 6l2-3h14l2 3v2a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0z"/></svg></span>
                                 <div>
                                     <h4>Color-code order platforms</h4>
-                                    <p>Choose the colors used to identify each order source in the queue.</p>
+                                    <p>Choose the colors used to identify each order source. Colors follow this employee profile on every Store Ops station.</p>
                                 </div>
                             </div>
                             <div class="admin-source-color-list" data-source-color-list></div>
