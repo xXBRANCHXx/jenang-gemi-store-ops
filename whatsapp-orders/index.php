@@ -34,7 +34,7 @@ $walkInsJsVersion = (string) @filemtime(dirname(__DIR__) . '/walk-ins.js');
         'active' => 'whatsapp-orders',
         'title' => 'WhatsApp Orders',
         'eyebrow' => 'Store Ops',
-        'description' => 'WA invoice builder for direct WhatsApp, website, and partner customer requests.',
+        'description' => 'WA invoice builder for direct WhatsApp customer orders.',
         'indicator' => 'WA invoice',
         'app_attributes' => [
             'data-walk-ins' => true,
@@ -42,7 +42,7 @@ $walkInsJsVersion = (string) @filemtime(dirname(__DIR__) . '/walk-ins.js');
             'data-walk-ins-invoice-type' => 'whatsapp',
             'data-walk-ins-default-customer' => 'WhatsApp customer',
             'data-walk-ins-contact-kind' => 'address',
-            'data-walk-ins-requires-sale-type' => 'true',
+            'data-walk-ins-requires-shipping-cost' => 'true',
         ],
     ]);
     ?>
@@ -77,7 +77,7 @@ $walkInsJsVersion = (string) @filemtime(dirname(__DIR__) . '/walk-ins.js');
                                 <span class="admin-panel-kicker">Customer</span>
                                 <h3>Invoice details</h3>
                             </div>
-                            <span class="admin-panel-meta">Sale type is required</span>
+                            <span class="admin-panel-meta">Shipping cost is required</span>
                         </div>
                         <div class="admin-walkins-customer-grid admin-walkins-customer-grid-wa">
                             <label class="admin-walkins-input-shell">
@@ -93,13 +93,11 @@ $walkInsJsVersion = (string) @filemtime(dirname(__DIR__) . '/walk-ins.js');
                                 <input type="text" data-walkins-customer-email placeholder="Delivery address" autocomplete="street-address">
                             </label>
                             <label class="admin-walkins-input-shell">
-                                <span>Sale Type</span>
-                                <select data-walkins-sale-type required>
-                                    <option value="">Choose sale type</option>
-                                    <option value="Whatsapp">Whatsapp</option>
-                                    <option value="Website">Website</option>
-                                    <option value="Partner">Partner</option>
-                                </select>
+                                <span>Shipping Cost</span>
+                                <span class="admin-walkins-money-input">
+                                    <b aria-hidden="true">Rp</b>
+                                    <input type="text" inputmode="numeric" data-walkins-shipping-cost placeholder="0" autocomplete="off" required aria-label="Shipping cost in rupiah">
+                                </span>
                             </label>
                         </div>
                     </article>
@@ -160,6 +158,7 @@ $walkInsJsVersion = (string) @filemtime(dirname(__DIR__) . '/walk-ins.js');
                             <div><dt>Subtotal</dt><dd data-walkins-subtotal>Rp0</dd></div>
                             <div><dt>Discount</dt><dd data-walkins-discount>Rp0</dd></div>
                             <div><dt>Tax</dt><dd data-walkins-tax>Rp0</dd></div>
+                            <div><dt>Shipping</dt><dd data-walkins-shipping-total>Rp0</dd></div>
                             <div><dt>Items</dt><dd data-walkins-total-items>0</dd></div>
                         </dl>
                         <div class="admin-walkins-grand-total">

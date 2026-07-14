@@ -5873,6 +5873,28 @@ button.admin-store-sidebar-profile:hover {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--admin-accent-primary) 18%, transparent);
 }
 
+.admin-walkins-money-input {
+  position: relative;
+  display: block;
+}
+
+.admin-walkins-money-input b {
+  position: absolute;
+  z-index: 1;
+  left: 14px;
+  top: 50%;
+  color: var(--admin-muted);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.admin-walkins-money-input input {
+  padding-left: 38px;
+}
+
 .admin-walkins-input-shell:has(.admin-walkins-field-icon) {
   position: relative;
   display: block;
@@ -6688,6 +6710,28 @@ button.admin-store-sidebar-profile:hover {
   color: #000;
   font-family: 'Plus Jakarta Sans', Arial, sans-serif;
   font-weight: 950;
+}
+
+.admin-walkins-invoice-shipping-cost {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7mm;
+  margin-top: 6mm;
+  padding-right: 3mm;
+  color: #111827;
+  font-family: 'Plus Jakarta Sans', Arial, sans-serif;
+  font-size: 3.5mm;
+  font-weight: 850;
+}
+
+.admin-walkins-invoice-shipping-cost span,
+.admin-walkins-invoice-shipping-cost strong {
+  min-width: 36mm;
+  text-align: right;
+}
+
+.admin-walkins-invoice-shipping-cost + .admin-walkins-invoice-total {
+  margin-top: 2mm;
 }
 
 .admin-walkins-invoice-total div {

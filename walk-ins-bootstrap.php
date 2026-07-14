@@ -4,7 +4,6 @@ declare(strict_types=1);
 require_once __DIR__ . '/sku-db-bootstrap.php';
 
 const JG_STORE_OPS_WALKINS_INVOICE_TYPES = ['walk_in', 'whatsapp'];
-const JG_STORE_OPS_WALKINS_WHATSAPP_SALE_TYPES = ['Whatsapp', 'Website', 'Partner'];
 
 function jg_store_ops_walkins_now(): string
 {
@@ -58,6 +57,7 @@ function jg_store_ops_walkins_ensure_schema(PDO $pdo): void
     jg_store_ops_sku_ensure_column($pdo, 'store_ops_walkin_invoices', 'invoice_type', 'VARCHAR(24) NOT NULL DEFAULT "walk_in" AFTER invoice_number');
     jg_store_ops_sku_ensure_column($pdo, 'store_ops_walkin_invoices', 'sale_type', 'VARCHAR(24) NOT NULL DEFAULT "Walk In" AFTER invoice_type');
     jg_store_ops_sku_ensure_column($pdo, 'store_ops_walkin_invoices', 'customer_address', 'VARCHAR(255) NOT NULL DEFAULT "" AFTER customer_email');
+    jg_store_ops_sku_ensure_column($pdo, 'store_ops_walkin_invoices', 'shipping_cost', 'DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER tax');
     jg_store_ops_sku_ensure_column($pdo, 'store_ops_walkin_invoices', 'analytics_visible', 'TINYINT(1) NOT NULL DEFAULT 1 AFTER item_count');
     jg_store_ops_sku_ensure_column($pdo, 'store_ops_walkin_invoice_items', 'discount_rate', 'DECIMAL(6,2) NOT NULL DEFAULT 0.00 AFTER quantity');
     jg_store_ops_sku_ensure_column($pdo, 'store_ops_walkin_invoice_items', 'discount_total', 'DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER discount_rate');
@@ -95,18 +95,7 @@ function jg_store_ops_walkins_normalize_invoice_number(string $value): string
 
 function jg_store_ops_walkins_normalize_sale_type(string $invoiceType, mixed $value): string
 {
-    if ($invoiceType !== 'whatsapp') {
-        return 'Walk In';
-    }
-
-    $normalized = strtolower(trim((string) $value));
-    foreach (JG_STORE_OPS_WALKINS_WHATSAPP_SALE_TYPES as $saleType) {
-        if ($normalized === strtolower($saleType)) {
-            return $saleType;
-        }
-    }
-
-    throw new InvalidArgumentException('Choose a sale type before completing this WhatsApp order.');
+    return $invoiceType === 'whatsapp' ? 'Whatsapp' : 'Walk In';
 }
 
 function jg_store_ops_walkins_invoice_label(string $invoiceType, string $saleType): string
@@ -149,6 +138,24 @@ function jg_store_ops_walkins_money(mixed $value): string
     }
 
     return number_format(max(0, round((float) $value, 2)), 2, '.', '');
+}
+
+function jg_store_ops_walkins_shipping_cost(string $invoiceType, array $payload): string
+{
+    if ($invoiceType !== 'whatsapp') {
+        return '0.00';
+    }
+
+    if (!array_key_exists('shipping_cost', $payload) || $payload['shipping_cost'] === '' || $payload['shipping_cost'] === null) {
+        throw new InvalidArgumentException('Enter a shipping cost before completing this WhatsApp order. Use 0 when shipping is free.');
+    }
+
+    $value = $payload['shipping_cost'];
+    if (!is_numeric($value) || (float) $value < 0 || (float) $value > 999999999999.99) {
+        throw new InvalidArgumentException('Shipping cost must be a valid non-negative rupiah amount.');
+    }
+
+    return number_format(round((float) $value, 2), 2, '.', '');
 }
 
 function jg_store_ops_walkins_discount_rate(mixed $value): float
@@ -249,6 +256,7 @@ function jg_store_ops_walkins_invoice_row(array $row): array
         'subtotal' => number_format((float) ($row['subtotal'] ?? 0), 2, '.', ''),
         'discount_total' => number_format((float) ($row['discount_total'] ?? 0), 2, '.', ''),
         'tax' => number_format((float) ($row['tax'] ?? 0), 2, '.', ''),
+        'shipping_cost' => number_format((float) ($row['shipping_cost'] ?? 0), 2, '.', ''),
         'total' => number_format((float) ($row['total'] ?? 0), 2, '.', ''),
         'item_count' => (int) ($row['item_count'] ?? 0),
         'analytics_visible' => (int) ($row['analytics_visible'] ?? 1) === 1,
@@ -272,7 +280,7 @@ function jg_store_ops_walkins_recent(PDO $pdo, int $limit = 12, string $invoiceT
     $stmt = $pdo->prepare(
         sprintf(
             'SELECT invoice_number, invoice_type, sale_type, customer_name, customer_phone, customer_email,
-                customer_address, payment_method, subtotal, discount_total, tax, total, item_count,
+                customer_address, payment_method, subtotal, discount_total, tax, shipping_cost, total, item_count,
                 analytics_visible, created_by, created_at
              FROM store_ops_walkin_invoices
              %s
@@ -301,7 +309,7 @@ function jg_store_ops_walkins_records(PDO $pdo, int $limit = 500): array
     $limit = max(1, min(1000, $limit));
     $stmt = $pdo->query(
         'SELECT invoice_number, invoice_type, sale_type, customer_name, customer_phone, customer_email,
-            customer_address, payment_method, subtotal, discount_total, tax, total, item_count,
+            customer_address, payment_method, subtotal, discount_total, tax, shipping_cost, total, item_count,
             analytics_visible, created_by, created_at
          FROM store_ops_walkin_invoices
          ORDER BY created_at DESC, invoice_number DESC
@@ -324,7 +332,7 @@ function jg_store_ops_walkins_find_invoice(PDO $pdo, string $invoiceNumber): ?ar
 
     $invoiceStmt = $pdo->prepare(
         'SELECT invoice_number, invoice_type, sale_type, customer_name, customer_phone, customer_email,
-            customer_address, payment_method, subtotal, discount_total, tax, total, item_count,
+            customer_address, payment_method, subtotal, discount_total, tax, shipping_cost, total, item_count,
             analytics_visible, created_by, created_at
          FROM store_ops_walkin_invoices
          WHERE invoice_number = :invoice_number
@@ -396,7 +404,7 @@ function jg_store_ops_walkins_sales_summary(PDO $pdo): array
     jg_store_ops_walkins_ensure_schema($pdo);
     $stmt = $pdo->query(
         'SELECT invoice_number, invoice_type, sale_type, customer_name, customer_phone, customer_email,
-            customer_address, payment_method, subtotal, discount_total, tax, total, item_count,
+            customer_address, payment_method, subtotal, discount_total, tax, shipping_cost, total, item_count,
             analytics_visible, created_by, created_at
          FROM store_ops_walkin_invoices'
     );
@@ -441,6 +449,7 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
 
     $invoiceType = jg_store_ops_walkins_normalize_invoice_type($payload['invoice_type'] ?? $payload['order_type'] ?? 'walk_in');
     $saleType = jg_store_ops_walkins_normalize_sale_type($invoiceType, $payload['sale_type'] ?? '');
+    $shippingCost = jg_store_ops_walkins_shipping_cost($invoiceType, $payload);
     $invoiceNumber = jg_store_ops_walkins_normalize_invoice_number((string) ($payload['invoice_number'] ?? ''));
     if ($invoiceNumber === '') {
         $invoiceNumber = jg_store_ops_walkins_invoice_number($invoiceType);
@@ -567,15 +576,15 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
         }
 
         $tax = 0.0;
-        $total = round($subtotal - $discountTotal + $tax, 2);
+        $total = round($subtotal - $discountTotal + $tax + (float) $shippingCost, 2);
         $insertInvoice = $pdo->prepare(
             'INSERT INTO store_ops_walkin_invoices (
                 invoice_number, invoice_type, sale_type, customer_name, customer_phone, customer_email,
-                customer_address, payment_method, subtotal, discount_total, tax, total, item_count,
+                customer_address, payment_method, subtotal, discount_total, tax, shipping_cost, total, item_count,
                 analytics_visible, created_by, created_at
              ) VALUES (
                 :invoice_number, :invoice_type, :sale_type, :customer_name, :customer_phone, :customer_email,
-                :customer_address, :payment_method, :subtotal, :discount_total, :tax, :total, :item_count,
+                :customer_address, :payment_method, :subtotal, :discount_total, :tax, :shipping_cost, :total, :item_count,
                 1, :created_by, :created_at
              )'
         );
@@ -591,6 +600,7 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
             ':subtotal' => number_format($subtotal, 2, '.', ''),
             ':discount_total' => number_format($discountTotal, 2, '.', ''),
             ':tax' => number_format($tax, 2, '.', ''),
+            ':shipping_cost' => $shippingCost,
             ':total' => number_format($total, 2, '.', ''),
             ':item_count' => $itemCount,
             ':created_by' => $createdBy,
@@ -630,6 +640,7 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
                 'subtotal' => number_format($subtotal, 2, '.', ''),
                 'discount_total' => number_format($discountTotal, 2, '.', ''),
                 'tax' => number_format($tax, 2, '.', ''),
+                'shipping_cost' => $shippingCost,
                 'total' => number_format($total, 2, '.', ''),
                 'item_count' => $itemCount,
                 'analytics_visible' => true,

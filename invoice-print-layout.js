@@ -121,6 +121,12 @@
           </div>
         </section>
         ${isLastPage ? `
+          ${invoice.invoice_type === 'whatsapp' ? `
+            <section class="admin-walkins-invoice-shipping-cost">
+              <span>Shipping Cost</span>
+              <strong>${formatPrintTotal(invoice.shipping_cost)}</strong>
+            </section>
+          ` : ''}
           <section class="admin-walkins-invoice-total">
             <div>
               <strong>Amount Due</strong>
@@ -196,6 +202,7 @@
         customer_email: customer.email || '-',
         customer_address: customer.address || '-',
         created_at: timestamps.created_at || timestamps.ordered_at || '',
+        shipping_cost: revenue.shipping_cost || 0,
         total: revenue.total || revenue.gross || 0
       },
       items: items.map((item) => ({

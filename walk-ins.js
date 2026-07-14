@@ -11,12 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const defaultCustomerName = root.dataset.walkInsDefaultCustomer || (isWhatsappInvoice ? 'WhatsApp customer' : 'Walk-in customer');
   const contactKind = root.dataset.walkInsContactKind || (isWhatsappInvoice ? 'address' : 'email');
   const contactFallback = contactKind === 'address' ? 'No address' : 'No email';
-  const requiresSaleType = root.dataset.walkInsRequiresSaleType === 'true';
-  const saleTypePrintLabels = {
-    Whatsapp: 'Whatsapp',
-    Website: 'Whatsapp (from site)',
-    Partner: 'Whatsapp (from partner)'
-  };
+  const requiresShippingCost = root.dataset.walkInsRequiresShippingCost === 'true';
   const refs = {
     catalogStatus: document.querySelector('[data-walkins-catalog-status]'),
     invoiceNumber: document.querySelector('[data-walkins-invoice-number]'),
@@ -27,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     customerName: document.querySelector('[data-walkins-customer-name]'),
     customerPhone: document.querySelector('[data-walkins-customer-phone]'),
     customerEmail: document.querySelector('[data-walkins-customer-email]'),
-    saleType: document.querySelector('[data-walkins-sale-type]'),
+    shippingCost: document.querySelector('[data-walkins-shipping-cost]'),
     itemCount: document.querySelector('[data-walkins-item-count]'),
     cartList: document.querySelector('[data-walkins-cart-list]'),
     clearCart: document.querySelector('[data-walkins-clear-cart]'),
@@ -38,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     subtotal: document.querySelector('[data-walkins-subtotal]'),
     discount: document.querySelector('[data-walkins-discount]'),
     tax: document.querySelector('[data-walkins-tax]'),
+    shippingTotal: document.querySelector('[data-walkins-shipping-total]'),
     totalItems: document.querySelector('[data-walkins-total-items]'),
     total: document.querySelector('[data-walkins-total]'),
     complete: document.querySelector('[data-walkins-complete]'),
@@ -56,7 +52,6 @@ document.addEventListener('DOMContentLoaded', () => {
     invoiceNumber: '',
     cart: [],
     paymentMethod: 'Cash',
-    saleType: '',
     invoicePrinted: false,
     recent: [],
     busy: false,
@@ -93,6 +88,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const moneyValue = (value) => {
     const number = Number(value || 0);
     return Number.isFinite(number) ? number : 0;
+  };
+  const shippingCostValue = () => {
+    const rawValue = String(refs.shippingCost?.value || '').replace(/[^0-9]/g, '');
+    return rawValue === '' ? 0 : moneyValue(rawValue);
+  };
+  const shippingCostMissing = () => requiresShippingCost && String(refs.shippingCost?.value || '').trim() === '';
+  const formatShippingCostInput = () => {
+    if (!(refs.shippingCost instanceof HTMLInputElement)) return;
+    const digits = refs.shippingCost.value.replace(/[^0-9]/g, '');
+    refs.shippingCost.value = digits === '' ? '' : new Intl.NumberFormat('id-ID').format(Number(digits));
   };
   const discountRateForItem = (item) => Math.max(0, Math.min(100, moneyValue(item.discount_rate)));
   const lineGross = (item) => moneyValue(item.sale_price) * Number(item.qty || 0);
@@ -240,7 +245,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const discount = state.cart.reduce((sum, item) => sum + lineDiscount(item), 0);
     const tax = 0;
     const itemCount = state.cart.reduce((sum, item) => sum + Number(item.qty || 0), 0);
-    return { subtotal, discount, tax, total: subtotal - discount + tax, itemCount };
+    const shippingCost = isWhatsappInvoice ? shippingCostValue() : 0;
+    return { subtotal, discount, tax, shippingCost, total: subtotal - discount + tax + shippingCost, itemCount };
   };
 
   const renderInvoiceNumber = () => {
@@ -255,12 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (refs.summaryContact) refs.summaryContact.textContent = `${phone || 'No phone'} / ${contact || contactFallback}`;
   };
 
-  const selectedSaleType = () => String(refs.saleType?.value || state.saleType || '').trim();
-  const invoiceCustomerLabel = () => {
-    if (!isWhatsappInvoice) return 'Walk In';
-    return saleTypePrintLabels[selectedSaleType()] || 'Whatsapp';
-  };
-  const missingSaleType = () => requiresSaleType && !selectedSaleType();
+  const invoiceCustomerLabel = () => isWhatsappInvoice ? 'Whatsapp' : 'Walk In';
 
   const renderTotals = () => {
     const summary = totals();
@@ -268,20 +269,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (refs.subtotal) refs.subtotal.textContent = formatRupiah(summary.subtotal);
     if (refs.discount) refs.discount.textContent = formatRupiah(summary.discount);
     if (refs.tax) refs.tax.textContent = formatRupiah(summary.tax);
+    if (refs.shippingTotal) refs.shippingTotal.textContent = formatRupiah(summary.shippingCost);
     if (refs.totalItems) refs.totalItems.textContent = String(summary.itemCount);
     if (refs.total) refs.total.textContent = formatRupiah(summary.total);
     if (refs.complete instanceof HTMLButtonElement) {
       const needsPrintedInvoice = state.cart.length > 0 && !state.invoicePrinted;
-      const saleTypeMissing = missingSaleType();
-      refs.complete.disabled = state.busy || state.cart.length === 0 || needsPrintedInvoice || saleTypeMissing;
+      const shippingMissing = shippingCostMissing();
+      refs.complete.disabled = state.busy || state.cart.length === 0 || needsPrintedInvoice || shippingMissing;
       refs.complete.classList.toggle('is-locked', needsPrintedInvoice);
-      refs.complete.title = saleTypeMissing
-        ? 'Choose a sale type before completing this invoice.'
+      refs.complete.title = shippingMissing
+        ? 'Enter a shipping cost before completing this invoice.'
         : (needsPrintedInvoice ? 'Print this invoice before completing the sale.' : '');
     }
     if (refs.print instanceof HTMLButtonElement) {
-      refs.print.disabled = state.cart.length === 0 || missingSaleType();
-      refs.print.title = missingSaleType() ? 'Choose a sale type before printing this invoice.' : '';
+      refs.print.disabled = state.cart.length === 0 || shippingCostMissing();
+      refs.print.title = shippingCostMissing() ? 'Enter a shipping cost before printing this invoice.' : '';
     }
   };
 
@@ -587,12 +589,11 @@ document.addEventListener('DOMContentLoaded', () => {
     state.invoiceNumber = invoiceNumber || state.invoiceNumber;
     state.cart = [];
     state.paymentMethod = 'Cash';
-    state.saleType = '';
     state.invoicePrinted = false;
     if (refs.customerName instanceof HTMLInputElement) refs.customerName.value = '';
     if (refs.customerPhone instanceof HTMLInputElement) refs.customerPhone.value = '';
     if (refs.customerEmail instanceof HTMLInputElement) refs.customerEmail.value = '';
-    if (refs.saleType instanceof HTMLSelectElement) refs.saleType.value = '';
+    if (refs.shippingCost instanceof HTMLInputElement) refs.shippingCost.value = '';
     document.querySelectorAll('[data-walkins-payment]').forEach((button) => {
       button.classList.toggle('is-active', button.dataset.walkinsPayment === 'Cash');
     });
@@ -629,6 +630,7 @@ document.addEventListener('DOMContentLoaded', () => {
         customer_email: contactKind === 'email' ? customer.contact : '-',
         customer_address: contactKind === 'address' ? customer.contact : '-',
         created_at: new Date().toISOString(),
+        shipping_cost: summary.shippingCost,
         total: summary.total
       },
       items: state.cart.map((item) => ({
@@ -651,8 +653,8 @@ document.addEventListener('DOMContentLoaded', () => {
       setError('Add at least one product before printing the invoice.');
       return false;
     }
-    if (missingSaleType()) {
-      setError('Choose a sale type before printing this invoice.');
+    if (shippingCostMissing()) {
+      setError('Enter a shipping cost before printing this invoice. Use 0 when shipping is free.');
       return false;
     }
     if (!invoiceLayout) {
@@ -690,8 +692,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const completeSale = async () => {
     if (!state.cart.length || state.busy || !state.invoicePrinted) return;
-    if (missingSaleType()) {
-      setError('Choose a sale type before completing this invoice.');
+    if (shippingCostMissing()) {
+      setError('Enter a shipping cost before completing this invoice. Use 0 when shipping is free.');
       renderTotals();
       return;
     }
@@ -706,7 +708,7 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({
           action: 'complete_sale',
           invoice_type: invoiceType,
-          sale_type: selectedSaleType(),
+          shipping_cost: shippingCostValue(),
           invoice_number: state.invoiceNumber,
           customer: {
             full_name: refs.customerName?.value || '',
@@ -798,8 +800,8 @@ document.addEventListener('DOMContentLoaded', () => {
       renderTotals();
     });
   });
-  refs.saleType?.addEventListener('change', () => {
-    state.saleType = selectedSaleType();
+  refs.shippingCost?.addEventListener('input', () => {
+    formatShippingCostInput();
     invalidatePrintedInvoice();
     renderTotals();
   });

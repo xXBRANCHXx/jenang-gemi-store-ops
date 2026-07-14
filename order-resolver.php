@@ -285,10 +285,7 @@ function jg_store_ops_order_resolver_find_walkin(string $orderId): ?array
 
     try {
         $stmt = $pdo->prepare(
-            'SELECT invoice_number, invoice_type, sale_type, customer_name, customer_phone, customer_email,
-                customer_address, payment_method, subtotal, discount_total, tax, total, item_count,
-                created_by, created_at
-             FROM store_ops_walkin_invoices
+            'SELECT * FROM store_ops_walkin_invoices
              WHERE UPPER(invoice_number) = :order_id
              LIMIT 1'
         );
@@ -351,6 +348,7 @@ function jg_store_ops_order_resolver_find_walkin(string $orderId): ?array
             'subtotal' => jg_store_ops_order_resolver_money($invoice['subtotal'] ?? 0),
             'discount_total' => jg_store_ops_order_resolver_money($invoice['discount_total'] ?? 0),
             'tax' => jg_store_ops_order_resolver_money($invoice['tax'] ?? 0),
+            'shipping_cost' => jg_store_ops_order_resolver_money($invoice['shipping_cost'] ?? 0),
             'gross' => jg_store_ops_order_resolver_money($invoice['total'] ?? 0),
             'net' => jg_store_ops_order_resolver_money($invoice['total'] ?? 0),
             'fees' => 0.0,

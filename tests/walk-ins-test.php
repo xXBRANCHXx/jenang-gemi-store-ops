@@ -24,10 +24,23 @@ walkins_expect(true, jg_store_ops_walkins_analytics_included(['invoice_type' => 
 walkins_expect(true, jg_store_ops_walkins_analytics_included(['invoice_type' => 'whatsapp', 'sale_type' => 'Whatsapp', 'analytics_visible' => 1]), 'Direct WhatsApp invoices should count.');
 walkins_expect(false, jg_store_ops_walkins_analytics_included(['invoice_type' => 'whatsapp', 'sale_type' => 'Website', 'analytics_visible' => 1]), 'Website WhatsApp invoices should not double count.');
 walkins_expect(false, jg_store_ops_walkins_analytics_included(['invoice_type' => 'walk_in', 'sale_type' => 'Walk In', 'analytics_visible' => 0]), 'Hidden invoices should not count.');
+walkins_expect('Whatsapp', jg_store_ops_walkins_normalize_sale_type('whatsapp', ''), 'WhatsApp sales should no longer require a sale type.');
+walkins_expect('Whatsapp', jg_store_ops_walkins_normalize_sale_type('whatsapp', 'Partner'), 'WhatsApp sales should always be direct WhatsApp sales.');
+walkins_expect('0.00', jg_store_ops_walkins_shipping_cost('whatsapp', ['shipping_cost' => 0]), 'Zero shipping must be accepted.');
+walkins_expect('25000.00', jg_store_ops_walkins_shipping_cost('whatsapp', ['shipping_cost' => 25000]), 'Shipping cost should normalize as money.');
+walkins_expect('0.00', jg_store_ops_walkins_shipping_cost('walk_in', []), 'Walk-in sales should not require shipping cost.');
 
 try {
-    jg_store_ops_walkins_normalize_sale_type('whatsapp', '');
-    fwrite(STDERR, 'Empty WhatsApp sale type should fail.' . PHP_EOL);
+    jg_store_ops_walkins_shipping_cost('whatsapp', []);
+    fwrite(STDERR, 'Missing WhatsApp shipping cost should fail.' . PHP_EOL);
+    exit(1);
+} catch (InvalidArgumentException) {
+    // Expected.
+}
+
+try {
+    jg_store_ops_walkins_shipping_cost('whatsapp', ['shipping_cost' => -1]);
+    fwrite(STDERR, 'Negative WhatsApp shipping cost should fail.' . PHP_EOL);
     exit(1);
 } catch (InvalidArgumentException) {
     // Expected.
