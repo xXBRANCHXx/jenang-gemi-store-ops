@@ -159,7 +159,26 @@ function jg_store_ops_partner_orders_partner_registry_url(): string
 
 function jg_store_ops_partner_orders_feed_token(): string
 {
-    return jg_store_ops_partner_orders_config('JG_STORE_OPS_ORDERS_TOKEN', 'store_ops_orders_token');
+    $configured = jg_store_ops_partner_orders_config('JG_STORE_OPS_ORDERS_TOKEN', 'store_ops_orders_token');
+    if ($configured !== '') {
+        return $configured;
+    }
+
+    $database = jg_store_ops_partner_orders_db_config();
+    return jg_store_ops_partner_orders_derive_token(
+        (string) ($database['name'] ?? ''),
+        (string) ($database['pass'] ?? '')
+    );
+}
+
+function jg_store_ops_partner_orders_derive_token(string $databaseName, string $databasePassword): string
+{
+    $databaseName = trim($databaseName);
+    if ($databaseName === '' || $databasePassword === '') {
+        return '';
+    }
+
+    return hash_hmac('sha256', "jenang-gemi/store-ops/orders/v1\n" . $databaseName, $databasePassword);
 }
 
 function jg_store_ops_partner_orders_fetch_json(string $url, array $headers = []): ?array

@@ -23,4 +23,7 @@ return [
     'partner_db_user' => '',
     'partner_db_password' => '',
     'partner_db_charset' => 'utf8mb4',
+    // Preferred explicit secret. When blank, direct Partner DB deployments derive a scoped token from the shared DB credential.
+    'store_ops_orders_token' => '',
+    'partner_portal_base_url' => 'https://partner.jenanggemi.com',
 ];

@@ -36,6 +36,14 @@ $testExpires = 1784188800;
 partner_order_lifecycle_expect(
     true,
     hash_equals(
+        hash_hmac('sha256', "jenang-gemi/store-ops/orders/v1\ntest_partner_db", 'test-db-password'),
+        jg_store_ops_partner_orders_derive_token('test_partner_db', 'test-db-password')
+    ),
+    'Store Ops should derive the same scoped token from its shared Partner database credential.'
+);
+partner_order_lifecycle_expect(
+    true,
+    hash_equals(
         hash_hmac('sha256', "PO123\n{$testExpires}", $testToken),
         jg_store_ops_partner_orders_sign_label_download('PO123', $testExpires, $testToken)
     ),
