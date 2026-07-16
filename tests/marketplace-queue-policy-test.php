@@ -21,5 +21,11 @@ marketplace_queue_expect(false, jg_store_ops_marketplace_requires_label_backed(t
 marketplace_queue_expect(true, jg_store_ops_marketplace_requires_label_backed(true, true, ['automatic_shipment_enabled' => false], false, false), 'Stale pre-cutover metadata must fail closed after activation.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_requires_label_backed(true, true, ['hard_set' => ['enabled' => true]], true, null), 'A legacy active projection without frozen sources must fail closed.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_requires_label_backed(false, false, ['automatic_shipment_enabled' => false]), 'Unknown local state must fail closed.');
+marketplace_queue_expect(false, jg_store_ops_marketplace_feed_enabled(true, false), 'Big Set OFF must hide every marketplace feed.');
+marketplace_queue_expect(false, jg_store_ops_marketplace_feed_enabled(false, false), 'Unknown Big Set state must hide every marketplace feed.');
+marketplace_queue_expect(true, jg_store_ops_marketplace_feed_enabled(true, true), 'Marketplace feeds may load only after Big Set activation.');
+marketplace_queue_expect(false, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee'], false), 'Big Set OFF must reject Shopee actions.');
+marketplace_queue_expect(false, jg_store_ops_marketplace_action_enabled(['source_platform' => 'tiktok'], false), 'Big Set OFF must reject TikTok actions.');
+marketplace_queue_expect(true, jg_store_ops_marketplace_action_enabled(['source_platform' => 'partner'], false), 'Big Set OFF must not block unrelated partner work.');
 
 echo "marketplace-queue-policy-test: ok\n";

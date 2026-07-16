@@ -31,6 +31,17 @@ function jg_store_ops_marketplace_order_visible(array $order, string $sourcePlat
     return $labelBacked || !jg_store_ops_marketplace_awaiting_collection($order, $sourcePlatform);
 }
 
+function jg_store_ops_marketplace_feed_enabled(bool $localHardSetKnown, bool $localHardSetEnabled): bool
+{
+    return $localHardSetKnown && $localHardSetEnabled;
+}
+
+function jg_store_ops_marketplace_action_enabled(array $key, bool $localHardSetEnabled): bool
+{
+    $platform = strtolower(trim((string) ($key['source_platform'] ?? '')));
+    return !in_array($platform, ['shopee', 'tiktok'], true) || $localHardSetEnabled;
+}
+
 function jg_store_ops_marketplace_requires_label_backed(
     bool $localHardSetKnown,
     bool $localHardSetEnabled,

@@ -41,6 +41,15 @@ function jg_store_ops_orders_normalize_account(string $value): string
     return trim(strtolower((string) preg_replace('/[^a-z0-9._-]+/i', '-', $value)), '.-_');
 }
 
+function jg_store_ops_orders_marketplace_big_set_enabled(PDO $pdo): bool
+{
+    try {
+        return !empty(jg_store_ops_website_state($pdo)['enabled']);
+    } catch (Throwable) {
+        return false;
+    }
+}
+
 /**
  * @return array<int, string>
  */
@@ -891,6 +900,12 @@ if ($method === 'POST') {
         $pdo = jg_store_ops_fulfillment_db();
         $key = jg_store_ops_fulfillment_key_from_payload($payload);
         jg_store_ops_fulfillment_validate_key($key);
+        if (!jg_store_ops_marketplace_action_enabled(
+            $key,
+            jg_store_ops_orders_marketplace_big_set_enabled($pdo)
+        )) {
+            throw new RuntimeException('Big Set is OFF. Marketplace orders cannot be processed in Store Ops.');
+        }
         $employeeId = jg_store_ops_orders_current_employee_id();
         $employeeName = jg_store_ops_orders_current_employee_name();
 
@@ -967,7 +982,9 @@ if ($method === 'POST') {
         }
     } catch (RuntimeException $exception) {
         $message = $exception->getMessage();
-        $status = str_contains(strtolower($message), 'claimed') || str_contains(strtolower($message), 'another employee') ? 409 : 422;
+        $status = (str_contains(strtolower($message), 'claimed')
+            || str_contains(strtolower($message), 'another employee')
+            || str_contains(strtolower($message), 'big set')) ? 409 : 422;
         jg_store_ops_orders_fail($message, $status);
     } catch (Throwable $error) {
         error_log('Store Ops order action failed: ' . $error->getMessage());
@@ -1041,6 +1058,9 @@ if (isset($_GET['shipping_label'])) {
     }
     $account = (string) $selectedSource['account'];
     $platform = (string) $selectedSource['platform'];
+    if (!jg_store_ops_orders_marketplace_big_set_enabled(jg_store_ops_fulfillment_db())) {
+        jg_store_ops_orders_fail('Big Set is OFF. Marketplace labels are unavailable.', 409);
+    }
     $setupToken = jg_store_ops_marketplace_setup_token($platform);
     if ($setupToken === '') {
         jg_store_ops_orders_fail('Marketplace setup token is not configured for ' . $platform . '.', 500);
@@ -1086,7 +1106,15 @@ try {
     $errors[] = 'Local Hard Set state unavailable: ' . $hardSetStateError->getMessage();
 }
 
-foreach ($sources as $source) {
+$marketplaceFeedEnabled = jg_store_ops_marketplace_feed_enabled($localHardSetKnown, $localHardSetEnabled);
+$marketplaceSources = $marketplaceFeedEnabled ? $sources : [];
+if (!$marketplaceFeedEnabled) {
+    $decoded['meta']['marketplace_blocked_reason'] = $localHardSetKnown
+        ? 'big_set_off'
+        : 'big_set_state_unavailable';
+}
+
+foreach ($marketplaceSources as $source) {
     $platform = $source['platform'];
     $account = $source['account'];
     $setupToken = jg_store_ops_marketplace_setup_token($platform);
@@ -1175,6 +1203,7 @@ $decoded['meta']['website_orders'] = [
 ];
 $decoded['meta']['errors'] = $errors;
 $decoded['meta']['processed_collection_count'] = $processedCollectionOrders;
+$decoded['meta']['marketplace_enabled'] = $marketplaceFeedEnabled;
 $decoded['meta']['count'] = count($decoded['orders']);
 $decoded['meta']['current_employee'] = [
     'id' => jg_store_ops_orders_current_employee_id(),
