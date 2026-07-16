@@ -128,7 +128,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let ordersRefreshPromise = null;
   let lastOrdersRefreshAt = 0;
   let ordersEtag = '';
-  let emptyOrdersRefreshCount = 0;
   let skuCatalogRefreshPromise = null;
   let boardResizeTimer = 0;
   let clientCacheDbPromise = null;
@@ -1252,12 +1251,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (degradedRefresh) {
         throw new Error('Order refresh was incomplete; keeping the current board.');
       }
-      emptyOrdersRefreshCount += 1;
-      if (emptyOrdersRefreshCount < 2) {
-        throw new Error('Order refresh returned empty once; waiting for confirmation.');
-      }
-    } else {
-      emptyOrdersRefreshCount = 0;
     }
 
     return nextOrders;
@@ -2122,16 +2115,44 @@ document.addEventListener('DOMContentLoaded', () => {
     openFulfillment(button.dataset.startOrder || '');
   });
 
-  document.querySelector('[data-next-scan]')?.addEventListener('click', () => {
+  document.querySelector('[data-next-scan]')?.addEventListener('click', async (event) => {
     const order = activeOrder();
     if (!order) return;
-    saveOrders();
-    try {
-      window.sessionStorage.setItem(activeOrderStorageKey, order.id);
-    } catch (_error) {
-      // Query string still carries the order id.
+    const button = event.currentTarget instanceof HTMLButtonElement ? event.currentTarget : null;
+    const originalLabel = button?.textContent || 'Lanjut';
+    const scanPage = window.open('', '_blank');
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Memproses…';
     }
-    openStorePage(`./scan/?order=${encodeURIComponent(order.id)}`);
+
+    try {
+      await postOrderAction('begin_fulfillment', order);
+      saveOrders();
+      try {
+        window.sessionStorage.setItem(activeOrderStorageKey, order.id);
+      } catch (_error) {
+        // Query string still carries the order id.
+      }
+      const scanUrl = `./scan/?order=${encodeURIComponent(order.id)}`;
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalLabel;
+      }
+      if (scanPage && !scanPage.closed) {
+        scanPage.location.href = scanUrl;
+      } else {
+        window.location.href = scanUrl;
+      }
+    } catch (error) {
+      if (scanPage && !scanPage.closed) scanPage.close();
+      showBoardAlert(error instanceof Error ? error.message : 'Unable to start this order.');
+      refreshOrders(false, { force: true }).catch(() => {});
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalLabel;
+      }
+    }
   });
 
   document.querySelectorAll('[data-close-fulfillment-modal]').forEach((button) => {

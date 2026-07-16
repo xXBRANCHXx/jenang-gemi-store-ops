@@ -627,15 +627,23 @@ function jg_store_ops_orders_partner_set_status_direct(string $orderId, string $
         return false;
     }
 
+    $currentStmt = $pdo->prepare('SELECT status FROM partner_orders WHERE id = :id LIMIT 1');
+    $currentStmt->execute([':id' => $orderId]);
+    $currentStatus = $currentStmt->fetchColumn();
+    if ($currentStatus === false || !jg_store_ops_partner_orders_status_can_transition((string) $currentStatus, $status)) {
+        return false;
+    }
+
     $stmt = $pdo->prepare(
         'UPDATE partner_orders
          SET status = :status, updated_at = :updated_at
-         WHERE id = :id'
+         WHERE id = :id AND status = :current_status'
     );
     $stmt->execute([
         ':status' => $status,
         ':updated_at' => gmdate('Y-m-d H:i:s'),
         ':id' => $orderId,
+        ':current_status' => (string) $currentStatus,
     ]);
 
     if ($stmt->rowCount() > 0) {
@@ -892,7 +900,7 @@ if ($method === 'POST') {
         exit;
     }
 
-    $validActions = ['claim_order', 'release_order', 'record_scan', 'complete_scan', 'label_printed', 'fulfill_order', 'reprint_label'];
+    $validActions = ['claim_order', 'begin_fulfillment', 'release_order', 'record_scan', 'complete_scan', 'label_printed', 'fulfill_order', 'reprint_label'];
     if (!in_array($action, $validActions, true)) {
         jg_store_ops_orders_fail('Unknown action.', 400);
     }
@@ -912,6 +920,15 @@ if ($method === 'POST') {
 
         if ($action === 'claim_order') {
             $row = jg_store_ops_fulfillment_claim($pdo, $key, $employeeId, $employeeName);
+            jg_store_ops_orders_fulfillment_response($pdo, $row);
+        }
+
+        if ($action === 'begin_fulfillment') {
+            $row = jg_store_ops_fulfillment_claim($pdo, $key, $employeeId, $employeeName);
+            if ($key['source_platform'] === 'partner'
+                && !jg_store_ops_orders_partner_update_status($key['order_id'], 'IS_BEING_FULFILLED')) {
+                throw new RuntimeException('Unable to start this Partner order. It may have been cancelled; refresh the board and try again.');
+            }
             jg_store_ops_orders_fulfillment_response($pdo, $row);
         }
 

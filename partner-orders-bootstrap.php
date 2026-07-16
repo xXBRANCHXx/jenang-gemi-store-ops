@@ -411,6 +411,33 @@ function jg_store_ops_partner_orders_status_is_visible(string $status): bool
     return in_array($normalized, ['', 'DRAFT', 'READY', 'SUBMITTED', 'LISTED', 'IS_LISTED'], true);
 }
 
+function jg_store_ops_partner_orders_normalize_status(string $status): string
+{
+    $normalized = strtoupper(trim($status));
+    return match ($normalized) {
+        '', 'DRAFT', 'READY', 'SUBMITTED', 'LISTED' => 'IS_LISTED',
+        'PROCESSING' => 'IS_BEING_FULFILLED',
+        'COMPLETED', 'SHIPPED' => 'FULFILLED',
+        'CANCELED' => 'CANCELLED',
+        default => $normalized,
+    };
+}
+
+function jg_store_ops_partner_orders_status_can_transition(string $currentStatus, string $nextStatus): bool
+{
+    $current = jg_store_ops_partner_orders_normalize_status($currentStatus);
+    $next = jg_store_ops_partner_orders_normalize_status($nextStatus);
+    if ($current === $next) {
+        return true;
+    }
+
+    return match ($current) {
+        'IS_LISTED' => in_array($next, ['IS_BEING_FULFILLED', 'FULFILLED'], true),
+        'IS_BEING_FULFILLED' => $next === 'FULFILLED',
+        default => false,
+    };
+}
+
 function jg_store_ops_partner_orders_has_labels(array $order): bool
 {
     foreach ((array) ($order['labels'] ?? []) as $label) {
@@ -454,15 +481,23 @@ function jg_store_ops_partner_orders_update_status(string $displayId, string $st
         return false;
     }
 
+    $currentStmt = $pdo->prepare('SELECT status FROM partner_orders WHERE id = :id LIMIT 1');
+    $currentStmt->execute([':id' => $originalId]);
+    $currentStatus = $currentStmt->fetchColumn();
+    if ($currentStatus === false || !jg_store_ops_partner_orders_status_can_transition((string) $currentStatus, $normalizedStatus)) {
+        return false;
+    }
+
     $stmt = $pdo->prepare(
         'UPDATE partner_orders
          SET status = :status, updated_at = :updated_at
-         WHERE id = :id'
+         WHERE id = :id AND status = :current_status'
     );
     $stmt->execute([
         ':status' => $normalizedStatus,
         ':updated_at' => gmdate('Y-m-d H:i:s'),
         ':id' => $originalId,
+        ':current_status' => (string) $currentStatus,
     ]);
 
     if ($stmt->rowCount() > 0) {
