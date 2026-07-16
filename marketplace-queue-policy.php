@@ -22,8 +22,51 @@ function jg_store_ops_marketplace_awaiting_collection(array $order, string $sour
     return false;
 }
 
-function jg_store_ops_marketplace_order_visible(array $order, string $sourcePlatform, bool $requireLabelBacked): bool
+function jg_store_ops_marketplace_status(array $order): string
 {
+    // API-normalized rows use status=IMPORTED for Store Ops workflow state.
+    // Always prefer the marketplace's own status field.
+    foreach (['marketplaceStatus', 'marketplace_status', 'orderStatus', 'order_status', 'status'] as $key) {
+        $value = $order[$key] ?? null;
+        if (!is_scalar($value)) {
+            continue;
+        }
+        $status = strtoupper(trim((string) $value));
+        if ($status !== '') {
+            return $status;
+        }
+    }
+    return '';
+}
+
+function jg_store_ops_marketplace_pre_activation_visible(array $order, string $sourcePlatform): bool
+{
+    if (jg_store_ops_marketplace_label_backed($order)) {
+        return false;
+    }
+
+    $platform = strtolower(trim((string) ($order['platform'] ?? $order['source_platform'] ?? $sourcePlatform)));
+    $source = strtolower(trim($sourcePlatform));
+    $status = jg_store_ops_marketplace_status($order);
+    if ($source === 'shopee' || str_contains($platform, 'shopee')) {
+        return $status === 'READY_TO_SHIP';
+    }
+    if ($source === 'tiktok' || str_contains($platform, 'tiktok')) {
+        return in_array($status, ['AWAITING_SHIPMENT', 'SHIPMENT_PENDING'], true);
+    }
+    return false;
+}
+
+function jg_store_ops_marketplace_order_visible(
+    array $order,
+    string $sourcePlatform,
+    bool $requireLabelBacked,
+    bool $preActivationOnly = false
+): bool
+{
+    if ($preActivationOnly) {
+        return jg_store_ops_marketplace_pre_activation_visible($order, $sourcePlatform);
+    }
     $labelBacked = jg_store_ops_marketplace_label_backed($order);
     if ($requireLabelBacked && !$labelBacked) {
         return false;
@@ -33,7 +76,8 @@ function jg_store_ops_marketplace_order_visible(array $order, string $sourcePlat
 
 function jg_store_ops_marketplace_feed_enabled(bool $localHardSetKnown, bool $localHardSetEnabled): bool
 {
-    return $localHardSetKnown && $localHardSetEnabled;
+    // OFF still has a read-only pre-arrangement queue. Unknown state fails closed.
+    return $localHardSetKnown;
 }
 
 function jg_store_ops_marketplace_action_enabled(array $key, bool $localHardSetEnabled): bool

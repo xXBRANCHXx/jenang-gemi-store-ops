@@ -323,7 +323,8 @@ function jg_store_ops_orders_filter_marketplace_queue(
     array $orders,
     string $sourcePlatform,
     int &$processedCollectionCount = 0,
-    bool $requireLabelBacked = false
+    bool $requireLabelBacked = false,
+    bool $preActivationOnly = false
 ): array
 {
     $filtered = [];
@@ -331,7 +332,7 @@ function jg_store_ops_orders_filter_marketplace_queue(
         if (!is_array($order)) {
             continue;
         }
-        if (!jg_store_ops_marketplace_order_visible($order, $sourcePlatform, $requireLabelBacked)) {
+        if (!jg_store_ops_marketplace_order_visible($order, $sourcePlatform, $requireLabelBacked, $preActivationOnly)) {
             if (jg_store_ops_marketplace_awaiting_collection($order, $sourcePlatform)) {
                 $processedCollectionCount++;
             }
@@ -1109,9 +1110,7 @@ try {
 $marketplaceFeedEnabled = jg_store_ops_marketplace_feed_enabled($localHardSetKnown, $localHardSetEnabled);
 $marketplaceSources = $marketplaceFeedEnabled ? $sources : [];
 if (!$marketplaceFeedEnabled) {
-    $decoded['meta']['marketplace_blocked_reason'] = $localHardSetKnown
-        ? 'big_set_off'
-        : 'big_set_state_unavailable';
+    $decoded['meta']['marketplace_blocked_reason'] = 'big_set_state_unavailable';
 }
 
 foreach ($marketplaceSources as $source) {
@@ -1161,7 +1160,8 @@ foreach ($marketplaceSources as $source) {
         $accountOrders,
         $platform,
         $accountProcessedCollectionOrders,
-        $requireLabelBacked
+        $requireLabelBacked,
+        !$localHardSetEnabled
     );
     $processedCollectionOrders += $accountProcessedCollectionOrders;
     $successfulAccounts++;
@@ -1204,6 +1204,10 @@ $decoded['meta']['website_orders'] = [
 $decoded['meta']['errors'] = $errors;
 $decoded['meta']['processed_collection_count'] = $processedCollectionOrders;
 $decoded['meta']['marketplace_enabled'] = $marketplaceFeedEnabled;
+$decoded['meta']['marketplace_feed_mode'] = !$localHardSetKnown
+    ? 'blocked'
+    : ($localHardSetEnabled ? 'active' : 'pre_activation_statuses');
+$decoded['meta']['big_set_enabled'] = $localHardSetEnabled;
 $decoded['meta']['count'] = count($decoded['orders']);
 $decoded['meta']['current_employee'] = [
     'id' => jg_store_ops_orders_current_employee_id(),
