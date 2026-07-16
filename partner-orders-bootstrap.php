@@ -761,6 +761,19 @@ function jg_store_ops_partner_orders_original_id(string $displayId): string
     return $trimmed;
 }
 
+function jg_store_ops_partner_orders_label_with_order_id(array $label, array $order, string $displayId): array
+{
+    if (trim((string) ($label['order_id'] ?? '')) !== '') {
+        return $label;
+    }
+
+    $sourceOrderId = trim((string) ($order['sourceOrderId'] ?? $order['source_order_id'] ?? ''));
+    $label['order_id'] = $sourceOrderId !== ''
+        ? jg_store_ops_partner_orders_original_id($sourceOrderId)
+        : jg_store_ops_partner_orders_original_id($displayId);
+    return $label;
+}
+
 function jg_store_ops_partner_orders_find_label(string $displayId): ?array
 {
     $feed = jg_store_ops_partner_orders_fetch_feed();
@@ -771,7 +784,7 @@ function jg_store_ops_partner_orders_find_label(string $displayId): ?array
             }
 
             $label = (array) (($order['labels'] ?? [])[0] ?? []);
-            return $label !== [] ? $label : null;
+            return $label !== [] ? jg_store_ops_partner_orders_label_with_order_id($label, $order, $displayId) : null;
         }
     }
 

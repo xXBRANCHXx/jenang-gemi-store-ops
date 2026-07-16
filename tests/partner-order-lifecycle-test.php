@@ -45,6 +45,13 @@ putenv('JG_STORE_OPS_ORDERS_TOKEN=' . $testToken);
 $fallbackUrl = jg_store_ops_partner_orders_label_url(['order_id' => 'PO123', 'path' => 'shipping-labels/private.pdf']);
 partner_order_lifecycle_expect(true, str_starts_with($fallbackUrl, 'https://partner.jenanggemi.com/api/store-label/?'), 'Private labels must use the signed Partner endpoint.');
 partner_order_lifecycle_expect(false, str_contains($fallbackUrl, '/shipping-labels/private.pdf'), 'Private storage paths must never be exposed as public URLs.');
+$legacyFeedLabel = jg_store_ops_partner_orders_label_with_order_id(
+    ['path' => 'shipping-labels/private.pdf'],
+    ['id' => 'PARTNER-PO456', 'sourceOrderId' => 'PO456'],
+    'PARTNER-PO456'
+);
+partner_order_lifecycle_expect(true, ($legacyFeedLabel['order_id'] ?? '') === 'PO456', 'Legacy feed labels should inherit their source order ID.');
+partner_order_lifecycle_expect(true, str_starts_with(jg_store_ops_partner_orders_label_url($legacyFeedLabel), 'https://partner.jenanggemi.com/api/store-label/?'), 'Legacy feed labels should resolve through the signed private endpoint.');
 putenv('JG_STORE_OPS_ORDERS_TOKEN');
 
 echo "partner-order-lifecycle-test: ok\n";
