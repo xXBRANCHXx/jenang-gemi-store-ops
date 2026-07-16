@@ -783,10 +783,12 @@ function jg_store_ops_partner_orders_find_label(string $displayId): ?array
     $originalId = jg_store_ops_partner_orders_original_id($displayId);
     try {
         $stmt = $pdo->prepare(
-            'SELECT l.original_name, l.relative_path, l.mime_type, l.size_bytes, l.created_at
+            'SELECT o.id AS order_id, l.original_name, l.relative_path, l.mime_type, l.size_bytes, l.created_at
              FROM partner_order_labels l
              INNER JOIN partner_orders o ON o.id = l.order_id
-             WHERE o.id = :id OR UPPER(o.id) = :upper_id OR UPPER(CONCAT("PARTNER-", o.id)) = :upper_display_id
+             WHERE (o.id = :id OR UPPER(o.id) = :upper_id OR UPPER(CONCAT("PARTNER-", o.id)) = :upper_display_id)
+               AND l.deleted_at IS NULL
+               AND (l.expires_at IS NULL OR l.expires_at > UTC_TIMESTAMP())
              ORDER BY l.created_at DESC, l.id DESC
              LIMIT 1'
         );
@@ -804,12 +806,35 @@ function jg_store_ops_partner_orders_find_label(string $displayId): ?array
     }
 
     return [
+        'order_id' => (string) ($row['order_id'] ?? $originalId),
         'name' => (string) ($row['original_name'] ?? 'Partner shipping label'),
         'path' => (string) ($row['relative_path'] ?? ''),
         'mime_type' => (string) ($row['mime_type'] ?? ''),
         'size_bytes' => (int) ($row['size_bytes'] ?? 0),
         'created_at' => (string) ($row['created_at'] ?? ''),
     ];
+}
+
+function jg_store_ops_partner_orders_sign_label_download(string $orderId, int $expires, string $token): string
+{
+    return hash_hmac('sha256', trim($orderId) . "\n" . $expires, $token);
+}
+
+function jg_store_ops_partner_orders_signed_label_url(string $orderId): string
+{
+    $orderId = jg_store_ops_partner_orders_original_id($orderId);
+    $token = jg_store_ops_partner_orders_feed_token();
+    if ($orderId === '' || $token === '') {
+        return '';
+    }
+
+    $expires = time() + 300;
+    $baseUrl = rtrim(jg_store_ops_partner_orders_config('JG_PARTNER_PORTAL_BASE_URL', 'partner_portal_base_url', 'https://partner.jenanggemi.com'), '/');
+    return $baseUrl . '/api/store-label/?' . http_build_query([
+        'order_id' => $orderId,
+        'expires' => $expires,
+        'signature' => jg_store_ops_partner_orders_sign_label_download($orderId, $expires, $token),
+    ]);
 }
 
 function jg_store_ops_partner_orders_label_url(array $label): string
@@ -819,11 +844,10 @@ function jg_store_ops_partner_orders_label_url(array $label): string
         return $url;
     }
 
-    $path = ltrim((string) ($label['path'] ?? ''), '/');
-    if ($path === '') {
-        return '';
+    $orderId = trim((string) ($label['order_id'] ?? ''));
+    if ($orderId !== '') {
+        return jg_store_ops_partner_orders_signed_label_url($orderId);
     }
 
-    $baseUrl = rtrim(jg_store_ops_partner_orders_config('JG_PARTNER_PORTAL_BASE_URL', 'partner_portal_base_url', 'https://partner.jenanggemi.com'), '/');
-    return $baseUrl . '/' . $path;
+    return '';
 }

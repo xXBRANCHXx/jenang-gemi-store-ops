@@ -31,4 +31,20 @@ partner_order_lifecycle_expect(
     'Store Ops should proxy the signed Partner PDF URL.'
 );
 
+$testToken = 'store-ops-label-test';
+$testExpires = 1784188800;
+partner_order_lifecycle_expect(
+    true,
+    hash_equals(
+        hash_hmac('sha256', "PO123\n{$testExpires}", $testToken),
+        jg_store_ops_partner_orders_sign_label_download('PO123', $testExpires, $testToken)
+    ),
+    'The direct-database fallback should sign the same private Partner label route as the Partner feed.'
+);
+putenv('JG_STORE_OPS_ORDERS_TOKEN=' . $testToken);
+$fallbackUrl = jg_store_ops_partner_orders_label_url(['order_id' => 'PO123', 'path' => 'shipping-labels/private.pdf']);
+partner_order_lifecycle_expect(true, str_starts_with($fallbackUrl, 'https://partner.jenanggemi.com/api/store-label/?'), 'Private labels must use the signed Partner endpoint.');
+partner_order_lifecycle_expect(false, str_contains($fallbackUrl, '/shipping-labels/private.pdf'), 'Private storage paths must never be exposed as public URLs.');
+putenv('JG_STORE_OPS_ORDERS_TOKEN');
+
 echo "partner-order-lifecycle-test: ok\n";
