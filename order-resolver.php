@@ -506,7 +506,14 @@ function jg_store_ops_order_resolver_fetch_json(string $url, array $headers = []
 function jg_store_ops_order_resolver_marketplace_request(string $path, array $query): ?array
 {
     $baseUrl = rtrim(jg_store_ops_order_resolver_config('JG_SHOPEE_INGEST_BASE_URL', 'shopee_ingest_base_url', 'https://api.jenanggemi.com'), '/');
-    $setupToken = jg_store_ops_order_resolver_config('JG_SHOPEE_INGEST_SETUP_TOKEN', 'shopee_ingest_setup_token');
+    $platform = str_starts_with($path, '/tiktok/') ? 'tiktok' : 'shopee';
+    $setupToken = $platform === 'tiktok'
+        ? jg_store_ops_order_resolver_config(
+            'JG_TIKTOK_INGEST_SETUP_TOKEN',
+            'tiktok_ingest_setup_token',
+            jg_store_ops_order_resolver_config('JG_SHOPEE_INGEST_SETUP_TOKEN', 'shopee_ingest_setup_token')
+        )
+        : jg_store_ops_order_resolver_config('JG_SHOPEE_INGEST_SETUP_TOKEN', 'shopee_ingest_setup_token');
     if ($baseUrl === '' || $setupToken === '') {
         return null;
     }

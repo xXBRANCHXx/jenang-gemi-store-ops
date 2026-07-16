@@ -7,6 +7,7 @@ require_once dirname(__DIR__, 2) . '/sku-db-bootstrap.php';
 require_once dirname(__DIR__, 2) . '/partner-orders-bootstrap.php';
 require_once dirname(__DIR__, 2) . '/store-ops-fulfillment-runtime.php';
 require_once dirname(__DIR__, 2) . '/website-orders-bootstrap.php';
+require_once dirname(__DIR__, 2) . '/marketplace-queue-policy.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -37,7 +38,7 @@ function jg_store_ops_orders_config(string $envKey, string $configKey, string $d
 
 function jg_store_ops_orders_normalize_account(string $value): string
 {
-    return trim(strtolower((string) preg_replace('/[^a-z0-9._-]+/', '-', $value)), '.-_');
+    return trim(strtolower((string) preg_replace('/[^a-z0-9._-]+/i', '-', $value)), '.-_');
 }
 
 /**
@@ -110,7 +111,7 @@ function jg_store_ops_orders_marketplace_status_callback(array $key, string $sta
         return;
     }
     $baseUrl = rtrim(jg_store_ops_orders_config('JG_SHOPEE_INGEST_BASE_URL', 'shopee_ingest_base_url', 'https://api.jenanggemi.com'), '/');
-    $setupToken = jg_store_ops_orders_config('JG_SHOPEE_INGEST_SETUP_TOKEN', 'shopee_ingest_setup_token');
+    $setupToken = jg_store_ops_marketplace_setup_token((string) $key['source_platform']);
     if ($baseUrl === '' || $setupToken === '') {
         throw new RuntimeException('Marketplace fulfillment callback is not configured.');
     }
@@ -122,12 +123,12 @@ function jg_store_ops_orders_marketplace_status_callback(array $key, string $sta
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     $context = stream_context_create(['http' => [
         'method' => 'POST',
-        'header' => "Accept: application/json\r\nContent-Type: application/json\r\n",
+        'header' => "Accept: application/json\r\nContent-Type: application/json\r\nAuthorization: Bearer {$setupToken}\r\n",
         'content' => $payload,
         'timeout' => 12,
         'ignore_errors' => true,
     ]]);
-    $raw = @file_get_contents($baseUrl . '/fulfillment/status?setup_token=' . rawurlencode($setupToken), false, $context);
+    $raw = @file_get_contents($baseUrl . '/fulfillment/status', false, $context);
     $decoded = is_string($raw) ? json_decode($raw, true) : null;
     if (!is_array($decoded) || empty($decoded['ok'])) {
         throw new RuntimeException('API Ingest did not accept the marketplace fulfillment callback.');
@@ -309,15 +310,22 @@ function jg_store_ops_orders_tiktok_awaiting_collection_processed(array $order, 
  * @param array<int, mixed> $orders
  * @return array<int, array<string, mixed>>
  */
-function jg_store_ops_orders_filter_marketplace_queue(array $orders, string $sourcePlatform, int &$processedCollectionCount = 0): array
+function jg_store_ops_orders_filter_marketplace_queue(
+    array $orders,
+    string $sourcePlatform,
+    int &$processedCollectionCount = 0,
+    bool $requireLabelBacked = false
+): array
 {
     $filtered = [];
     foreach ($orders as $order) {
         if (!is_array($order)) {
             continue;
         }
-        if (jg_store_ops_orders_tiktok_awaiting_collection_processed($order, $sourcePlatform)) {
-            $processedCollectionCount++;
+        if (!jg_store_ops_marketplace_order_visible($order, $sourcePlatform, $requireLabelBacked)) {
+            if (jg_store_ops_marketplace_awaiting_collection($order, $sourcePlatform)) {
+                $processedCollectionCount++;
+            }
             continue;
         }
         $filtered[] = $order;
@@ -972,7 +980,6 @@ if ($method !== 'GET') {
 }
 
 $baseUrl = rtrim(jg_store_ops_orders_config('JG_SHOPEE_INGEST_BASE_URL', 'shopee_ingest_base_url', 'https://api.jenanggemi.com'), '/');
-$setupToken = jg_store_ops_orders_config('JG_SHOPEE_INGEST_SETUP_TOKEN', 'shopee_ingest_setup_token');
 $sources = jg_store_ops_orders_configured_sources();
 
 if (isset($_GET['shipping_label'])) {
@@ -1013,7 +1020,7 @@ if (isset($_GET['shipping_label'])) {
         jg_store_ops_orders_proxy_file($labelUrl, $filename);
     }
 
-    if ($baseUrl === '' || $setupToken === '' || $sources === []) {
+    if ($baseUrl === '' || $sources === []) {
         jg_store_ops_orders_fail('Marketplace order source is not configured.', 500);
     }
 
@@ -1034,6 +1041,10 @@ if (isset($_GET['shipping_label'])) {
     }
     $account = (string) $selectedSource['account'];
     $platform = (string) $selectedSource['platform'];
+    $setupToken = jg_store_ops_marketplace_setup_token($platform);
+    if ($setupToken === '') {
+        jg_store_ops_orders_fail('Marketplace setup token is not configured for ' . $platform . '.', 500);
+    }
 
     $query = http_build_query([
         'account' => $account,
@@ -1045,7 +1056,7 @@ if (isset($_GET['shipping_label'])) {
     jg_store_ops_orders_proxy_file($url, $platform . '-label-' . preg_replace('/[^A-Za-z0-9_-]+/', '-', $orderSn) . '.pdf');
 }
 
-if ($baseUrl === '' || $setupToken === '' || $sources === []) {
+if ($baseUrl === '' || $sources === []) {
     jg_store_ops_orders_fail('Marketplace order sources are not configured.', 500);
 }
 
@@ -1061,10 +1072,28 @@ $decoded = [
 $errors = [];
 $successfulAccounts = 0;
 $processedCollectionOrders = 0;
+$localHardSetKnown = false;
+$localHardSetEnabled = false;
+$localAutomaticSources = [];
+try {
+    $localHardSetState = jg_store_ops_website_state(jg_store_ops_fulfillment_db());
+    $localHardSetKnown = true;
+    $localHardSetEnabled = !empty($localHardSetState['enabled']);
+    $localAutomaticSources = is_array($localHardSetState['automatic_sources'] ?? null)
+        ? $localHardSetState['automatic_sources']
+        : [];
+} catch (Throwable $hardSetStateError) {
+    $errors[] = 'Local Hard Set state unavailable: ' . $hardSetStateError->getMessage();
+}
 
 foreach ($sources as $source) {
     $platform = $source['platform'];
     $account = $source['account'];
+    $setupToken = jg_store_ops_marketplace_setup_token($platform);
+    if ($setupToken === '') {
+        $errors[] = $platform . ':' . $account . ': setup token is not configured';
+        continue;
+    }
     $query = http_build_query([
         'account' => $account,
         'setup_token' => $setupToken,
@@ -1089,7 +1118,23 @@ foreach ($sources as $source) {
     jg_store_ops_orders_cache_write($url, $raw);
     $accountOrders = is_array($accountPayload['orders'] ?? null) ? $accountPayload['orders'] : [];
     $accountProcessedCollectionOrders = 0;
-    $accountOrders = jg_store_ops_orders_filter_marketplace_queue($accountOrders, $platform, $accountProcessedCollectionOrders);
+    $sourceKey = $platform . ':' . $account;
+    $localSourceAutomatic = $localHardSetEnabled && $localAutomaticSources === []
+        ? null
+        : in_array($sourceKey, $localAutomaticSources, true);
+    $requireLabelBacked = jg_store_ops_marketplace_requires_label_backed(
+        $localHardSetKnown,
+        $localHardSetEnabled,
+        is_array($accountPayload['meta'] ?? null) ? $accountPayload['meta'] : [],
+        true,
+        $localSourceAutomatic
+    );
+    $accountOrders = jg_store_ops_orders_filter_marketplace_queue(
+        $accountOrders,
+        $platform,
+        $accountProcessedCollectionOrders,
+        $requireLabelBacked
+    );
     $processedCollectionOrders += $accountProcessedCollectionOrders;
     $successfulAccounts++;
     $decoded['orders'] = array_merge($decoded['orders'], $accountOrders);
@@ -1101,6 +1146,7 @@ foreach ($sources as $source) {
         'shop_id' => (string) ($accountPayload['meta']['shop_id'] ?? ''),
         'label_backed_only' => !empty($accountPayload['meta']['label_backed_only']),
         'hard_set_enabled' => !empty($accountPayload['meta']['hard_set']['enabled']),
+        'automatic_shipment_enabled' => !empty($accountPayload['meta']['automatic_shipment_enabled']),
     ];
 }
 

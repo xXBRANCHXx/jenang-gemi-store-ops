@@ -11,8 +11,11 @@ return [
     'admin_code_hash' => '',
     'shopee_ingest_base_url' => 'https://api.jenanggemi.com',
     'shopee_ingest_setup_token' => '',
+    'tiktok_ingest_setup_token' => '',
     'shopee_accounts' => 'jenang-gemi-shopee,zero-shopee,zfit-shopee',
     'tiktok_accounts' => 'jenang-gemi-tiktok,zero-tiktok,zfit-tiktok',
+    // Required before Big Set activation; include every API Ingest automatic source.
+    'marketplace_sources' => 'shopee:jenang-gemi-shopee,shopee:zero-shopee,shopee:zfit-shopee,tiktok:jenang-gemi-tiktok,tiktok:zero-tiktok,tiktok:zfit-tiktok',
     'partner_db_host' => '',
     'partner_db_port' => '3306',
     'partner_db_name' => '',

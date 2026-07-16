@@ -1,6 +1,31 @@
+(function exposeStoreOrderPresentation(global) {
+  const normalizeDeadline = (order, now = Date.now()) => {
+    const deadlineAt = Number(order?.deadlineAt || order?.deadline_at || 0);
+    return {
+      deadlineAt: Number.isFinite(deadlineAt) && deadlineAt > 0 ? deadlineAt : now + 86400000,
+      deadlineType: String(order?.deadlineType || order?.deadline_type || 'deadline'),
+      deadlineLabel: String(order?.deadlineLabel || order?.deadline_label || 'Deadline')
+    };
+  };
+
+  const minutesRemaining = (order, now = Date.now()) => Math.ceil((Number(order?.deadlineAt || 0) - now) / 60000);
+  const formatDeadline = (order, now = Date.now()) => {
+    const minutes = minutesRemaining(order, now);
+    if (minutes <= 0) return 'Overdue';
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return rest ? `${hours}h ${rest}m` : `${hours}h`;
+  };
+
+  global.JGStoreOrderPresentation = Object.freeze({ normalizeDeadline, minutesRemaining, formatDeadline });
+})(typeof window !== 'undefined' ? window : globalThis);
+
 document.addEventListener('DOMContentLoaded', () => {
   const root = document.querySelector('[data-store-home]');
   if (!root) return;
+  const orderPresentation = window.JGStoreOrderPresentation;
+  if (!orderPresentation) throw new Error('Store order deadline presentation is unavailable.');
 
   const adminThemes = ['dark', 'light', 'system'];
   const legacyThemeMap = {
@@ -1105,7 +1130,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const normalizeOrder = (order, catalogRows, storedById) => {
     const id = String(order.id || '').trim();
-    const deadlineAt = Number(order.deadlineAt || 0);
+    const deadline = orderPresentation.normalizeDeadline(order);
     return mergeLocalOrderState({
       id,
       platform: String(order.platform || 'Shopee'),
@@ -1115,9 +1140,12 @@ document.addEventListener('DOMContentLoaded', () => {
       partnerName: String(order.partnerName || order.partner_name || ''),
       status: String(order.status || 'IS_LISTED'),
       marketplaceStatus: String(order.marketplaceStatus || 'READY_TO_SHIP'),
+      labelBacked: Boolean(order.labelBacked || order.label_backed),
       packageNumber: String(order.packageNumber || ''),
       instant: Boolean(order.instant),
-      deadlineAt: Number.isFinite(deadlineAt) && deadlineAt > 0 ? deadlineAt : Date.now() + 86400000,
+      deadlineAt: deadline.deadlineAt,
+      deadlineType: deadline.deadlineType,
+      deadlineLabel: deadline.deadlineLabel,
       fulfillmentStatus: String(order.fulfillmentStatus || 'UNCLAIMED'),
       claimedBy: order.claimedBy || null,
       claimedByName: String(order.claimedByName || ''),
@@ -1142,7 +1170,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const catalogRows = catalogLookup();
     return stored
       .map((order) => normalizeOrder(order, catalogRows, storedById))
-      .filter((order) => order.id);
+      .filter((order) => {
+        if (!order.id) return false;
+        const platform = normalizeSourceKey(order.platform);
+        return !['shopee', 'tiktok'].includes(platform) || order.labelBacked;
+      });
   };
 
   const hydrateOrdersFromCache = () => {
@@ -1751,17 +1783,9 @@ document.addEventListener('DOMContentLoaded', () => {
     resetEmployeeProfileForm();
   };
 
-  const minutesRemaining = (order) => Math.ceil((order.deadlineAt - Date.now()) / 60000);
+  const minutesRemaining = (order) => orderPresentation.minutesRemaining(order);
   const isCriticalOrder = (order) => order.deadlineAt - Date.now() < 60 * 60000;
-
-  const formatDeadline = (order) => {
-    const minutes = minutesRemaining(order);
-    if (minutes <= 0) return 'Overdue';
-    if (minutes < 60) return `${minutes}m`;
-    const hours = Math.floor(minutes / 60);
-    const rest = minutes % 60;
-    return rest ? `${hours}h ${rest}m` : `${hours}h`;
-  };
+  const formatDeadline = (order) => orderPresentation.formatDeadline(order);
 
   const formatClock = () => {
     const formatter = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1946,7 +1970,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span class="admin-order-id">${escapeHtml(order.id)}</span>
             ${order.instant ? '<span class="admin-instant-badge" role="img" aria-label="Instant shipping order" title="Instant shipping order"><svg viewBox="0 0 32 20" aria-hidden="true" focusable="false"><path class="admin-instant-badge-speed" d="M2 6h5.5M1 10h5M3 14h4.5"/><path class="admin-instant-badge-truck" d="M8.5 6.5h11v7.5h-11zM19.5 9.2h4.1l3.1 3.2V14h-7.2zM22.1 9.2v3.2h4.6"/><circle class="admin-instant-badge-wheel" cx="11.5" cy="15" r="2"/><circle class="admin-instant-badge-wheel" cx="23.5" cy="15" r="2"/></svg><span class="admin-instant-badge-label">Instant</span></span>' : ''}
           </div>
-          <div class="admin-order-deadline">${escapeHtml(formatDeadline(order))}</div>
+          <div class="admin-order-deadline"><span>${escapeHtml(order.deadlineLabel)}</span>${escapeHtml(formatDeadline(order))}</div>
           <div class="admin-order-meta">
             <span>${escapeHtml(sourceLabel)}</span>
             <span>${escapeHtml(claimLabel)}</span>
@@ -1973,7 +1997,7 @@ document.addEventListener('DOMContentLoaded', () => {
       orderSummary.innerHTML = `
         <span><strong>${escapeHtml(sourceLabelFromOrder(order))}</strong> ${escapeHtml(order.marketplaceStatus)}</span>
         <span><strong>Status</strong> ${escapeHtml(order.status)}</span>
-        <span><strong>Deadline</strong> ${escapeHtml(formatDeadline(order))}</span>
+        <span><strong>${escapeHtml(order.deadlineLabel)}</strong> ${escapeHtml(formatDeadline(order))}</span>
       `;
     }
     if (pickList) {

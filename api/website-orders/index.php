@@ -20,18 +20,33 @@ if (!jg_store_ops_website_token_matches()) {
 try {
     $pdo = jg_store_ops_fulfillment_db();
     jg_store_ops_website_ensure_schema($pdo);
+    $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
     $action = strtolower(trim((string) ($_GET['action'] ?? '')));
     $body = json_decode((string) file_get_contents('php://input'), true);
     $body = is_array($body) ? $body : [];
+    $readiness = jg_store_ops_big_set_readiness($pdo);
     if ($action === 'activate') {
-        jg_store_ops_website_json(['ok' => true, 'state' => jg_store_ops_website_activate($pdo, $body)]);
+        if ($method !== 'POST') {
+            jg_store_ops_website_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
+        }
+        $currentState = jg_store_ops_website_state($pdo);
+        if (jg_store_ops_website_activation_requires_readiness($currentState) && empty($readiness['ready'])) {
+            jg_store_ops_website_json(['ok' => false, 'error' => 'store_ops_not_ready', 'readiness' => $readiness], 409);
+        }
+        jg_store_ops_website_json(['ok' => true, 'state' => jg_store_ops_website_activate($pdo, $body), 'readiness' => $readiness]);
     }
     if ($action === 'ingest') {
+        if ($method !== 'POST') {
+            jg_store_ops_website_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
+        }
         $order = jg_store_ops_website_ingest($pdo, $body);
         jg_store_ops_website_json(['ok' => true, 'order' => $order]);
     }
     if ($action === 'state') {
-        jg_store_ops_website_json(['ok' => true, 'state' => jg_store_ops_website_state($pdo)]);
+        if ($method !== 'GET') {
+            jg_store_ops_website_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
+        }
+        jg_store_ops_website_json(['ok' => true, 'state' => jg_store_ops_website_state($pdo), 'readiness' => $readiness]);
     }
     jg_store_ops_website_json(['ok' => false, 'error' => 'Unknown action.'], 404);
 } catch (InvalidArgumentException $error) {

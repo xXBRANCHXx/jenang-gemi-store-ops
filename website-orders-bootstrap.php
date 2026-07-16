@@ -31,6 +31,230 @@ function jg_store_ops_website_token(): string
     return jg_store_ops_website_derive_token($seed);
 }
 
+function jg_store_ops_marketplace_setup_token(string $platform): string
+{
+    $platform = strtolower(trim($platform));
+    if ($platform === 'tiktok') {
+        $configured = jg_store_ops_website_config('JG_TIKTOK_INGEST_SETUP_TOKEN', 'tiktok_ingest_setup_token');
+        if ($configured !== '') {
+            return $configured;
+        }
+    }
+    return jg_store_ops_website_config('JG_SHOPEE_INGEST_SETUP_TOKEN', 'shopee_ingest_setup_token');
+}
+
+/** @return array<int,string> */
+function jg_store_ops_normalize_marketplace_sources(mixed $value): array
+{
+    $candidates = is_array($value) ? $value : explode(',', (string) $value);
+    $sources = [];
+    foreach ($candidates as $source) {
+        if (!is_scalar($source)) {
+            continue;
+        }
+        $parts = array_map(
+            static fn (string $part): string => trim(strtolower((string) preg_replace('/[^a-z0-9._-]+/i', '-', $part)), '.-_'),
+            explode(':', trim((string) $source), 2)
+        );
+        if (in_array($parts[0] ?? '', ['shopee', 'tiktok'], true) && ($parts[1] ?? '') !== '') {
+            $normalized = ($parts[0] ?? '') . ':' . ($parts[1] ?? '');
+            $sources[$normalized] = $normalized;
+        }
+    }
+    $sources = array_values($sources);
+    sort($sources);
+    return $sources;
+}
+
+/** @return array<int,string> */
+function jg_store_ops_website_activation_sources(mixed $value, array $configuredSources): array
+{
+    if (!is_array($value)) {
+        throw new InvalidArgumentException('The automatic source scope must be a list.');
+    }
+    $requested = [];
+    foreach ($value as $candidate) {
+        if (!is_scalar($candidate)) {
+            throw new InvalidArgumentException('The automatic source scope contains an invalid entry.');
+        }
+        $normalized = jg_store_ops_normalize_marketplace_sources([(string) $candidate]);
+        if (count($normalized) !== 1) {
+            throw new InvalidArgumentException('The automatic source scope contains an invalid marketplace account.');
+        }
+        $requested[$normalized[0]] = $normalized[0];
+    }
+    $requested = array_values($requested);
+    sort($requested);
+    if ($requested === []) {
+        throw new InvalidArgumentException('The API Ingest frozen automatic source scope is required.');
+    }
+
+    $configuredSources = jg_store_ops_normalize_marketplace_sources($configuredSources);
+    $missingSources = array_values(array_diff($requested, $configuredSources));
+    if ($missingSources !== []) {
+        throw new RuntimeException('Store Ops is not configured for automatic sources: ' . implode(', ', $missingSources));
+    }
+    return $requested;
+}
+
+/** @return array<int,string> */
+function jg_store_ops_big_set_sources_from_values(
+    string $marketplaceSources,
+    string $shopeeAccounts,
+    string $shopeeAccount,
+    string $tiktokAccounts
+): array {
+    if (trim($marketplaceSources) !== '') {
+        return jg_store_ops_normalize_marketplace_sources($marketplaceSources);
+    }
+
+    $sources = [];
+    $shopeeValue = trim($shopeeAccounts) !== '' ? $shopeeAccounts : $shopeeAccount;
+    foreach (explode(',', $shopeeValue) as $account) {
+        $account = trim(strtolower((string) preg_replace('/[^a-z0-9._-]+/i', '-', $account)), '.-_');
+        if ($account !== '') {
+            $sources['shopee:' . $account] = 'shopee:' . $account;
+        }
+    }
+    foreach (explode(',', $tiktokAccounts) as $account) {
+        $account = trim(strtolower((string) preg_replace('/[^a-z0-9._-]+/i', '-', $account)), '.-_');
+        if ($account !== '') {
+            $sources['tiktok:' . $account] = 'tiktok:' . $account;
+        }
+    }
+    return jg_store_ops_normalize_marketplace_sources(array_values($sources));
+}
+
+/** @return array<int,string> */
+function jg_store_ops_big_set_sources(): array
+{
+    return jg_store_ops_big_set_sources_from_values(
+        jg_store_ops_website_config('JG_MARKETPLACE_SOURCES', 'marketplace_sources'),
+        jg_store_ops_website_config('JG_SHOPEE_ACCOUNTS', 'shopee_accounts'),
+        jg_store_ops_website_config('JG_SHOPEE_ACCOUNT', 'shopee_account', 'jenang-gemi-shopee'),
+        jg_store_ops_website_config('JG_TIKTOK_ACCOUNTS', 'tiktok_accounts')
+    );
+}
+
+/** @return array{ready:bool,detail:string,platforms:array<int,string>} */
+function jg_store_ops_big_set_api_access_response(array $decoded, array $sources): array
+{
+    $required = [];
+    foreach ($sources as $source) {
+        $platform = strtolower(trim((string) explode(':', (string) $source, 2)[0]));
+        if (in_array($platform, ['shopee', 'tiktok'], true)) {
+            $required[$platform] = $platform;
+        }
+    }
+    $allowed = [];
+    foreach (is_array($decoded['platforms'] ?? null) ? $decoded['platforms'] : [] as $platform) {
+        $platform = strtolower(trim((string) $platform));
+        if (in_array($platform, ['shopee', 'tiktok'], true)) {
+            $allowed[$platform] = $platform;
+        }
+    }
+    $missing = array_values(array_diff(array_values($required), array_values($allowed)));
+    $ready = !empty($decoded['ok']) && $required !== [] && $missing === [];
+    return [
+        'ready' => $ready,
+        'detail' => $ready
+            ? 'Authenticated API Ingest access for ' . implode(', ', array_values($required))
+            : ($missing !== []
+                ? 'Configured setup token is not accepted for: ' . implode(', ', $missing)
+                : 'API Ingest fulfillment access endpoint did not authenticate or respond'),
+        'platforms' => array_values($allowed),
+    ];
+}
+
+/** @return array{ready:bool,checks:array<int,array{key:string,label:string,ready:bool,detail:string}>,sources:array<int,string>} */
+function jg_store_ops_big_set_readiness(PDO $pdo): array
+{
+    $checks = [];
+    $add = static function (string $key, string $label, bool $ready, string $detail) use (&$checks): void {
+        $checks[] = compact('key', 'label', 'ready', 'detail');
+    };
+    try {
+        jg_store_ops_website_ensure_schema($pdo);
+        $pdo->query('SELECT id FROM store_ops_order_fulfillment_v2 LIMIT 1');
+        $add('fulfillment_db', 'Store Ops fulfillment database', true, 'Fulfillment and website-ingestion tables are readable');
+    } catch (Throwable $error) {
+        $add('fulfillment_db', 'Store Ops fulfillment database', false, $error->getMessage());
+    }
+    $explicitSources = jg_store_ops_website_config('JG_MARKETPLACE_SOURCES', 'marketplace_sources');
+    $sources = jg_store_ops_big_set_sources();
+    $sourceScopeReady = trim($explicitSources) !== '' && $sources !== [];
+    $add(
+        'marketplace_sources',
+        'Explicit Store Ops marketplace sources',
+        $sourceScopeReady,
+        $sourceScopeReady
+            ? implode(', ', $sources)
+            : 'JG_MARKETPLACE_SOURCES / marketplace_sources must explicitly include every API Ingest automatic shipment source'
+    );
+    try {
+        $state = jg_store_ops_website_state($pdo);
+        if (!empty($state['enabled'])) {
+            $frozenSources = (array) ($state['automatic_sources'] ?? []);
+            $missingFrozenSources = array_values(array_diff($frozenSources, $sources));
+            $frozenReady = $frozenSources !== [] && $missingFrozenSources === [];
+            $add(
+                'frozen_automatic_sources',
+                'Frozen automatic shipment sources',
+                $frozenReady,
+                $frozenReady
+                    ? implode(', ', $frozenSources)
+                    : ($frozenSources === []
+                        ? 'The active Store Ops cutover has no frozen automatic source scope.'
+                        : 'Store Ops configuration is missing frozen sources: ' . implode(', ', $missingFrozenSources))
+            );
+        }
+    } catch (Throwable $error) {
+        $add('frozen_automatic_sources', 'Frozen automatic shipment sources', false, $error->getMessage());
+    }
+    $baseUrl = rtrim(jg_store_ops_website_config('JG_SHOPEE_INGEST_BASE_URL', 'shopee_ingest_base_url', 'https://api.jenanggemi.com'), '/');
+    $access = ['ready' => false, 'detail' => 'API Ingest base URL or setup token is missing', 'platforms' => []];
+    if ($baseUrl !== '' && $sources !== []) {
+        $requiredPlatforms = [];
+        foreach ($sources as $source) {
+            $platform = (string) (explode(':', $source, 2)[0] ?? '');
+            if (in_array($platform, ['shopee', 'tiktok'], true)) {
+                $requiredPlatforms[$platform] = $platform;
+            }
+        }
+        $allowedPlatforms = [];
+        $responsesByToken = [];
+        foreach (array_values($requiredPlatforms) as $platform) {
+            $setupToken = jg_store_ops_marketplace_setup_token($platform);
+            if ($setupToken === '') {
+                continue;
+            }
+            $tokenKey = hash('sha256', $setupToken);
+            if (!array_key_exists($tokenKey, $responsesByToken)) {
+                $context = stream_context_create(['http' => [
+                    'method' => 'GET',
+                    'header' => "Accept: application/json\r\nAuthorization: Bearer {$setupToken}\r\n",
+                    'timeout' => 3,
+                    'ignore_errors' => true,
+                ]]);
+                $raw = @file_get_contents($baseUrl . '/fulfillment/access', false, $context);
+                $decoded = is_string($raw) ? json_decode($raw, true) : null;
+                $responsesByToken[$tokenKey] = is_array($decoded) ? $decoded : [];
+            }
+            $response = $responsesByToken[$tokenKey];
+            if (!empty($response['ok']) && in_array($platform, (array) ($response['platforms'] ?? []), true)) {
+                $allowedPlatforms[] = $platform;
+            }
+        }
+        $access = jg_store_ops_big_set_api_access_response(['ok' => true, 'platforms' => $allowedPlatforms], $sources);
+    }
+    $add('api_ingest_callback', 'API Ingest order and callback access', $access['ready'], $access['detail']);
+    return [
+        'ready' => !in_array(false, array_column($checks, 'ready'), true),
+        'checks' => $checks,
+        'sources' => $sources,
+    ];
+}
+
 function jg_store_ops_website_now(): string
 {
     return gmdate('Y-m-d H:i:s');
@@ -44,8 +268,15 @@ function jg_store_ops_website_ensure_schema(PDO $pdo): void
             enabled TINYINT(1) NOT NULL DEFAULT 0,
             activated_at DATETIME(6) NULL DEFAULT NULL,
             activated_by VARCHAR(160) NOT NULL DEFAULT "",
+            automatic_sources_json LONGTEXT NULL DEFAULT NULL,
             updated_at DATETIME NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+    jg_store_ops_fulfillment_ensure_column(
+        $pdo,
+        'store_ops_website_ingestion',
+        'automatic_sources_json',
+        'LONGTEXT NULL DEFAULT NULL AFTER activated_by'
     );
     $pdo->exec(
         'CREATE TABLE IF NOT EXISTS store_ops_website_orders (
@@ -74,12 +305,15 @@ function jg_store_ops_website_state(PDO $pdo, bool $forUpdate = false): array
         jg_store_ops_website_ensure_schema($pdo);
     }
     $row = $pdo->query(
-        'SELECT enabled, activated_at, activated_by, updated_at FROM store_ops_website_ingestion WHERE id = 1' . ($forUpdate ? ' FOR UPDATE' : '')
+        'SELECT enabled, activated_at, activated_by, automatic_sources_json, updated_at
+         FROM store_ops_website_ingestion WHERE id = 1' . ($forUpdate ? ' FOR UPDATE' : '')
     )->fetch();
+    $automaticSources = json_decode((string) ($row['automatic_sources_json'] ?? ''), true);
     return [
         'enabled' => (bool) (int) ($row['enabled'] ?? 0),
         'activated_at' => isset($row['activated_at']) ? (string) $row['activated_at'] : null,
         'activated_by' => (string) ($row['activated_by'] ?? ''),
+        'automatic_sources' => jg_store_ops_normalize_marketplace_sources(is_array($automaticSources) ? $automaticSources : []),
         'updated_at' => (string) ($row['updated_at'] ?? ''),
     ];
 }
@@ -95,8 +329,30 @@ function jg_store_ops_website_token_matches(): bool
 
 function jg_store_ops_website_parse_utc(mixed $value): DateTimeImmutable
 {
-    $date = new DateTimeImmutable(trim((string) $value), new DateTimeZone('UTC'));
+    $value = trim((string) $value);
+    if (
+        $value === ''
+        || preg_match('/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})?$/', $value) !== 1
+    ) {
+        throw new InvalidArgumentException('A UTC timestamp is required.');
+    }
+    $date = new DateTimeImmutable($value, new DateTimeZone('UTC'));
+    $errors = DateTimeImmutable::getLastErrors();
+    if (is_array($errors) && ((int) $errors['warning_count'] > 0 || (int) $errors['error_count'] > 0)) {
+        throw new InvalidArgumentException('A valid UTC timestamp is required.');
+    }
     return $date->setTimezone(new DateTimeZone('UTC'));
+}
+
+function jg_store_ops_website_activation_requires_readiness(array $state): bool
+{
+    return empty($state['enabled']);
+}
+
+function jg_store_ops_website_cutover_matches(mixed $existing, mixed $incoming): bool
+{
+    return jg_store_ops_website_parse_utc($existing)->format('Y-m-d H:i:s.u')
+        === jg_store_ops_website_parse_utc($incoming)->format('Y-m-d H:i:s.u');
 }
 
 function jg_store_ops_website_activate(PDO $pdo, array $payload): array
@@ -106,14 +362,25 @@ function jg_store_ops_website_activate(PDO $pdo, array $payload): array
     }
     $activatedAt = jg_store_ops_website_parse_utc($payload['activated_at'] ?? '');
     $actor = mb_substr(trim((string) ($payload['activated_by'] ?? 'Executive Dashboard')), 0, 160);
+    $configuredSources = jg_store_ops_big_set_sources();
+    $automaticSources = jg_store_ops_website_activation_sources(
+        $payload['automatic_sources'] ?? [],
+        $configuredSources
+    );
+    $sourcesJson = json_encode($automaticSources, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if (!is_string($sourcesJson)) {
+        throw new RuntimeException('Unable to encode the frozen automatic source scope.');
+    }
     jg_store_ops_website_ensure_schema($pdo);
     $pdo->beginTransaction();
     try {
         $state = jg_store_ops_website_state($pdo, true);
         if (!empty($state['enabled'])) {
-            $existing = jg_store_ops_website_parse_utc((string) $state['activated_at']);
-            if ($existing->format('Y-m-d H:i:s.u') !== $activatedAt->format('Y-m-d H:i:s.u')) {
+            if (!jg_store_ops_website_cutover_matches((string) $state['activated_at'], $activatedAt->format('Y-m-d H:i:s.u'))) {
                 throw new RuntimeException('Store Ops already has a different permanent cutover timestamp.');
+            }
+            if ((array) ($state['automatic_sources'] ?? []) !== $automaticSources) {
+                throw new RuntimeException('Store Ops already has a different frozen automatic source scope.');
             }
             $pdo->commit();
             return $state;
@@ -121,9 +388,15 @@ function jg_store_ops_website_activate(PDO $pdo, array $payload): array
         $formatted = $activatedAt->format('Y-m-d H:i:s.u');
         $pdo->prepare(
             'UPDATE store_ops_website_ingestion
-             SET enabled = 1, activated_at = :activated_at, activated_by = :activated_by, updated_at = :updated_at
+             SET enabled = 1, activated_at = :activated_at, activated_by = :activated_by,
+                 automatic_sources_json = :automatic_sources_json, updated_at = :updated_at
              WHERE id = 1 AND enabled = 0'
-        )->execute([':activated_at' => $formatted, ':activated_by' => $actor, ':updated_at' => jg_store_ops_website_now()]);
+        )->execute([
+            ':activated_at' => $formatted,
+            ':activated_by' => $actor,
+            ':automatic_sources_json' => $sourcesJson,
+            ':updated_at' => jg_store_ops_website_now(),
+        ]);
         $pdo->commit();
         return jg_store_ops_website_state($pdo);
     } catch (Throwable $error) {
