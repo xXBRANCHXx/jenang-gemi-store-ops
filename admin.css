@@ -7958,8 +7958,10 @@ button.admin-store-sidebar-profile:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   width: min(100%, 720px);
   min-width: 0;
+  min-height: 530px;
   padding: clamp(28px, 4vw, 48px);
   border-radius: 16px;
 }
@@ -7970,6 +7972,7 @@ button.admin-store-sidebar-profile:hover {
 
 .admin-stock-adjust-page-minimal .admin-stock-adjust-head {
   display: grid;
+  justify-content: center;
   justify-items: center;
   gap: 0;
   width: 100%;
@@ -7978,7 +7981,7 @@ button.admin-store-sidebar-profile:hover {
 }
 
 .admin-stock-adjust-page-minimal .admin-stock-adjust-head h2 {
-  margin: 10px 0 8px;
+  margin: 0;
   font-size: clamp(30px, 4vw, 44px);
   letter-spacing: -0.035em;
 }
@@ -8042,8 +8045,9 @@ button.admin-store-sidebar-profile:hover {
 
 .admin-stock-adjust-page-minimal .admin-stock-empty {
   width: 100%;
-  min-height: 210px;
-  padding: 48px 18px 26px;
+  min-height: 0;
+  margin-top: 78px;
+  padding: 0;
 }
 
 .admin-stock-adjust-page-minimal .admin-stock-empty svg {

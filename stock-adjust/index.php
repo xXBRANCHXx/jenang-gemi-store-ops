@@ -46,19 +46,8 @@ $stockAdjustmentsJsVersion = (string) @filemtime(dirname(__DIR__) . '/stock-adju
         <main class="admin-stock-adjust-layout">
             <section class="admin-panel admin-stock-adjust-card" aria-labelledby="stock-adjust-title">
                 <header class="admin-stock-adjust-head">
-                    <span class="admin-panel-kicker">Manual stock adjustment</span>
                     <h2 id="stock-adjust-title">Scan a barcode</h2>
-                    <p>Each scan counts as one unit. Scan the same product again to increase the quantity.</p>
-                    <button type="button" class="admin-ghost-btn" data-stock-scanner-connect>Connect scanner</button>
                 </header>
-
-                <div class="admin-stock-scanner-state" data-stock-scan-status aria-live="polite">
-                    <span class="admin-stock-scanner-pulse" aria-hidden="true"></span>
-                    <div>
-                        <strong>Ready to scan</strong>
-                        <span>Keyboard scanners work automatically.</span>
-                    </div>
-                </div>
 
                 <p class="admin-form-error admin-stock-adjust-error" data-stock-adjust-error hidden></p>
                 <p class="admin-stock-adjust-success" data-stock-adjust-success hidden></p>
@@ -67,7 +56,7 @@ $stockAdjustmentsJsVersion = (string) @filemtime(dirname(__DIR__) . '/stock-adju
                     <svg viewBox="0 0 48 48" aria-hidden="true">
                         <path d="M6 16V8h8M34 8h8v8M42 32v8h-8M14 40H6v-8M14 17v14M19 17v14M25 17v14M29 17v14M34 17v14"/>
                     </svg>
-                    <strong>Waiting for scan</strong>
+                    <strong data-stock-scan-status aria-live="polite">Waiting for scan</strong>
                 </div>
 
                 <article class="admin-stock-product" data-stock-adjust-product hidden>

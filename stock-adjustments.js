@@ -67,15 +67,9 @@
     successBox.hidden = message === '';
   };
 
-  const setStatus = (title, detail) => {
+  const setStatus = () => {
     if (!scanStatus) return;
-    scanStatus.innerHTML = `
-      <span class="admin-stock-scanner-pulse" aria-hidden="true"></span>
-      <div>
-        <strong>${escapeHtml(title)}</strong>
-        <span>${escapeHtml(detail)}</span>
-      </div>
-    `;
+    scanStatus.textContent = 'Waiting for scan';
   };
 
   const setBusy = (value) => {
