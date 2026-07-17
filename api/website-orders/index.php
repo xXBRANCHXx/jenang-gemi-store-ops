@@ -35,6 +35,12 @@ try {
         }
         jg_store_ops_website_json(['ok' => true, 'state' => jg_store_ops_website_activate($pdo, $body), 'readiness' => $readiness]);
     }
+    if ($action === 'automation') {
+        if ($method !== 'POST') {
+            jg_store_ops_website_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
+        }
+        jg_store_ops_website_json(['ok' => true, 'state' => jg_store_ops_website_set_automation_paused($pdo, $body), 'readiness' => $readiness]);
+    }
     if ($action === 'ingest') {
         if ($method !== 'POST') {
             jg_store_ops_website_json(['ok' => false, 'error' => 'Method not allowed.'], 405);

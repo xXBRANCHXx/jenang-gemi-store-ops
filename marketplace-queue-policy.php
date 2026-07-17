@@ -111,13 +111,24 @@ function jg_store_ops_marketplace_feed_enabled(bool $localHardSetKnown, bool $lo
     return $localHardSetKnown;
 }
 
-function jg_store_ops_marketplace_action_enabled(array $key, bool $localHardSetEnabled): bool
+function jg_store_ops_marketplace_action_enabled(array $key, bool $localHardSetEnabled, bool $automationPaused = false): bool
 {
     $platform = strtolower(trim((string) ($key['source_platform'] ?? '')));
     if (!in_array($platform, ['shopee', 'tiktok'], true)) {
         return true;
     }
-    return $localHardSetEnabled && !jg_store_ops_marketplace_cancellation_requested($key);
+    if (!$localHardSetEnabled || jg_store_ops_marketplace_cancellation_requested($key)) {
+        return false;
+    }
+    if (
+        !empty($key['instant'])
+        && strtolower(trim((string) ($key['action'] ?? ''))) === 'arrange_instant_shipment'
+    ) {
+        return true;
+    }
+    // A regular marketplace card can be processed only after API Ingest has
+    // safely stored its label. Paused unarranged rows stay visible/read-only.
+    return jg_store_ops_marketplace_label_backed($key);
 }
 
 function jg_store_ops_marketplace_requires_label_backed(
@@ -125,11 +136,15 @@ function jg_store_ops_marketplace_requires_label_backed(
     bool $localHardSetEnabled,
     array $remoteMeta,
     bool $remoteMetaFresh = true,
-    ?bool $localSourceAutomatic = null
+    ?bool $localSourceAutomatic = null,
+    bool $automationPaused = false
 ): bool
 {
     if (!$localHardSetKnown) {
         return true;
+    }
+    if ($localHardSetEnabled && $automationPaused && $localSourceAutomatic === true) {
+        return false;
     }
     // The exact automatic source set is frozen when Store Ops acknowledges the
     // irreversible cutover. It remains authoritative even if a later API

@@ -179,6 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeSettingsTab = 'scanner';
   let dropOffOnly = false;
   let bigSetEnabled = false;
+  let automaticArrangementPaused = false;
   const scannerBarcodeWaitSeconds = 6;
   const scannerBarcodeWaitMs = scannerBarcodeWaitSeconds * 1000;
   let state = {
@@ -1245,6 +1246,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!order.id) return false;
         const platform = normalizeSourceKey(order.platform);
         return !['shopee', 'tiktok'].includes(platform)
+          || automaticArrangementPaused
           || order.labelBacked
           || orderPresentation.isInstantManualLifecycle(order)
           || orderPresentation.isCancellationRequested(order);
@@ -1252,14 +1254,16 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const hydrateOrdersFromCache = () => {
-    const cachedAt = Number(readStoredOrdersMeta().savedAt || 0);
+    const cachedMeta = readStoredOrdersMeta();
+    const cachedAt = Number(cachedMeta.savedAt || 0);
     if (!Number.isFinite(cachedAt) || cachedAt <= 0 || Date.now() - cachedAt > ordersStartupCacheMaxAgeMs) {
       return false;
     }
+    bigSetEnabled = Boolean(cachedMeta.bigSetEnabled);
+    automaticArrangementPaused = Boolean(cachedMeta.automaticArrangementPaused);
     const cachedOrders = normalizeCachedOrders();
     if (!cachedOrders.length) return false;
-    ordersEtag = String(readStoredOrdersMeta().etag || '');
-    bigSetEnabled = Boolean(readStoredOrdersMeta().bigSetEnabled);
+    ordersEtag = String(cachedMeta.etag || '');
     state.orders = cachedOrders;
     ordersSnapshotReady = true;
     renderBoard();
@@ -1275,10 +1279,11 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
     const rows = Array.isArray(cached) ? cached : (Array.isArray(cached?.orders) ? cached.orders : []);
+    bigSetEnabled = Boolean(cached?.bigSetEnabled);
+    automaticArrangementPaused = Boolean(cached?.automaticArrangementPaused);
     const cachedOrders = normalizeCachedOrders(rows);
     if (!cachedOrders.length) return false;
     ordersEtag = String(cached?.etag || ordersEtag || '');
-    bigSetEnabled = Boolean(cached?.bigSetEnabled);
     state.orders = cachedOrders;
     ordersSnapshotReady = true;
     renderBoard();
@@ -1305,6 +1310,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ordersEtag = response.headers.get('ETag') || response.headers.get('etag') || ordersEtag;
     const meta = payload.meta && typeof payload.meta === 'object' ? payload.meta : {};
     bigSetEnabled = Boolean(meta.big_set_enabled);
+    automaticArrangementPaused = Boolean(meta.automation_paused);
     const refreshErrors = Array.isArray(meta.errors) ? meta.errors : [];
     const configuredSources = Number(meta.configured_sources || 0);
     const successfulAccounts = Number(meta.successful_accounts || 0);
@@ -1345,7 +1351,7 @@ document.addEventListener('DOMContentLoaded', () => {
       delete cached.clientClaimReleaseRequested;
       return cached;
     });
-    const meta = { savedAt: Date.now(), etag: ordersEtag, bigSetEnabled };
+    const meta = { savedAt: Date.now(), etag: ordersEtag, bigSetEnabled, automaticArrangementPaused };
     try {
       window.localStorage.setItem(ordersStorageKey, JSON.stringify(cacheOrders));
       window.localStorage.setItem(ordersStorageMetaKey, JSON.stringify(meta));
@@ -1576,6 +1582,7 @@ document.addEventListener('DOMContentLoaded', () => {
     instant: Boolean(order?.instant),
     manual_arrangement_required: Boolean(order?.manualArrangementRequired),
     cancellation_requested: orderPresentation.isCancellationRequested(order),
+    label_backed: Boolean(order?.labelBacked),
     ...extra
   });
 
@@ -2045,6 +2052,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const isDropOff = orderPresentation.isDropOff(order);
       const cancellationRequested = orderPresentation.isCancellationRequested(order);
       const instantManualLifecycle = orderPresentation.isInstantManualLifecycle(order) && !order.labelBacked;
+      const marketplacePlatform = normalizeSourceKey(order.platform);
+      const pausedUnarranged = automaticArrangementPaused
+        && ['shopee', 'tiktok'].includes(marketplacePlatform)
+        && !order.labelBacked
+        && !instantManualLifecycle
+        && !cancellationRequested;
       const instantState = String(order.instantArrangementState || '').trim().toLowerCase();
       const pickupSlotLabel = order.handoverMethod === 'PICKUP' ? orderPresentation.formatHandoverSlot(order) : '';
       const handoverDescription = order.shippingProviderName
@@ -2080,10 +2093,12 @@ document.addEventListener('DOMContentLoaded', () => {
               ? 'Arranged · preparing label…'
               : (instantState === 'failed' ? 'Retry accept + arrange' : 'Accept + arrange shipment')));
         actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-instant-action" data-arrange-instant="${escapeHtml(order.id)}" ${instantDisabled ? 'disabled' : ''}><span>${escapeHtml(instantLabel)}</span></button>`;
+      } else if (pausedUnarranged) {
+        actionButton = '<button type="button" class="admin-start-order-btn admin-manual-order-btn" disabled><span>Automation paused · arrange in marketplace</span></button>';
       }
       return `
         <article
-          class="admin-order-card ${isCritical && !isLocked ? 'is-critical' : ''} ${order.instant ? 'is-instant' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${(instantManualLifecycle || cancellationRequested) ? 'has-manual-action' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
+          class="admin-order-card ${isCritical && !isLocked ? 'is-critical' : ''} ${order.instant ? 'is-instant' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${(instantManualLifecycle || cancellationRequested || pausedUnarranged) ? 'has-manual-action' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
           data-source-key="${escapeHtml(sourceKey)}"
           ${order.handoverMethod ? `data-handover-method="${escapeHtml(order.handoverMethod)}"` : ''}
           ${sourceColor ? `data-source-color="${customSourceColor ? 'custom' : escapeHtml(sourceColor)}"` : ''}
@@ -2101,6 +2116,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>${itemCount} product${itemCount === 1 ? '' : 's'}</span>
           </div>
           ${cancellationRequested ? `<div class="admin-cancellation-alert">Cancellation requested — do not process. Resolve it in ${escapeHtml(String(order.platform || 'the marketplace'))}.</div>` : ''}
+          ${pausedUnarranged ? '<div class="admin-cancellation-alert">Automatic shipment arrangement is paused. This order is visible for tracking; arrange it in the marketplace before processing.</div>' : ''}
           ${instantState === 'failed' && order.instantArrangementError ? `<div class="admin-instant-action-error">${escapeHtml(order.instantArrangementError)}</div>` : ''}
           ${actionButton}
         </article>
@@ -2210,6 +2226,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const openFulfillment = (orderId) => {
     const order = state.orders.find((item) => item.id === orderId);
     if (!order) return;
+    if (
+      automaticArrangementPaused
+      && ['shopee', 'tiktok'].includes(normalizeSourceKey(order.platform))
+      && !order.labelBacked
+    ) return;
     if (orderPresentation.isCancellationRequested(order) || orderPresentation.requiresManualInstantArrangement(order)) return;
     if (order.locked && !order.currentEmployeeCanWork) return;
     applyOptimisticClaim(order);

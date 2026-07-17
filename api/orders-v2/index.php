@@ -50,6 +50,16 @@ function jg_store_ops_orders_marketplace_big_set_enabled(PDO $pdo): bool
     }
 }
 
+function jg_store_ops_orders_marketplace_automation_paused(PDO $pdo): bool
+{
+    try {
+        $state = jg_store_ops_website_state($pdo);
+        return !empty($state['enabled']) && !empty($state['automation_paused']);
+    } catch (Throwable) {
+        return false;
+    }
+}
+
 /**
  * @return array<int, string>
  */
@@ -638,7 +648,7 @@ function jg_store_ops_orders_partner_feed_url(): string
 
 function jg_store_ops_orders_partner_feed_token(): string
 {
-    return jg_store_ops_orders_config('JG_STORE_OPS_ORDERS_TOKEN', 'store_ops_orders_token');
+    return jg_store_ops_partner_orders_feed_token();
 }
 
 function jg_store_ops_orders_partner_request_json(string $method, string $url, array $headers = [], ?array $body = null): ?array
@@ -1090,11 +1100,18 @@ if ($method === 'POST') {
         jg_store_ops_fulfillment_validate_key($key);
         if (!jg_store_ops_marketplace_action_enabled(
             array_merge($payload, $key),
-            jg_store_ops_orders_marketplace_big_set_enabled($pdo)
+            jg_store_ops_orders_marketplace_big_set_enabled($pdo),
+            jg_store_ops_orders_marketplace_automation_paused($pdo)
         )) {
-            throw new RuntimeException(jg_store_ops_marketplace_cancellation_requested($payload)
-                ? 'Cancellation requested. Handle this order in the marketplace before processing it.'
-                : 'Big Set is OFF. Marketplace orders cannot be processed in Store Ops.');
+            throw new RuntimeException(
+                jg_store_ops_marketplace_cancellation_requested($payload)
+                    ? 'Cancellation requested. Handle this order in the marketplace before processing it.'
+                    : (!jg_store_ops_orders_marketplace_big_set_enabled($pdo)
+                        ? 'Big Set is OFF. Marketplace orders cannot be processed in Store Ops.'
+                        : (jg_store_ops_orders_marketplace_automation_paused($pdo)
+                            ? 'Automatic shipment arrangement is paused. This order remains visible but cannot be processed until its shipment is manually arranged and its label is ready.'
+                            : 'This marketplace order cannot be processed until its shipment is arranged and its label is ready.'))
+            );
         }
         $employeeId = jg_store_ops_orders_current_employee_id();
         $employeeName = jg_store_ops_orders_current_employee_name();
@@ -1309,6 +1326,7 @@ $processedCollectionOrders = 0;
 $localHardSetKnown = false;
 $localHardSetEnabled = false;
 $localAutomaticSources = [];
+$localAutomationPaused = false;
 try {
     $localHardSetState = jg_store_ops_website_state(jg_store_ops_fulfillment_db());
     $localHardSetKnown = true;
@@ -1316,6 +1334,7 @@ try {
     $localAutomaticSources = is_array($localHardSetState['automatic_sources'] ?? null)
         ? $localHardSetState['automatic_sources']
         : [];
+    $localAutomationPaused = $localHardSetEnabled && !empty($localHardSetState['automation_paused']);
 } catch (Throwable $hardSetStateError) {
     $errors[] = 'Local Hard Set state unavailable: ' . $hardSetStateError->getMessage();
 }
@@ -1380,7 +1399,8 @@ foreach ($marketplaceSources as $source) {
         $localHardSetEnabled,
         is_array($accountPayload['meta'] ?? null) ? $accountPayload['meta'] : [],
         !$usedStaleMarketplaceCache,
-        $localSourceAutomatic
+        $localSourceAutomatic,
+        $localAutomationPaused
     );
     $accountOrders = jg_store_ops_orders_filter_marketplace_queue(
         $accountOrders,
@@ -1401,6 +1421,7 @@ foreach ($marketplaceSources as $source) {
         'label_backed_only' => !empty($accountPayload['meta']['label_backed_only']),
         'hard_set_enabled' => !empty($accountPayload['meta']['hard_set']['enabled']),
         'automatic_shipment_enabled' => !empty($accountPayload['meta']['automatic_shipment_enabled']),
+        'automation_paused' => !empty($accountPayload['meta']['hard_set']['automation_paused']),
         'stale' => $usedStaleMarketplaceCache,
     ];
 }
@@ -1436,8 +1457,9 @@ $decoded['meta']['processed_collection_count'] = $processedCollectionOrders;
 $decoded['meta']['marketplace_enabled'] = $marketplaceFeedEnabled;
 $decoded['meta']['marketplace_feed_mode'] = !$localHardSetKnown
     ? 'blocked'
-    : ($localHardSetEnabled ? 'active' : 'pre_activation_statuses');
+    : ($localAutomationPaused ? 'automation_paused' : ($localHardSetEnabled ? 'active' : 'pre_activation_statuses'));
 $decoded['meta']['big_set_enabled'] = $localHardSetEnabled;
+$decoded['meta']['automation_paused'] = $localAutomationPaused;
 $decoded['meta']['count'] = count($decoded['orders']);
 $decoded['meta']['current_employee'] = [
     'id' => jg_store_ops_orders_current_employee_id(),
