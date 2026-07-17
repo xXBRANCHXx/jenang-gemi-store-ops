@@ -1,6 +1,9 @@
 global.window = global;
 global.document = { addEventListener() {} };
 
+const fs = require('node:fs');
+const path = require('node:path');
+
 require('../store-home.js');
 
 const assert = (condition, message) => {
@@ -51,6 +54,24 @@ assert(
 assert(
   listedOrders.length === 3,
   'Filtering the board must not mutate or remove orders from IS_LISTED.'
+);
+assert(
+  presentation.shouldShowOrderLoading(false, []),
+  'Store Ops must show loading until the first order snapshot confirms whether the queue is empty.'
+);
+assert(
+  !presentation.shouldShowOrderLoading(true, []),
+  'A confirmed zero-order snapshot must show the real empty state instead of loading forever.'
+);
+assert(
+  !presentation.shouldShowOrderLoading(false, listedOrders),
+  'Cached visible orders must render immediately while the live refresh continues.'
+);
+const dashboardTemplate = fs.readFileSync(path.join(__dirname, '../dashboard/index.php'), 'utf8');
+assert(
+  dashboardTemplate.includes('data-order-board aria-busy="true"')
+    && dashboardTemplate.includes('admin-board-empty admin-board-loading'),
+  'The server-rendered queue must show loading before Store Ops JavaScript starts.'
 );
 
 console.log('store-order-handover-test: ok');

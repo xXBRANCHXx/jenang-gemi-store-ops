@@ -5133,12 +5133,12 @@ button.admin-store-sidebar-profile:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 8px;
   min-height: 36px;
-  padding: 0 10px;
-  border: 1px solid var(--admin-border);
-  border-radius: 7px;
-  background: var(--admin-surface-soft);
+  padding: 0 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--admin-muted);
   cursor: pointer;
   font-size: 9px;
@@ -5148,14 +5148,16 @@ button.admin-store-sidebar-profile:hover {
 }
 
 .admin-dropoff-filter:hover {
-  border-color: rgba(245, 158, 11, 0.58);
   color: var(--admin-text);
 }
 
 .admin-dropoff-filter.is-active {
-  border-color: #f59e0b;
-  background: rgba(245, 158, 11, 0.16);
   color: #fbbf24;
+}
+
+.admin-dropoff-filter:focus-visible {
+  outline: 2px solid #f59e0b;
+  outline-offset: 3px;
 }
 
 .admin-dropoff-filter-switch {
@@ -5163,9 +5165,10 @@ button.admin-store-sidebar-profile:hover {
   display: block;
   width: 28px;
   height: 16px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.34);
-  transition: background 0.16s ease;
+  border: 1px solid var(--admin-border);
+  border-radius: 5px;
+  background: var(--admin-surface-soft);
+  transition: background 0.16s ease, border-color 0.16s ease;
 }
 
 .admin-dropoff-filter-switch span {
@@ -5174,16 +5177,18 @@ button.admin-store-sidebar-profile:hover {
   left: 3px;
   width: 10px;
   height: 10px;
-  border-radius: 50%;
-  background: #fff;
+  border-radius: 3px;
+  background: var(--admin-muted);
   transition: transform 0.16s ease;
 }
 
 .admin-dropoff-filter.is-active .admin-dropoff-filter-switch {
+  border-color: #f59e0b;
   background: #f59e0b;
 }
 
 .admin-dropoff-filter.is-active .admin-dropoff-filter-switch span {
+  background: #2a1600;
   transform: translateX(12px);
 }
 
@@ -5496,9 +5501,9 @@ button.admin-store-sidebar-profile:hover {
   }
 
   .admin-dropoff-filter {
-    width: 38px;
-    min-width: 38px;
-    padding: 0 5px;
+    width: 30px;
+    min-width: 30px;
+    padding: 0;
   }
 
   .admin-dropoff-filter-label {

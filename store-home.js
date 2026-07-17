@@ -32,6 +32,7 @@
     const rows = Array.isArray(orders) ? orders : [];
     return dropOffOnly ? rows.filter((order) => isDropOff(order)) : rows.slice();
   };
+  const shouldShowOrderLoading = (snapshotReady, orders) => !snapshotReady && (!Array.isArray(orders) || orders.length === 0);
 
   global.JGStoreOrderPresentation = Object.freeze({
     normalizeDeadline,
@@ -39,7 +40,8 @@
     formatDeadline,
     normalizeHandoverMethod,
     isDropOff,
-    filterOrdersByHandover
+    filterOrdersByHandover,
+    shouldShowOrderLoading
   });
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -152,6 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let ordersRefreshPromise = null;
   let lastOrdersRefreshAt = 0;
   let ordersEtag = '';
+  let ordersSnapshotReady = false;
   let skuCatalogRefreshPromise = null;
   let boardResizeTimer = 0;
   let clientCacheDbPromise = null;
@@ -1211,6 +1214,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!cachedOrders.length) return false;
     ordersEtag = String(readStoredOrdersMeta().etag || '');
     state.orders = cachedOrders;
+    ordersSnapshotReady = true;
     renderBoard();
     renderSourceColorList();
     return true;
@@ -1228,6 +1232,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!cachedOrders.length) return false;
     ordersEtag = String(cached?.etag || ordersEtag || '');
     state.orders = cachedOrders;
+    ordersSnapshotReady = true;
     renderBoard();
     renderSourceColorList();
     return true;
@@ -1926,6 +1931,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const renderBoardMessage = (message, options = {}) => {
     if (!board) return;
+    board.setAttribute('aria-busy', options.loading ? 'true' : 'false');
     board.style.setProperty('--order-rows', String(boardBaseRows));
     board.style.setProperty('--order-columns', '1');
     if (options.loading) {
@@ -1945,6 +1951,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const renderBoard = () => {
     if (!board) return;
+    if (orderPresentation.shouldShowOrderLoading(ordersSnapshotReady, state.orders)) {
+      renderBoardMessage('Loading Orders', { loading: true });
+      return;
+    }
+    board.setAttribute('aria-busy', 'false');
     const ordersChanged = syncOrdersFromStorage();
     if (ordersChanged) saveOrders();
     const currentActiveOrder = activeOrder();
@@ -2462,9 +2473,11 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const loadedOrders = await loadOrders();
         if (loadedOrders === null) {
+          ordersSnapshotReady = true;
           renderBoard();
           return state.orders;
         }
+        ordersSnapshotReady = true;
         state.orders = loadedOrders;
         lastOrdersRefreshAt = Date.now();
         saveOrders();

@@ -181,7 +181,14 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
             <main class="admin-layout">
                 <section class="admin-panel admin-panel-wide admin-fulfillment-panel">
                     <div class="admin-order-board-wrap">
-                        <div class="admin-order-board" data-order-board></div>
+                        <div class="admin-order-board" data-order-board aria-busy="true" style="--order-rows: 6; --order-columns: 1;">
+                            <div class="admin-board-empty admin-board-loading" role="status" aria-live="polite">
+                                <strong>Loading Orders</strong>
+                                <span class="admin-loading-worm" aria-hidden="true">
+                                    <i></i><i></i><i></i><i></i><i></i>
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </section>
             </main>
