@@ -7954,25 +7954,25 @@ button.admin-store-sidebar-profile:hover {
   overflow-y: auto;
 }
 
-@media (min-width: 761px) {
-  .admin-stock-adjust-page-minimal .admin-stock-adjust-layout {
-    width: calc(100% + var(--store-sidebar-width) + 8px);
-    margin-left: calc(0px - var(--store-sidebar-width) - 8px);
-    transition: width 0.22s ease, margin-left 0.22s ease;
-  }
-}
-
 .admin-stock-adjust-page-minimal .admin-stock-adjust-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   width: min(100%, 720px);
   min-width: 0;
   padding: clamp(28px, 4vw, 48px);
   border-radius: 16px;
 }
 
+.admin-stock-adjust-page-minimal .admin-stock-adjust-card > * {
+  flex: 0 0 auto;
+}
+
 .admin-stock-adjust-page-minimal .admin-stock-adjust-head {
   display: grid;
   justify-items: center;
   gap: 0;
+  width: 100%;
   padding: 0;
   text-align: center;
 }
@@ -8034,12 +8034,14 @@ button.admin-store-sidebar-profile:hover {
 }
 
 .admin-stock-adjust-page-minimal :is(.admin-stock-adjust-error, .admin-stock-adjust-success) {
+  width: min(100%, 520px);
   max-width: 520px;
   margin: 14px auto 0;
   text-align: center;
 }
 
 .admin-stock-adjust-page-minimal .admin-stock-empty {
+  width: 100%;
   min-height: 210px;
   padding: 48px 18px 26px;
 }
@@ -8070,6 +8072,7 @@ button.admin-store-sidebar-profile:hover {
   border-radius: 0;
   background: transparent;
   text-align: center;
+  width: 100%;
 }
 
 .admin-stock-adjust-page-minimal .admin-stock-product[hidden] {
@@ -8197,6 +8200,8 @@ button.admin-store-sidebar-profile:hover {
 }
 
 .admin-stock-adjust-page-minimal .admin-stock-history-mark {
+  display: grid;
+  place-items: center;
   width: 38px;
   height: 38px;
   border-radius: 50%;
