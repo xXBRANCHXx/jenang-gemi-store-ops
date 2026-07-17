@@ -28,13 +28,18 @@
     return ['PICKUP', 'DROP_OFF'].includes(value) ? value : '';
   };
   const isDropOff = (order) => normalizeHandoverMethod(order) === 'DROP_OFF';
+  const filterOrdersByHandover = (orders, dropOffOnly = false) => {
+    const rows = Array.isArray(orders) ? orders : [];
+    return dropOffOnly ? rows.filter((order) => isDropOff(order)) : rows.slice();
+  };
 
   global.JGStoreOrderPresentation = Object.freeze({
     normalizeDeadline,
     minutesRemaining,
     formatDeadline,
     normalizeHandoverMethod,
-    isDropOff
+    isDropOff,
+    filterOrdersByHandover
   });
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -67,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const boardDensity = document.querySelector('[data-board-density]');
   const boardOverflow = document.querySelector('[data-board-overflow]');
   const boardClock = document.querySelector('[data-board-clock]');
+  const dropOffFilter = document.querySelector('[data-dropoff-filter]');
   const reprintModal = document.querySelector('[data-reprint-modal]');
   const reprintForm = document.querySelector('[data-reprint-form]');
   const reprintError = document.querySelector('[data-reprint-error]');
@@ -135,6 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let selectedScannerLabel = '';
   let selectedScannerVerified = false;
   let activeSettingsTab = 'scanner';
+  let dropOffOnly = false;
   const scannerBarcodeWaitSeconds = 6;
   const scannerBarcodeWaitMs = scannerBarcodeWaitSeconds * 1000;
   let state = {
@@ -1319,6 +1326,8 @@ document.addEventListener('DOMContentLoaded', () => {
     .filter((order) => order.status !== 'FULFILLED' && order.fulfillmentStatus !== 'FULFILLED')
     .sort((a, b) => a.deadlineAt - b.deadlineAt);
 
+  const visibleListedOrders = (orders = listedOrders()) => orderPresentation.filterOrdersByHandover(orders, dropOffOnly);
+
   const orderProductCount = (order) => (Array.isArray(order?.items) ? order.items : [])
     .reduce((sum, item) => sum + Math.max(0, Number(item.quantity || item.qty || 0)), 0);
 
@@ -1885,6 +1894,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (criticalCount) criticalCount.textContent = String(listed.filter((order) => isCriticalOrder(order)).length);
     if (startedCount) startedCount.textContent = String(state.orders.filter((order) => order.claimedBy && order.fulfillmentStatus !== 'FULFILLED').length);
     if (fulfillingCount) fulfillingCount.textContent = String(state.orders.filter((order) => !['UNCLAIMED', 'FULFILLED'].includes(order.fulfillmentStatus)).length);
+    if (dropOffFilter) {
+      const dropOffCount = listed.filter((order) => orderPresentation.isDropOff(order)).length;
+      dropOffFilter.classList.toggle('is-active', dropOffOnly);
+      dropOffFilter.setAttribute('aria-pressed', dropOffOnly ? 'true' : 'false');
+      dropOffFilter.title = dropOffOnly
+        ? `Showing ${dropOffCount} drop-off order${dropOffCount === 1 ? '' : 's'}. Click to show all ${listed.length} listed orders.`
+        : `Show only ${dropOffCount} drop-off order${dropOffCount === 1 ? '' : 's'}. This does not change any order status.`;
+    }
   };
 
   const availableBoardColumns = () => {
@@ -1934,7 +1951,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (state.activeOrderId && (!currentActiveOrder || currentActiveOrder.fulfillmentStatus === 'FULFILLED' || currentActiveOrder.currentEmployeeCanWork === false)) {
       closeFulfillment();
     }
-    const orders = listedOrders();
+    const allListedOrders = listedOrders();
+    const orders = visibleListedOrders(allListedOrders);
     const { columnCount, rowCount } = boardDimensions(orders.length);
     board.style.setProperty('--order-rows', String(rowCount));
     board.style.setProperty('--order-columns', String(columnCount));
@@ -1943,7 +1961,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (boardOverflow) boardOverflow.hidden = rowCount <= boardBaseRows;
 
     if (!orders.length) {
-      board.innerHTML = '<div class="admin-board-empty">No listed orders waiting.</div>';
+      board.innerHTML = dropOffOnly && allListedOrders.length
+        ? `<div class="admin-board-empty">No drop-off orders waiting. Turn off “Drop-off only” to see all ${allListedOrders.length} listed orders.</div>`
+        : '<div class="admin-board-empty">No listed orders waiting.</div>';
       renderMetrics();
       refreshSiren();
       return;
@@ -2002,6 +2022,11 @@ document.addEventListener('DOMContentLoaded', () => {
     renderMetrics();
     refreshSiren();
   };
+
+  dropOffFilter?.addEventListener('click', () => {
+    dropOffOnly = !dropOffOnly;
+    renderBoard();
+  });
 
   const scheduleBoardRender = () => {
     window.clearTimeout(boardResizeTimer);

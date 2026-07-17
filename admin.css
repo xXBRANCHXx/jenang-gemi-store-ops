@@ -5129,6 +5129,68 @@ button.admin-store-sidebar-profile:hover {
   flex-wrap: nowrap;
 }
 
+.admin-dropoff-filter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: 7px;
+  background: var(--admin-surface-soft);
+  color: var(--admin-muted);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 850;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.admin-dropoff-filter:hover {
+  border-color: rgba(245, 158, 11, 0.58);
+  color: var(--admin-text);
+}
+
+.admin-dropoff-filter.is-active {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+}
+
+.admin-dropoff-filter-switch {
+  position: relative;
+  display: block;
+  width: 28px;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.34);
+  transition: background 0.16s ease;
+}
+
+.admin-dropoff-filter-switch span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.16s ease;
+}
+
+.admin-dropoff-filter.is-active .admin-dropoff-filter-switch {
+  background: #f59e0b;
+}
+
+.admin-dropoff-filter.is-active .admin-dropoff-filter-switch span {
+  transform: translateX(12px);
+}
+
+:root[data-admin-theme='light'] .admin-dropoff-filter.is-active {
+  color: #92400e;
+}
+
 .admin-store-workspace .admin-store-topbar .admin-view-indicator {
   min-height: 36px;
   padding: 0 11px;
@@ -5431,6 +5493,23 @@ button.admin-store-sidebar-profile:hover {
 
   .admin-store-workspace .admin-store-topbar .admin-view-indicator {
     display: none;
+  }
+
+  .admin-dropoff-filter {
+    width: 38px;
+    min-width: 38px;
+    padding: 0 5px;
+  }
+
+  .admin-dropoff-filter-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .admin-store-header-profile {

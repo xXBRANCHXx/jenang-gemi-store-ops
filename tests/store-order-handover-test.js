@@ -34,4 +34,23 @@ assert(
   'Orders without a recorded handover decision must not be guessed as drop-off.'
 );
 
+const listedOrders = [
+  { id: 'DROP', handoverMethod: 'DROP_OFF' },
+  { id: 'PICKUP', handoverMethod: 'PICKUP' },
+  { id: 'UNKNOWN' }
+];
+assert(
+  presentation.filterOrdersByHandover(listedOrders, false).length === 3,
+  'The safe default must keep every listed order visible.'
+);
+const dropOffOnly = presentation.filterOrdersByHandover(listedOrders, true);
+assert(
+  dropOffOnly.length === 1 && dropOffOnly[0].id === 'DROP',
+  'The optional filter must show only orders explicitly recorded as drop-off.'
+);
+assert(
+  listedOrders.length === 3,
+  'Filtering the board must not mutate or remove orders from IS_LISTED.'
+);
+
 console.log('store-order-handover-test: ok');

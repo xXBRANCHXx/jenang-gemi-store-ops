@@ -149,6 +149,16 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
                     </article>
                 </section>
                 <div class="admin-topbar-actions">
+                    <button
+                        type="button"
+                        class="admin-dropoff-filter"
+                        data-dropoff-filter
+                        aria-pressed="false"
+                        title="Show only drop-off orders. This does not change any order status."
+                    >
+                        <span class="admin-dropoff-filter-label">Drop-off only</span>
+                        <span class="admin-dropoff-filter-switch" aria-hidden="true"><span></span></span>
+                    </button>
                     <div class="admin-view-indicator" data-board-clock>Live Queue</div>
                     <?php if ($currentEmployeeCanManageProfiles): ?>
                         <button type="button" class="admin-store-header-profile" data-open-employee-profiles aria-label="Open profile management">
