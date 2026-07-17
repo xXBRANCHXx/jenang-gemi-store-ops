@@ -7936,3 +7936,276 @@ button.admin-store-sidebar-profile:hover {
     border-radius: 0;
   }
 }
+
+/* Minimal centered stock adjustment screen */
+.admin-stock-adjust-page-minimal .admin-store-workspace {
+  overflow: hidden;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-adjust-layout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  width: 100%;
+  min-height: 0;
+  max-height: calc(100svh - 74px);
+  padding: clamp(24px, 4vh, 48px) 24px 64px;
+  overflow-y: auto;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-adjust-card {
+  width: min(100%, 720px);
+  min-width: 0;
+  padding: clamp(28px, 4vw, 48px);
+  border-radius: 16px;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-adjust-head {
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  padding: 0;
+  text-align: center;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-adjust-head h2 {
+  margin: 10px 0 8px;
+  font-size: clamp(30px, 4vw, 44px);
+  letter-spacing: -0.035em;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-adjust-head p {
+  max-width: 470px;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-adjust-head .admin-ghost-btn {
+  min-height: 34px;
+  margin-top: 18px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  font-size: 10px;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-scanner-state {
+  justify-content: center;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 44px;
+  margin: 26px auto 0;
+  padding: 9px 14px;
+  border-color: var(--admin-border);
+  border-radius: 999px;
+  background: transparent;
+  text-align: left;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-scanner-state div {
+  gap: 1px;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-scanner-state strong {
+  font-size: 11px;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-scanner-state span:not(.admin-stock-scanner-pulse) {
+  font-size: 9px;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-scanner-pulse {
+  width: 7px;
+  height: 7px;
+  flex-basis: 7px;
+  box-shadow: none;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-scanner-pulse::after {
+  display: none;
+}
+
+.admin-stock-adjust-page-minimal :is(.admin-stock-adjust-error, .admin-stock-adjust-success) {
+  max-width: 520px;
+  margin: 14px auto 0;
+  text-align: center;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-empty {
+  min-height: 210px;
+  padding: 48px 18px 26px;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-empty svg {
+  width: 46px;
+  height: 46px;
+  margin-bottom: 14px;
+  stroke-width: 1.6;
+  opacity: 0.45;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-empty strong {
+  color: var(--admin-muted);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-product {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  margin-top: 28px;
+  padding: 28px 0 22px;
+  border-width: 1px 0 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: center;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-product[hidden] {
+  display: none;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-product-copy h3 {
+  margin-bottom: 7px;
+  font-size: clamp(22px, 3vw, 30px);
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-numbers {
+  grid-template-columns: 1fr 1fr;
+  width: min(100%, 400px);
+  margin: 0 auto;
+  gap: 0;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-numbers > div {
+  min-width: 0;
+  min-height: 86px;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: center;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-numbers > div + div {
+  border-left: 1px solid var(--admin-border);
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-numbers strong {
+  font-size: 40px;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-adjust-actions {
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: min(100%, 500px);
+  margin: 8px auto 0;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-action {
+  display: grid;
+  place-items: center;
+  min-height: 58px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-action span {
+  display: none;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-action strong {
+  align-self: center;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 12px;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-action.is-add {
+  border-color: var(--admin-text);
+  background: var(--admin-text);
+  color: var(--admin-bg);
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-action.is-subtract {
+  border-color: rgba(255, 82, 82, 0.3);
+  background: transparent;
+  color: #ff7676;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-clear {
+  margin-top: 12px;
+  text-decoration: none;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-history-card {
+  width: min(100%, 720px);
+  padding: 2px 8px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-history-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px 10px;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-history-head h3 {
+  margin: 0;
+  font-size: 12px;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-history-head span {
+  color: var(--admin-muted);
+  font-size: 9px;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-history {
+  gap: 0;
+  border-top: 1px solid var(--admin-border);
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-history-row {
+  min-height: 58px;
+  padding: 9px 2px;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  background: transparent;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-history-row:nth-child(n + 6) {
+  display: none;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-history-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: 11px;
+}
+
+@media (max-width: 620px) {
+  .admin-stock-adjust-page-minimal .admin-stock-adjust-layout {
+    max-height: calc(100svh - 64px);
+    padding: 16px 10px 44px;
+  }
+
+  .admin-stock-adjust-page-minimal .admin-stock-adjust-card {
+    padding: 26px 18px;
+  }
+
+  .admin-stock-adjust-page-minimal .admin-stock-adjust-head .admin-ghost-btn {
+    width: auto;
+  }
+
+  .admin-stock-adjust-page-minimal .admin-stock-adjust-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+}
