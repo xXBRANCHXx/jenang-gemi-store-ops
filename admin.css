@@ -1354,6 +1354,28 @@ button, input {
   transform: translateY(-0.2px);
 }
 
+.admin-dropoff-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid #fcd34d;
+  border-radius: 7px;
+  background: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.18);
+  color: #2a1600;
+  flex: 0 0 auto;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 9px;
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 :root[data-admin-theme='light'] .admin-instant-badge {
   --instant-icon-ink: var(--admin-accent-secondary);
   --instant-icon-fill: color-mix(in srgb, var(--admin-accent-secondary) 10%, transparent);
@@ -1478,6 +1500,17 @@ button, input {
 
 .admin-order-summary strong {
   color: var(--admin-text);
+}
+
+.admin-order-summary .admin-dropoff-summary {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+  font-weight: 850;
+}
+
+:root[data-admin-theme='light'] .admin-order-summary .admin-dropoff-summary {
+  color: #92400e;
 }
 
 .admin-pick-list,

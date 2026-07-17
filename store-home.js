@@ -18,7 +18,24 @@
     return rest ? `${hours}h ${rest}m` : `${hours}h`;
   };
 
-  global.JGStoreOrderPresentation = Object.freeze({ normalizeDeadline, minutesRemaining, formatDeadline });
+  const normalizeHandoverMethod = (order) => {
+    const value = String(order?.handoverMethod || order?.handover_method || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    if (value === 'DROPOFF') return 'DROP_OFF';
+    return ['PICKUP', 'DROP_OFF'].includes(value) ? value : '';
+  };
+  const isDropOff = (order) => normalizeHandoverMethod(order) === 'DROP_OFF';
+
+  global.JGStoreOrderPresentation = Object.freeze({
+    normalizeDeadline,
+    minutesRemaining,
+    formatDeadline,
+    normalizeHandoverMethod,
+    isDropOff
+  });
 })(typeof window !== 'undefined' ? window : globalThis);
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1142,6 +1159,8 @@ document.addEventListener('DOMContentLoaded', () => {
       labelBacked: Boolean(order.labelBacked || order.label_backed),
       packageNumber: String(order.packageNumber || ''),
       instant: Boolean(order.instant),
+      handoverMethod: orderPresentation.normalizeHandoverMethod(order),
+      shippingProviderName: String(order.shippingProviderName || order.shipping_provider_name || ''),
       deadlineAt: deadline.deadlineAt,
       deadlineType: deadline.deadlineType,
       deadlineLabel: deadline.deadlineLabel,
@@ -1938,6 +1957,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const sourceColor = colorForSource(sourceKey);
       const customSourceColor = isCustomSourceColor(sourceColor) ? sourceColor.toUpperCase() : '';
       const isLocked = order.locked && !order.currentEmployeeCanWork;
+      const isDropOff = orderPresentation.isDropOff(order);
+      const handoverDescription = order.shippingProviderName
+        ? `Drop-off order via ${order.shippingProviderName}`
+        : 'Drop-off order';
       const claimedBySelf = order.claimedBy && order.claimedBy === currentEmployee.id;
       const claimLabel = order.claimedByName ? `${order.claimStale ? 'Stale' : 'Claimed'} by ${order.claimedByName}` : order.marketplaceStatus;
       const buttonLabel = order.claimStale ? 'Reclaim' : (claimedBySelf ? 'Resume' : (index === 0 ? 'Start Next' : 'Start'));
@@ -1954,13 +1977,15 @@ document.addEventListener('DOMContentLoaded', () => {
             : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7z"/></svg>'));
       return `
         <article
-          class="admin-order-card ${isCritical && !isLocked ? 'is-critical' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''}"
+          class="admin-order-card ${isCritical && !isLocked ? 'is-critical' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
           data-source-key="${escapeHtml(sourceKey)}"
+          ${order.handoverMethod ? `data-handover-method="${escapeHtml(order.handoverMethod)}"` : ''}
           ${sourceColor ? `data-source-color="${customSourceColor ? 'custom' : escapeHtml(sourceColor)}"` : ''}
           ${cardStyles ? `style="${cardStyles}"` : ''}
         >
           <div class="admin-order-card-top">
             <span class="admin-order-id">${escapeHtml(order.id)}</span>
+            ${isDropOff ? `<span class="admin-dropoff-badge" aria-label="${escapeHtml(handoverDescription)}" title="${escapeHtml(handoverDescription)}">Drop-off</span>` : ''}
             ${order.instant ? '<span class="admin-instant-badge" role="img" aria-label="Instant shipping order" title="Instant shipping order"><svg viewBox="0 0 32 20" aria-hidden="true" focusable="false"><path class="admin-instant-badge-speed" d="M2 6h5.5M1 10h5M3 14h4.5"/><path class="admin-instant-badge-truck" d="M8.5 6.5h11v7.5h-11zM19.5 9.2h4.1l3.1 3.2V14h-7.2zM22.1 9.2v3.2h4.6"/><circle class="admin-instant-badge-wheel" cx="11.5" cy="15" r="2"/><circle class="admin-instant-badge-wheel" cx="23.5" cy="15" r="2"/></svg><span class="admin-instant-badge-label">Instant</span></span>' : ''}
           </div>
           <div class="admin-order-deadline"><span>${escapeHtml(order.deadlineLabel)}</span>${escapeHtml(formatDeadline(order))}</div>
@@ -1990,6 +2015,7 @@ document.addEventListener('DOMContentLoaded', () => {
       orderSummary.innerHTML = `
         <span><strong>${escapeHtml(sourceLabelFromOrder(order))}</strong> ${escapeHtml(order.marketplaceStatus)}</span>
         <span><strong>Status</strong> ${escapeHtml(order.status)}</span>
+        ${orderPresentation.isDropOff(order) ? `<span class="admin-dropoff-summary"><strong>Handover</strong> DROP-OFF${order.shippingProviderName ? ` · ${escapeHtml(order.shippingProviderName)}` : ''}</span>` : ''}
         <span><strong>${escapeHtml(order.deadlineLabel)}</strong> ${escapeHtml(formatDeadline(order))}</span>
       `;
     }
