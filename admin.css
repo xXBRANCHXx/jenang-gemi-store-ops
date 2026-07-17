@@ -1268,6 +1268,20 @@ button, input {
   animation: admin-critical-pulse 0.86s ease-in-out infinite;
 }
 
+.admin-order-card.is-cancellation-requested {
+  border-color: rgba(251, 146, 60, 0.86);
+  background: rgba(67, 28, 12, 0.82);
+}
+
+.admin-order-card.is-instant {
+  animation: admin-instant-pulse 0.78s ease-in-out infinite;
+}
+
+.admin-order-card.is-instant.is-locked {
+  opacity: 0.82;
+  filter: none;
+}
+
 @keyframes admin-critical-pulse {
   0%, 100% {
     border-color: rgba(255, 82, 82, 0.42);
@@ -1276,6 +1290,19 @@ button, input {
   50% {
     border-color: rgba(255, 82, 82, 0.95);
     background: rgba(48, 14, 18, 0.96);
+  }
+}
+
+@keyframes admin-instant-pulse {
+  0%, 100% {
+    border-color: rgba(248, 113, 113, 0.62);
+    background: var(--admin-surface-soft);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.08), 0 10px 24px rgba(0, 0, 0, 0.18);
+  }
+  50% {
+    border-color: #ff3030;
+    background: rgba(74, 10, 18, 0.98);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.24), 0 10px 28px rgba(127, 29, 29, 0.42);
   }
 }
 
@@ -1417,6 +1444,20 @@ button, input {
   text-transform: uppercase;
 }
 
+.admin-order-deadline > small {
+  display: block;
+  max-width: 150px;
+  margin-top: 3px;
+  overflow: hidden;
+  color: #7dd3fc;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .admin-order-meta {
   grid-column: 1;
   grid-row: 2;
@@ -1465,6 +1506,57 @@ button, input {
   cursor: not-allowed;
   background: rgba(148, 163, 184, 0.34);
   color: rgba(255, 255, 255, 0.68);
+}
+
+.admin-order-card.has-manual-action .admin-order-meta,
+.admin-cancellation-alert,
+.admin-instant-action-error,
+.admin-manual-order-btn {
+  grid-column: 1 / -1;
+}
+
+.admin-order-card.has-manual-action .admin-order-meta {
+  justify-content: flex-start;
+}
+
+.admin-cancellation-alert,
+.admin-instant-action-error {
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.admin-cancellation-alert {
+  border: 1px solid rgba(251, 146, 60, 0.72);
+  background: rgba(154, 52, 18, 0.5);
+  color: #fed7aa;
+}
+
+.admin-instant-action-error {
+  border: 1px solid rgba(248, 113, 113, 0.66);
+  background: rgba(127, 29, 29, 0.5);
+  color: #fecaca;
+}
+
+.admin-manual-order-btn {
+  width: 100%;
+  max-width: none;
+  min-height: 26px;
+  white-space: normal;
+}
+
+.admin-manual-order-btn.is-instant-action:not(:disabled) {
+  background: #ef4444;
+  color: #fff;
+}
+
+.admin-manual-order-btn.is-cancellation:disabled {
+  border: 1px solid rgba(251, 146, 60, 0.68);
+  background: rgba(154, 52, 18, 0.68);
+  color: #ffedd5;
+  opacity: 1;
 }
 
 :root[data-admin-theme='light'] .admin-start-order-btn:not(:disabled) {

@@ -144,6 +144,81 @@ function jg_store_ops_orders_marketplace_status_callback(array $key, string $sta
     }
 }
 
+/** @return array<string,mixed> */
+function jg_store_ops_orders_arrange_instant(array $key, array $payload, string $employeeId, string $employeeName): array
+{
+    $platform = (string) ($key['source_platform'] ?? '');
+    if (!in_array($platform, ['shopee', 'tiktok'], true)) {
+        throw new RuntimeException('Instant shipment arrangement is available only for marketplace orders.');
+    }
+    $baseUrl = rtrim(jg_store_ops_orders_config('JG_SHOPEE_INGEST_BASE_URL', 'shopee_ingest_base_url', 'https://api.jenanggemi.com'), '/');
+    $setupToken = jg_store_ops_marketplace_setup_token($platform);
+    if ($baseUrl === '' || $setupToken === '') {
+        throw new RuntimeException('Marketplace Instant arrangement is not configured.');
+    }
+    $body = json_encode([
+        'platform' => $platform,
+        'account_key' => (string) ($key['source_account'] ?? ''),
+        'order_id' => (string) ($key['order_id'] ?? ''),
+        'package_id' => trim((string) ($payload['package_id'] ?? $payload['package_number'] ?? '')),
+        'marketplace_status' => trim((string) ($payload['marketplace_status'] ?? '')),
+        'requested_by' => ['id' => $employeeId, 'name' => $employeeName],
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if (!is_string($body)) {
+        throw new RuntimeException('Unable to prepare the Instant arrangement request.');
+    }
+
+    $raw = false;
+    $status = 0;
+    if (function_exists('curl_init')) {
+        $curl = curl_init($baseUrl . '/fulfillment/arrange-instant');
+        if ($curl === false) {
+            throw new RuntimeException('Unable to initialize the Instant arrangement request.');
+        }
+        curl_setopt_array($curl, [
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => [
+                'Accept: application/json',
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $setupToken,
+            ],
+            CURLOPT_POSTFIELDS => $body,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 90,
+        ]);
+        $raw = curl_exec($curl);
+        $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        $curlError = curl_error($curl);
+        curl_close($curl);
+        if (!is_string($raw)) {
+            throw new RuntimeException($curlError !== '' ? $curlError : 'API Ingest did not answer the Instant arrangement request.');
+        }
+    } else {
+        $context = stream_context_create(['http' => [
+            'method' => 'POST',
+            'header' => "Accept: application/json\r\nContent-Type: application/json\r\nAuthorization: Bearer {$setupToken}\r\n",
+            'content' => $body,
+            'timeout' => 90,
+            'ignore_errors' => true,
+        ]]);
+        $raw = @file_get_contents($baseUrl . '/fulfillment/arrange-instant', false, $context);
+        foreach ((array) ($http_response_header ?? []) as $header) {
+            if (preg_match('/^HTTP\/\S+\s+(\d{3})/', (string) $header, $matches) === 1) {
+                $status = (int) $matches[1];
+                break;
+            }
+        }
+    }
+    $decoded = is_string($raw) ? json_decode($raw, true) : null;
+    if (!is_array($decoded) || $status >= 400 || empty($decoded['ok'])) {
+        throw new RuntimeException(is_array($decoded) && !empty($decoded['error'])
+            ? (string) $decoded['error']
+            : 'API Ingest did not accept the Instant arrangement request.');
+    }
+    return is_array($decoded['arrangement'] ?? null) ? $decoded['arrangement'] : [];
+}
+
 function jg_store_ops_orders_fetch(string $url): array
 {
     $cached = jg_store_ops_orders_cache_read($url);
@@ -900,7 +975,7 @@ if ($method === 'POST') {
         exit;
     }
 
-    $validActions = ['claim_order', 'begin_fulfillment', 'release_order', 'record_scan', 'complete_scan', 'label_printed', 'fulfill_order', 'reprint_label'];
+    $validActions = ['claim_order', 'begin_fulfillment', 'release_order', 'record_scan', 'complete_scan', 'label_printed', 'fulfill_order', 'reprint_label', 'arrange_instant_shipment'];
     if (!in_array($action, $validActions, true)) {
         jg_store_ops_orders_fail('Unknown action.', 400);
     }
@@ -910,13 +985,28 @@ if ($method === 'POST') {
         $key = jg_store_ops_fulfillment_key_from_payload($payload);
         jg_store_ops_fulfillment_validate_key($key);
         if (!jg_store_ops_marketplace_action_enabled(
-            $key,
+            array_merge($payload, $key),
             jg_store_ops_orders_marketplace_big_set_enabled($pdo)
         )) {
-            throw new RuntimeException('Big Set is OFF. Marketplace orders cannot be processed in Store Ops.');
+            throw new RuntimeException(jg_store_ops_marketplace_cancellation_requested($payload)
+                ? 'Cancellation requested. Handle this order in the marketplace before processing it.'
+                : 'Big Set is OFF. Marketplace orders cannot be processed in Store Ops.');
         }
         $employeeId = jg_store_ops_orders_current_employee_id();
         $employeeName = jg_store_ops_orders_current_employee_name();
+
+        if ($action === 'arrange_instant_shipment') {
+            $arrangement = jg_store_ops_orders_arrange_instant($key, $payload, $employeeId, $employeeName);
+            echo json_encode(['ok' => true, 'arrangement' => $arrangement], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+        if (
+            in_array((string) ($key['source_platform'] ?? ''), ['shopee', 'tiktok'], true)
+            && !empty($payload['instant'])
+            && !empty($payload['manual_arrangement_required'])
+        ) {
+            throw new RuntimeException('Accept and arrange this Instant shipment before starting fulfillment.');
+        }
 
         if ($action === 'claim_order') {
             $row = jg_store_ops_fulfillment_claim($pdo, $key, $employeeId, $employeeName);

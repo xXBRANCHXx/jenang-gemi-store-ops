@@ -28,6 +28,36 @@
     return ['PICKUP', 'DROP_OFF'].includes(value) ? value : '';
   };
   const isDropOff = (order) => normalizeHandoverMethod(order) === 'DROP_OFF';
+  const isCancellationRequested = (order) => {
+    if (Boolean(order?.cancellationRequested || order?.cancellation_requested)) return true;
+    const status = String(order?.marketplaceStatus || order?.marketplace_status || order?.orderStatus || order?.order_status || '')
+      .trim()
+      .toUpperCase();
+    return ['IN_CANCEL', 'CANCEL_REQUESTED', 'CANCELLATION_REQUESTED', 'CANCEL_PENDING', 'CANCELLATION_PENDING'].includes(status);
+  };
+  const requiresManualInstantArrangement = (order) => Boolean(
+    order?.instant && (order?.manualArrangementRequired || order?.manual_arrangement_required)
+  );
+  const isInstantManualLifecycle = (order) => {
+    if (!order?.instant) return false;
+    if (requiresManualInstantArrangement(order)) return true;
+    const state = String(order?.instantArrangementState || order?.instant_arrangement_state || '').trim().toLowerCase();
+    return ['required', 'requested', 'label_pending', 'failed', 'big_set_off'].includes(state);
+  };
+  const formatHandoverSlot = (order) => {
+    const supplied = String(order?.handoverSlotLabel || order?.handover_slot_label || '').trim();
+    if (supplied) return supplied;
+    const start = new Date(order?.handoverScheduledStartAt || order?.handover_scheduled_start_at || '');
+    if (Number.isNaN(start.getTime())) return '';
+    return new Intl.DateTimeFormat('en-GB', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Jakarta'
+    }).format(start);
+  };
   const filterOrdersByHandover = (orders, dropOffOnly = false) => {
     const rows = Array.isArray(orders) ? orders : [];
     return dropOffOnly ? rows.filter((order) => isDropOff(order)) : rows.slice();
@@ -40,6 +70,10 @@
     formatDeadline,
     normalizeHandoverMethod,
     isDropOff,
+    isCancellationRequested,
+    requiresManualInstantArrangement,
+    isInstantManualLifecycle,
+    formatHandoverSlot,
     filterOrdersByHandover,
     shouldShowOrderLoading
   });
@@ -144,6 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let selectedScannerVerified = false;
   let activeSettingsTab = 'scanner';
   let dropOffOnly = false;
+  let bigSetEnabled = false;
   const scannerBarcodeWaitSeconds = 6;
   const scannerBarcodeWaitMs = scannerBarcodeWaitSeconds * 1000;
   let state = {
@@ -1169,8 +1204,16 @@ document.addEventListener('DOMContentLoaded', () => {
       labelBacked: Boolean(order.labelBacked || order.label_backed),
       packageNumber: String(order.packageNumber || ''),
       instant: Boolean(order.instant),
+      cancellationRequested: orderPresentation.isCancellationRequested(order),
+      manualArrangementRequired: Boolean(order.manualArrangementRequired || order.manual_arrangement_required),
+      shipmentArranged: Boolean(order.shipmentArranged || order.shipment_arranged),
+      instantArrangementState: String(order.instantArrangementState || order.instant_arrangement_state || ''),
+      instantArrangementError: String(order.instantArrangementError || order.instant_arrangement_error || ''),
       handoverMethod: orderPresentation.normalizeHandoverMethod(order),
       shippingProviderName: String(order.shippingProviderName || order.shipping_provider_name || ''),
+      handoverScheduledStartAt: String(order.handoverScheduledStartAt || order.handover_scheduled_start_at || ''),
+      handoverScheduledEndAt: String(order.handoverScheduledEndAt || order.handover_scheduled_end_at || ''),
+      handoverSlotLabel: String(order.handoverSlotLabel || order.handover_slot_label || ''),
       deadlineAt: deadline.deadlineAt,
       deadlineType: deadline.deadlineType,
       deadlineLabel: deadline.deadlineLabel,
@@ -1201,7 +1244,10 @@ document.addEventListener('DOMContentLoaded', () => {
       .filter((order) => {
         if (!order.id) return false;
         const platform = normalizeSourceKey(order.platform);
-        return !['shopee', 'tiktok'].includes(platform) || order.labelBacked;
+        return !['shopee', 'tiktok'].includes(platform)
+          || order.labelBacked
+          || orderPresentation.isInstantManualLifecycle(order)
+          || orderPresentation.isCancellationRequested(order);
       });
   };
 
@@ -1213,6 +1259,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cachedOrders = normalizeCachedOrders();
     if (!cachedOrders.length) return false;
     ordersEtag = String(readStoredOrdersMeta().etag || '');
+    bigSetEnabled = Boolean(readStoredOrdersMeta().bigSetEnabled);
     state.orders = cachedOrders;
     ordersSnapshotReady = true;
     renderBoard();
@@ -1231,6 +1278,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cachedOrders = normalizeCachedOrders(rows);
     if (!cachedOrders.length) return false;
     ordersEtag = String(cached?.etag || ordersEtag || '');
+    bigSetEnabled = Boolean(cached?.bigSetEnabled);
     state.orders = cachedOrders;
     ordersSnapshotReady = true;
     renderBoard();
@@ -1256,6 +1304,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     ordersEtag = response.headers.get('ETag') || response.headers.get('etag') || ordersEtag;
     const meta = payload.meta && typeof payload.meta === 'object' ? payload.meta : {};
+    bigSetEnabled = Boolean(meta.big_set_enabled);
     const refreshErrors = Array.isArray(meta.errors) ? meta.errors : [];
     const configuredSources = Number(meta.configured_sources || 0);
     const successfulAccounts = Number(meta.successful_accounts || 0);
@@ -1296,7 +1345,7 @@ document.addEventListener('DOMContentLoaded', () => {
       delete cached.clientClaimReleaseRequested;
       return cached;
     });
-    const meta = { savedAt: Date.now(), etag: ordersEtag };
+    const meta = { savedAt: Date.now(), etag: ordersEtag, bigSetEnabled };
     try {
       window.localStorage.setItem(ordersStorageKey, JSON.stringify(cacheOrders));
       window.localStorage.setItem(ordersStorageMetaKey, JSON.stringify(meta));
@@ -1522,6 +1571,11 @@ document.addEventListener('DOMContentLoaded', () => {
     order_id: String(order?.id || extra.order_id || ''),
     source_platform: normalizeSourceKey(order?.platform || extra.source_platform || ''),
     source_account: sourceKeyFromOrder(order || extra),
+    package_id: String(order?.packageNumber || extra.package_id || ''),
+    marketplace_status: String(order?.marketplaceStatus || extra.marketplace_status || ''),
+    instant: Boolean(order?.instant),
+    manual_arrangement_required: Boolean(order?.manualArrangementRequired),
+    cancellation_requested: orderPresentation.isCancellationRequested(order),
     ...extra
   });
 
@@ -1989,11 +2043,17 @@ document.addEventListener('DOMContentLoaded', () => {
       const customSourceColor = isCustomSourceColor(sourceColor) ? sourceColor.toUpperCase() : '';
       const isLocked = order.locked && !order.currentEmployeeCanWork;
       const isDropOff = orderPresentation.isDropOff(order);
+      const cancellationRequested = orderPresentation.isCancellationRequested(order);
+      const instantManualLifecycle = orderPresentation.isInstantManualLifecycle(order) && !order.labelBacked;
+      const instantState = String(order.instantArrangementState || '').trim().toLowerCase();
+      const pickupSlotLabel = order.handoverMethod === 'PICKUP' ? orderPresentation.formatHandoverSlot(order) : '';
       const handoverDescription = order.shippingProviderName
         ? `Drop-off order via ${order.shippingProviderName}`
         : 'Drop-off order';
       const claimedBySelf = order.claimedBy && order.claimedBy === currentEmployee.id;
-      const claimLabel = order.claimedByName ? `${order.claimStale ? 'Stale' : 'Claimed'} by ${order.claimedByName}` : order.marketplaceStatus;
+      const claimLabel = cancellationRequested
+        ? 'Cancellation requested'
+        : (order.claimedByName ? `${order.claimStale ? 'Stale' : 'Claimed'} by ${order.claimedByName}` : order.marketplaceStatus);
       const buttonLabel = order.claimStale ? 'Reclaim' : (claimedBySelf ? 'Resume' : (index === 0 ? 'Start Next' : 'Start'));
       const cardStyles = [
         orderGridPositionStyle(index, rowCount),
@@ -2006,9 +2066,24 @@ document.addEventListener('DOMContentLoaded', () => {
           : (claimedBySelf
             ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>'
             : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7z"/></svg>'));
+      let actionButton = `<button type="button" class="admin-start-order-btn ${claimedBySelf ? 'is-resume' : ''} ${order.claimStale ? 'is-reclaim' : ''}" data-start-order="${escapeHtml(order.id)}" ${isLocked ? 'disabled' : ''}>${buttonIcon}<span>${escapeHtml(isLocked ? 'Locked' : buttonLabel)}</span></button>`;
+      if (cancellationRequested) {
+        const marketplaceName = String(order.platform || 'marketplace').trim() || 'marketplace';
+        actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-cancellation" disabled><span>Handle cancellation in ${escapeHtml(marketplaceName)}</span></button>`;
+      } else if (instantManualLifecycle) {
+        const instantDisabled = !bigSetEnabled || isLocked || ['requested', 'label_pending'].includes(instantState);
+        const instantLabel = !bigSetEnabled
+          ? 'Big Set OFF · arrangement locked'
+          : (instantState === 'requested'
+            ? 'Accepting + arranging…'
+            : (instantState === 'label_pending'
+              ? 'Arranged · preparing label…'
+              : (instantState === 'failed' ? 'Retry accept + arrange' : 'Accept + arrange shipment')));
+        actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-instant-action" data-arrange-instant="${escapeHtml(order.id)}" ${instantDisabled ? 'disabled' : ''}><span>${escapeHtml(instantLabel)}</span></button>`;
+      }
       return `
         <article
-          class="admin-order-card ${isCritical && !isLocked ? 'is-critical' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
+          class="admin-order-card ${isCritical && !isLocked ? 'is-critical' : ''} ${order.instant ? 'is-instant' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${(instantManualLifecycle || cancellationRequested) ? 'has-manual-action' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
           data-source-key="${escapeHtml(sourceKey)}"
           ${order.handoverMethod ? `data-handover-method="${escapeHtml(order.handoverMethod)}"` : ''}
           ${sourceColor ? `data-source-color="${customSourceColor ? 'custom' : escapeHtml(sourceColor)}"` : ''}
@@ -2019,13 +2094,15 @@ document.addEventListener('DOMContentLoaded', () => {
             ${isDropOff ? `<span class="admin-dropoff-badge" aria-label="${escapeHtml(handoverDescription)}" title="${escapeHtml(handoverDescription)}">Drop-off</span>` : ''}
             ${order.instant ? '<span class="admin-instant-badge" role="img" aria-label="Instant shipping order" title="Instant shipping order"><svg viewBox="0 0 32 20" aria-hidden="true" focusable="false"><path class="admin-instant-badge-speed" d="M2 6h5.5M1 10h5M3 14h4.5"/><path class="admin-instant-badge-truck" d="M8.5 6.5h11v7.5h-11zM19.5 9.2h4.1l3.1 3.2V14h-7.2zM22.1 9.2v3.2h4.6"/><circle class="admin-instant-badge-wheel" cx="11.5" cy="15" r="2"/><circle class="admin-instant-badge-wheel" cx="23.5" cy="15" r="2"/></svg><span class="admin-instant-badge-label">Instant</span></span>' : ''}
           </div>
-          <div class="admin-order-deadline"><span>${escapeHtml(order.deadlineLabel)}</span>${escapeHtml(formatDeadline(order))}</div>
+          <div class="admin-order-deadline"><span>${escapeHtml(order.deadlineLabel)}</span>${escapeHtml(formatDeadline(order))}${pickupSlotLabel ? `<small>Pickup ${escapeHtml(pickupSlotLabel)}</small>` : ''}</div>
           <div class="admin-order-meta">
             <span>${escapeHtml(sourceLabel)}</span>
             <span>${escapeHtml(claimLabel)}</span>
             <span>${itemCount} product${itemCount === 1 ? '' : 's'}</span>
           </div>
-          <button type="button" class="admin-start-order-btn ${claimedBySelf ? 'is-resume' : ''} ${order.claimStale ? 'is-reclaim' : ''}" data-start-order="${escapeHtml(order.id)}" ${isLocked ? 'disabled' : ''}>${buttonIcon}<span>${escapeHtml(isLocked ? 'Locked' : buttonLabel)}</span></button>
+          ${cancellationRequested ? `<div class="admin-cancellation-alert">Cancellation requested — do not process. Resolve it in ${escapeHtml(String(order.platform || 'the marketplace'))}.</div>` : ''}
+          ${instantState === 'failed' && order.instantArrangementError ? `<div class="admin-instant-action-error">${escapeHtml(order.instantArrangementError)}</div>` : ''}
+          ${actionButton}
         </article>
       `;
     }).join('');
@@ -2052,6 +2129,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <span><strong>${escapeHtml(sourceLabelFromOrder(order))}</strong> ${escapeHtml(order.marketplaceStatus)}</span>
         <span><strong>Status</strong> ${escapeHtml(order.status)}</span>
         ${orderPresentation.isDropOff(order) ? `<span class="admin-dropoff-summary"><strong>Handover</strong> DROP-OFF${order.shippingProviderName ? ` · ${escapeHtml(order.shippingProviderName)}` : ''}</span>` : ''}
+        ${order.handoverMethod === 'PICKUP' && orderPresentation.formatHandoverSlot(order) ? `<span><strong>Pickup</strong> ${escapeHtml(orderPresentation.formatHandoverSlot(order))}</span>` : ''}
         <span><strong>${escapeHtml(order.deadlineLabel)}</strong> ${escapeHtml(formatDeadline(order))}</span>
       `;
     }
@@ -2132,6 +2210,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const openFulfillment = (orderId) => {
     const order = state.orders.find((item) => item.id === orderId);
     if (!order) return;
+    if (orderPresentation.isCancellationRequested(order) || orderPresentation.requiresManualInstantArrangement(order)) return;
     if (order.locked && !order.currentEmployeeCanWork) return;
     applyOptimisticClaim(order);
     state.activeOrderId = order.id;
@@ -2143,6 +2222,30 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modal) modal.hidden = false;
     renderBoard();
     syncClaimInBackground(order, order.clientClaimRequestId);
+  };
+
+  const arrangeInstantShipment = async (orderId) => {
+    const order = state.orders.find((item) => item.id === orderId);
+    if (!order || !order.instant || orderPresentation.isCancellationRequested(order) || !bigSetEnabled) return;
+    order.instantArrangementState = 'requested';
+    order.instantArrangementError = '';
+    saveOrders();
+    renderBoard();
+    try {
+      const payload = await postOrderAction('arrange_instant_shipment', order);
+      const arrangement = payload.arrangement && typeof payload.arrangement === 'object' ? payload.arrangement : {};
+      order.instantArrangementState = String(arrangement.state || 'requested');
+      order.instantArrangementError = String(arrangement.error || '');
+      saveOrders();
+      renderBoard();
+      await refreshOrders(false, { force: true });
+    } catch (error) {
+      order.instantArrangementState = 'failed';
+      order.instantArrangementError = error instanceof Error ? error.message : 'Unable to arrange this Instant shipment.';
+      saveOrders();
+      renderBoard();
+      showBoardAlert(order.instantArrangementError);
+    }
   };
 
   const closeFulfillment = (releaseClaim = false) => {
@@ -2171,6 +2274,11 @@ document.addEventListener('DOMContentLoaded', () => {
   board?.addEventListener('click', (event) => {
     unlockAudio();
     const target = event.target instanceof Element ? event.target : null;
+    const instantButton = target?.closest('[data-arrange-instant]');
+    if (instantButton instanceof HTMLButtonElement) {
+      if (!instantButton.disabled) arrangeInstantShipment(instantButton.dataset.arrangeInstant || '');
+      return;
+    }
     const button = target?.closest('[data-start-order]');
     if (!(button instanceof HTMLButtonElement)) return;
     if (button.disabled) return;

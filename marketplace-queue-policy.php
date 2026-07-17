@@ -6,6 +6,32 @@ function jg_store_ops_marketplace_label_backed(array $order): bool
     return !empty($order['labelBacked']) || !empty($order['label_backed']);
 }
 
+function jg_store_ops_marketplace_cancellation_requested(array $order): bool
+{
+    if (!empty($order['cancellationRequested']) || !empty($order['cancellation_requested'])) {
+        return true;
+    }
+    return in_array(jg_store_ops_marketplace_status($order), [
+        'IN_CANCEL',
+        'CANCEL_REQUESTED',
+        'CANCELLATION_REQUESTED',
+        'CANCEL_PENDING',
+        'CANCELLATION_PENDING',
+    ], true);
+}
+
+function jg_store_ops_marketplace_instant_manual_order(array $order): bool
+{
+    if (empty($order['instant'])) {
+        return false;
+    }
+    if (!empty($order['manualArrangementRequired']) || !empty($order['manual_arrangement_required'])) {
+        return true;
+    }
+    $state = strtolower(trim((string) ($order['instantArrangementState'] ?? $order['instant_arrangement_state'] ?? '')));
+    return in_array($state, ['required', 'requested', 'label_pending', 'failed', 'big_set_off'], true);
+}
+
 function jg_store_ops_marketplace_awaiting_collection(array $order, string $sourcePlatform): bool
 {
     $platform = strtolower(trim((string) ($order['platform'] ?? $order['source_platform'] ?? $sourcePlatform)));
@@ -48,8 +74,11 @@ function jg_store_ops_marketplace_pre_activation_visible(array $order, string $s
     $platform = strtolower(trim((string) ($order['platform'] ?? $order['source_platform'] ?? $sourcePlatform)));
     $source = strtolower(trim($sourcePlatform));
     $status = jg_store_ops_marketplace_status($order);
+    if (jg_store_ops_marketplace_cancellation_requested($order)) {
+        return true;
+    }
     if ($source === 'shopee' || str_contains($platform, 'shopee')) {
-        return $status === 'READY_TO_SHIP';
+        return in_array($status, ['READY_TO_SHIP', 'IN_CANCEL'], true);
     }
     if ($source === 'tiktok' || str_contains($platform, 'tiktok')) {
         return in_array($status, ['AWAITING_SHIPMENT', 'SHIPMENT_PENDING'], true);
@@ -68,10 +97,12 @@ function jg_store_ops_marketplace_order_visible(
         return jg_store_ops_marketplace_pre_activation_visible($order, $sourcePlatform);
     }
     $labelBacked = jg_store_ops_marketplace_label_backed($order);
-    if ($requireLabelBacked && !$labelBacked) {
+    $manualAction = jg_store_ops_marketplace_cancellation_requested($order)
+        || jg_store_ops_marketplace_instant_manual_order($order);
+    if ($requireLabelBacked && !$labelBacked && !$manualAction) {
         return false;
     }
-    return $labelBacked || !jg_store_ops_marketplace_awaiting_collection($order, $sourcePlatform);
+    return $labelBacked || $manualAction || !jg_store_ops_marketplace_awaiting_collection($order, $sourcePlatform);
 }
 
 function jg_store_ops_marketplace_feed_enabled(bool $localHardSetKnown, bool $localHardSetEnabled): bool
@@ -83,7 +114,10 @@ function jg_store_ops_marketplace_feed_enabled(bool $localHardSetKnown, bool $lo
 function jg_store_ops_marketplace_action_enabled(array $key, bool $localHardSetEnabled): bool
 {
     $platform = strtolower(trim((string) ($key['source_platform'] ?? '')));
-    return !in_array($platform, ['shopee', 'tiktok'], true) || $localHardSetEnabled;
+    if (!in_array($platform, ['shopee', 'tiktok'], true)) {
+        return true;
+    }
+    return $localHardSetEnabled && !jg_store_ops_marketplace_cancellation_requested($key);
 }
 
 function jg_store_ops_marketplace_requires_label_backed(

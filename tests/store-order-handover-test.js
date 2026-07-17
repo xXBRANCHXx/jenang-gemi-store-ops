@@ -36,6 +36,22 @@ assert(
   !presentation.isDropOff({}),
   'Orders without a recorded handover decision must not be guessed as drop-off.'
 );
+assert(
+  presentation.isCancellationRequested({ marketplaceStatus: 'IN_CANCEL' }),
+  'Shopee IN_CANCEL orders must receive the cancellation hold.'
+);
+assert(
+  presentation.requiresManualInstantArrangement({ instant: true, manualArrangementRequired: true }),
+  'Instant orders must expose their manual arrangement action.'
+);
+assert(
+  presentation.isInstantManualLifecycle({ instant: true, instantArrangementState: 'label_pending' }),
+  'An Instant card must stay visible while its label is prepared.'
+);
+assert(
+  presentation.formatHandoverSlot({ handoverSlotLabel: 'Sat, 1 Aug 2026 · 13:00-15:00' }) === 'Sat, 1 Aug 2026 · 13:00-15:00',
+  'Store Ops must preserve the marketplace-selected pickup day.'
+);
 
 const listedOrders = [
   { id: 'DROP', handoverMethod: 'DROP_OFF' },
@@ -72,6 +88,20 @@ assert(
   dashboardTemplate.includes('data-order-board aria-busy="true"')
     && dashboardTemplate.includes('admin-board-empty admin-board-loading'),
   'The server-rendered queue must show loading before Store Ops JavaScript starts.'
+);
+const storeHome = fs.readFileSync(path.join(__dirname, '../store-home.js'), 'utf8');
+const adminCss = fs.readFileSync(path.join(__dirname, '../admin.css'), 'utf8');
+assert(
+  storeHome.includes('data-arrange-instant') && storeHome.includes('Accept + arrange shipment'),
+  'The Instant card must provide one combined acceptance and arrangement button.'
+);
+assert(
+  storeHome.includes('Handle cancellation in ${escapeHtml(marketplaceName)}') && storeHome.includes('do not process'),
+  'Cancellation-requested cards must visibly direct staff to Shopee and block processing.'
+);
+assert(
+  adminCss.includes('.admin-order-card.is-instant') && adminCss.includes('@keyframes admin-instant-pulse'),
+  'Instant cards must always receive their red pulse treatment.'
 );
 
 console.log('store-order-handover-test: ok');
