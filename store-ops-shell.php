@@ -41,6 +41,7 @@ function jg_store_ops_shell_svg(string $name): string
     $icons = [
         'orders' => '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h6"/></svg>',
         'inventory' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM4.4 7.7 12 12l7.6-4.3M12 12v9"/></svg>',
+        'stock-adjust' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM4.4 7.7 12 12l7.6-4.3M12 12v9M15.5 6.2h3M17 4.7v3M5.5 15.5h3"/></svg>',
         'walk-ins' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3"/></svg>',
         'integrations' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12h8M9 7V3M15 7V3M7 7h10v3a5 5 0 0 1-10 0zM12 15v6"/></svg>',
         'sku-db' => '<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>',
@@ -57,6 +58,7 @@ function jg_store_ops_shell_nav_items(string $rootPrefix): array
     return [
         ['key' => 'orders', 'label' => 'Orders', 'href' => $rootPrefix . 'dashboard/', 'title' => 'Orders'],
         ['key' => 'inventory', 'label' => 'Inventory', 'href' => $rootPrefix . 'inventory/', 'title' => 'Inventory'],
+        ['key' => 'stock-adjust', 'label' => 'Stock Adjust', 'href' => $rootPrefix . 'inventory/adjust/', 'title' => 'Stock Adjust'],
         ['key' => 'walk-ins', 'label' => 'Walk Ins', 'href' => $rootPrefix . 'walk-ins/', 'title' => 'Walk Ins'],
         ['key' => 'whatsapp-orders', 'label' => 'WhatsApp Orders', 'href' => $rootPrefix . 'whatsapp-orders/', 'title' => 'WhatsApp Orders'],
         ['key' => 'invoice-printer', 'label' => 'Invoice Printer', 'href' => $rootPrefix . 'invoice-printer/', 'title' => 'Invoice Printer'],
