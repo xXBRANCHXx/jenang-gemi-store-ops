@@ -7954,6 +7954,14 @@ button.admin-store-sidebar-profile:hover {
   overflow-y: auto;
 }
 
+@media (min-width: 761px) {
+  .admin-stock-adjust-page-minimal .admin-stock-adjust-layout {
+    width: calc(100% + var(--store-sidebar-width) + 8px);
+    margin-left: calc(0px - var(--store-sidebar-width) - 8px);
+    transition: width 0.22s ease, margin-left 0.22s ease;
+  }
+}
+
 .admin-stock-adjust-page-minimal .admin-stock-adjust-card {
   width: min(100%, 720px);
   min-width: 0;
@@ -8139,6 +8147,10 @@ button.admin-store-sidebar-profile:hover {
 .admin-stock-adjust-page-minimal .admin-stock-clear {
   margin-top: 12px;
   text-decoration: none;
+}
+
+.admin-stock-adjust-page-minimal .admin-stock-clear[hidden] {
+  display: none;
 }
 
 .admin-stock-adjust-page-minimal .admin-stock-history-card {
