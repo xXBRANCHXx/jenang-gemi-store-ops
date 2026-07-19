@@ -80,8 +80,8 @@ assert(
   'A confirmed zero-order snapshot must show the real empty state instead of loading forever.'
 );
 assert(
-  !presentation.shouldShowOrderLoading(false, listedOrders),
-  'Cached visible orders must render immediately while the live refresh continues.'
+  presentation.shouldShowOrderLoading(false, listedOrders),
+  'Cached orders must stay hidden until the first live refresh resolves.'
 );
 const dashboardTemplate = fs.readFileSync(path.join(__dirname, '../dashboard/index.php'), 'utf8');
 assert(

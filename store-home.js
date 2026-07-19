@@ -68,7 +68,7 @@
     const rows = Array.isArray(orders) ? orders : [];
     return dropOffOnly ? rows.filter((order) => isDropOff(order)) : rows.slice();
   };
-  const shouldShowOrderLoading = (snapshotReady, orders) => !snapshotReady && (!Array.isArray(orders) || orders.length === 0);
+  const shouldShowOrderLoading = (snapshotReady) => !snapshotReady;
 
   global.JGStoreOrderPresentation = Object.freeze({
     normalizeDeadline,
@@ -1273,7 +1273,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!cachedOrders.length) return false;
     ordersEtag = String(cachedMeta.etag || '');
     state.orders = cachedOrders;
-    ordersSnapshotReady = true;
     renderBoard();
     renderSourceColorList();
     return true;
@@ -1293,7 +1292,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!cachedOrders.length) return false;
     ordersEtag = String(cached?.etag || ordersEtag || '');
     state.orders = cachedOrders;
-    ordersSnapshotReady = true;
     renderBoard();
     renderSourceColorList();
     return true;
@@ -2623,7 +2621,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return state.orders;
       } catch (error) {
         lastOrdersRefreshAt = Date.now();
-        if (showError && !state.orders.length) {
+        if (state.orders.length) {
+          ordersSnapshotReady = true;
+          renderBoard();
+        } else if (showError) {
           const message = error instanceof Error ? error.message : 'Unable to load orders.';
           renderBoardMessage(message);
         }
