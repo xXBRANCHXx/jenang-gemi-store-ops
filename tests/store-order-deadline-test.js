@@ -53,5 +53,13 @@ assert(
   presentation.shouldSoundSiren({ instant: false, deadlineAt: now + 59 * 60000 }, now) === true,
   'Regular orders must still sound the siren below one hour remaining.'
 );
+assert(
+  presentation.shouldSoundSiren({ instant: true, deadlineAt: now - 1 }, now) === false,
+  'Overdue Instant orders must not sound the siren.'
+);
+assert(
+  presentation.shouldSoundSiren({ instant: false, deadlineAt: now }, now) === false,
+  'Orders at or past their deadline must not sound the siren.'
+);
 
 console.log('store-order-deadline-test: ok');

@@ -12,7 +12,8 @@
   const isCriticalOrder = (order, now = Date.now()) => Number(order?.deadlineAt || 0) - now < 60 * 60000;
   const shouldSoundSiren = (order, now = Date.now()) => {
     const thresholdMs = order?.instant ? 2 * 60 * 60000 : 60 * 60000;
-    return Number(order?.deadlineAt || 0) - now < thresholdMs;
+    const remainingMs = Number(order?.deadlineAt || 0) - now;
+    return remainingMs > 0 && remainingMs < thresholdMs;
   };
   const formatDeadline = (order, now = Date.now()) => {
     const minutes = minutesRemaining(order, now);
