@@ -37,4 +37,21 @@ assert(fallback.deadlineAt === now + 86400000, 'A missing deadline must receive 
 assert(fallback.deadlineLabel === 'Deadline', 'A non-marketplace fallback must retain the generic label.');
 assert(presentation.formatDeadline({ deadlineAt: now - 1 }, now) === 'Overdue', 'Expired deadlines must render as overdue.');
 
+assert(
+  presentation.shouldSoundSiren({ instant: true, deadlineAt: now + 2 * 60 * 60000 }, now) === false,
+  'Instant orders must stay silent at the two-hour boundary.'
+);
+assert(
+  presentation.shouldSoundSiren({ instant: true, deadlineAt: now + 119 * 60000 }, now) === true,
+  'Instant orders must sound the siren below two hours remaining.'
+);
+assert(
+  presentation.shouldSoundSiren({ instant: false, deadlineAt: now + 90 * 60000 }, now) === false,
+  'Regular orders must keep the existing one-hour siren threshold.'
+);
+assert(
+  presentation.shouldSoundSiren({ instant: false, deadlineAt: now + 59 * 60000 }, now) === true,
+  'Regular orders must still sound the siren below one hour remaining.'
+);
+
 console.log('store-order-deadline-test: ok');

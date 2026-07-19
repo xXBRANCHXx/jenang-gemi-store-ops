@@ -9,6 +9,11 @@
   };
 
   const minutesRemaining = (order, now = Date.now()) => Math.ceil((Number(order?.deadlineAt || 0) - now) / 60000);
+  const isCriticalOrder = (order, now = Date.now()) => Number(order?.deadlineAt || 0) - now < 60 * 60000;
+  const shouldSoundSiren = (order, now = Date.now()) => {
+    const thresholdMs = order?.instant ? 2 * 60 * 60000 : 60 * 60000;
+    return Number(order?.deadlineAt || 0) - now < thresholdMs;
+  };
   const formatDeadline = (order, now = Date.now()) => {
     const minutes = minutesRemaining(order, now);
     if (minutes <= 0) return 'Overdue';
@@ -67,6 +72,8 @@
   global.JGStoreOrderPresentation = Object.freeze({
     normalizeDeadline,
     minutesRemaining,
+    isCriticalOrder,
+    shouldSoundSiren,
     formatDeadline,
     normalizeHandoverMethod,
     isDropOff,
@@ -1871,7 +1878,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const minutesRemaining = (order) => orderPresentation.minutesRemaining(order);
-  const isCriticalOrder = (order) => order.deadlineAt - Date.now() < 60 * 60000;
+  const isCriticalOrder = (order) => orderPresentation.isCriticalOrder(order);
   const formatDeadline = (order) => orderPresentation.formatDeadline(order);
 
   const formatClock = () => {
@@ -1940,8 +1947,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const refreshSiren = () => {
-    const hasCritical = listedOrders().some((order) => !order.started && isCriticalOrder(order));
-    if (!hasCritical || !audioUnlocked) {
+    const hasSirenEligibleOrder = listedOrders().some((order) => !order.started && orderPresentation.shouldSoundSiren(order));
+    if (!hasSirenEligibleOrder || !audioUnlocked) {
       window.clearInterval(sirenTimer);
       sirenTimer = 0;
       return;
