@@ -11,6 +11,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusNode = document.querySelector('[data-print-status]');
   const errorNode = document.querySelector('[data-print-error]');
   const optionsNode = document.querySelector('[data-label-options]');
+  const confirmationNode = document.querySelector('[data-print-confirmation]');
+  const confirmationTitleNode = document.querySelector('[data-print-confirmation-title]');
+  const confirmationDetailNode = document.querySelector('[data-print-confirmation-detail]');
+  const confirmPrintedButton = document.querySelector('[data-confirm-label-printed]');
+  const printAgainButton = document.querySelector('[data-print-again]');
   const previewNode = document.querySelector('[data-label-preview]');
   const labelFrame = document.querySelector('[data-label-frame]');
 
@@ -206,7 +211,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const markPrintedOnServer = async () => {
     if (!order) return;
-    await flushPendingScanQueueForOrder();
     await postOrderAction(isReprint ? 'reprint_label' : 'label_printed', {
       printed_at: new Date().toISOString()
     });
@@ -220,19 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
-  const returnToDashboard = async () => {
-    if (!printInProgress || returningToDashboard) return;
-    returningToDashboard = true;
-    if (statusNode) statusNode.textContent = isReprint ? 'Returning' : 'Finalizing';
-    try {
-      await markFulfilledOnServer();
-    } catch (error) {
-      returningToDashboard = false;
-      printInProgress = false;
-      if (statusNode) statusNode.textContent = 'Fulfillment pending';
-      setError(error instanceof Error ? error.message : 'Unable to finalize fulfillment.');
-      return;
-    }
+  const returnToDashboard = () => {
     printInProgress = false;
     window.clearTimeout(returnTimer);
     try {
@@ -253,19 +245,73 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 150);
   };
 
-  const printLabel = async () => {
-    if (!order || !labelLoaded) return;
-    if (statusNode) statusNode.textContent = 'Printing';
-    printInProgress = true;
+  const setConfirmationActionsDisabled = (disabled) => {
+    if (confirmPrintedButton instanceof HTMLButtonElement) confirmPrintedButton.disabled = disabled;
+    if (printAgainButton instanceof HTMLButtonElement) printAgainButton.disabled = disabled;
+  };
+
+  const showPrintConfirmation = () => {
+    if (!printInProgress || returningToDashboard) return;
+    printInProgress = false;
     window.clearTimeout(returnTimer);
+    setPrintEnabled(false);
+    setConfirmationActionsDisabled(false);
+    if (confirmationTitleNode) {
+      confirmationTitleNode.textContent = isReprint
+        ? 'Did the shipping label reprint correctly?'
+        : 'Did the shipping label print correctly?';
+    }
+    if (confirmationDetailNode) {
+      confirmationDetailNode.textContent = isReprint
+        ? 'The reprint is recorded only after you confirm it.'
+        : 'The order stays listed until you confirm the printed label.';
+    }
+    if (confirmPrintedButton instanceof HTMLButtonElement) {
+      confirmPrintedButton.textContent = isReprint ? 'Confirm label reprinted' : 'Confirm label printed';
+    }
+    if (confirmationNode) confirmationNode.hidden = false;
+    if (statusNode) statusNode.textContent = 'Confirmation required';
+  };
+
+  const confirmPrinted = async () => {
+    if (!order || returningToDashboard) return;
+    returningToDashboard = true;
+    setConfirmationActionsDisabled(true);
+    setError('');
+    if (statusNode) statusNode.textContent = isReprint ? 'Confirming reprint' : 'Completing order';
     try {
       await markPrintedOnServer();
+      await markFulfilledOnServer();
     } catch (error) {
-      printInProgress = false;
-      if (statusNode) statusNode.textContent = 'Ready';
-      setError(error instanceof Error ? error.message : 'Unable to update order status.');
+      returningToDashboard = false;
+      setConfirmationActionsDisabled(false);
+      if (statusNode) statusNode.textContent = 'Confirmation required';
+      const message = error instanceof Error ? error.message : 'Unable to confirm the printed label.';
+      setError(`${message} The order remains listed.`);
       return;
     }
+    if (statusNode) statusNode.textContent = 'Label confirmed';
+    returnToDashboard();
+  };
+
+  const printLabel = async () => {
+    if (!order || !labelLoaded || returningToDashboard) return;
+    window.clearTimeout(returnTimer);
+    if (confirmationNode) confirmationNode.hidden = true;
+    setConfirmationActionsDisabled(true);
+    setPrintEnabled(false);
+    setError('');
+    if (statusNode) statusNode.textContent = 'Preparing print';
+    try {
+      await flushPendingScanQueueForOrder();
+    } catch (error) {
+      setPrintEnabled(true);
+      if (statusNode) statusNode.textContent = 'Ready';
+      setError(error instanceof Error ? error.message : 'Unable to prepare this order for printing.');
+      return;
+    }
+    printInProgress = true;
+    if (statusNode) statusNode.textContent = 'Printing';
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         try {
@@ -277,10 +323,11 @@ document.addEventListener('DOMContentLoaded', () => {
             window.print();
           }
           returnTimer = window.setTimeout(() => {
-            returnToDashboard();
+            showPrintConfirmation();
           }, 1500);
         } catch (_error) {
           printInProgress = false;
+          setPrintEnabled(true);
           if (statusNode) statusNode.textContent = 'Ready';
           setError('Unable to open the print dialog.');
         }
@@ -376,7 +423,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  window.addEventListener('afterprint', returnToDashboard);
+  window.addEventListener('afterprint', showPrintConfirmation);
   window.addEventListener('beforeunload', () => {
     if (labelUrl) URL.revokeObjectURL(labelUrl);
   });
@@ -388,4 +435,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!order || button.disabled) return;
     printLabel();
   });
+
+  printAgainButton?.addEventListener('click', () => {
+    if (confirmationNode) confirmationNode.hidden = true;
+    printLabel();
+  });
+
+  confirmPrintedButton?.addEventListener('click', confirmPrinted);
 });

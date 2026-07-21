@@ -11,6 +11,8 @@ function partner_order_lifecycle_expect(bool $expected, bool $actual, string $me
 }
 
 partner_order_lifecycle_expect(true, jg_store_ops_partner_orders_status_is_visible('IS_LISTED'), 'Listed Partner orders should be visible.');
+partner_order_lifecycle_expect(true, jg_store_ops_partner_orders_status_is_visible('IS_BEING_FULFILLED'), 'Accepted Partner orders should remain visible until label printing is confirmed.');
+partner_order_lifecycle_expect(true, jg_store_ops_partner_orders_status_is_visible('PROCESSING'), 'Legacy processing Partner orders should remain visible until label printing is confirmed.');
 partner_order_lifecycle_expect(false, jg_store_ops_partner_orders_status_is_visible('CANCELLED'), 'Cancelled Partner orders should be removed from Store Ops.');
 partner_order_lifecycle_expect(true, jg_store_ops_partner_orders_status_can_transition('IS_LISTED', 'IS_BEING_FULFILLED'), 'Lanjut should start Partner fulfillment.');
 partner_order_lifecycle_expect(false, jg_store_ops_partner_orders_status_can_transition('CANCELLED', 'IS_BEING_FULFILLED'), 'A cancelled order must not be revived by a stale Store Ops client.');

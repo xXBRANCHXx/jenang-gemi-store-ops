@@ -427,7 +427,7 @@ function jg_store_ops_partner_orders_enrich_order(array $order): array
 function jg_store_ops_partner_orders_status_is_visible(string $status): bool
 {
     $normalized = strtoupper(trim($status));
-    return in_array($normalized, ['', 'DRAFT', 'READY', 'SUBMITTED', 'LISTED', 'IS_LISTED'], true);
+    return in_array($normalized, ['', 'DRAFT', 'READY', 'SUBMITTED', 'LISTED', 'IS_LISTED', 'PROCESSING', 'IS_BEING_FULFILLED'], true);
 }
 
 function jg_store_ops_partner_orders_normalize_status(string $status): string
