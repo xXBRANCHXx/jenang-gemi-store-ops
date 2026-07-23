@@ -196,15 +196,16 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
 
         <div class="admin-modal-shell admin-fulfillment-modal" data-fulfillment-modal hidden>
             <div class="admin-modal-backdrop" data-close-fulfillment-modal></div>
-            <div class="admin-modal-card admin-fulfillment-card" data-fulfillment-card>
+            <div class="admin-modal-card admin-fulfillment-card" data-fulfillment-card role="dialog" aria-modal="true" aria-labelledby="store-order-modal-title">
                 <div class="admin-modal-head">
                     <div>
                         <span class="admin-panel-kicker" data-modal-step-label>Pick List</span>
-                        <h3 data-modal-title>Order</h3>
+                        <h3 id="store-order-modal-title" data-modal-title>Order</h3>
                     </div>
                     <button type="button" class="admin-ghost-btn" data-close-fulfillment-modal>Close</button>
                 </div>
-                <div class="admin-quiz-stage" data-pick-stage>
+                <div class="admin-order-preview" data-order-preview hidden></div>
+                <div class="admin-quiz-stage" data-pick-stage hidden>
                     <div class="admin-order-summary" data-order-summary></div>
                     <div class="admin-pick-list" data-pick-list></div>
                     <div class="admin-modal-actions">

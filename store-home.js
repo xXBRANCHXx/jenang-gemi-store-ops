@@ -69,6 +69,51 @@
     return dropOffOnly ? rows.filter((order) => isDropOff(order)) : rows.slice();
   };
   const shouldShowOrderLoading = (snapshotReady) => !snapshotReady;
+  const previewActionState = (order, context = {}) => {
+    const platform = String(order?.platform || '').trim().toLowerCase();
+    const pausedUnarranged = Boolean(context.automaticArrangementPaused)
+      && ['shopee', 'tiktok'].includes(platform)
+      && !order?.labelBacked;
+    const claimedBySelf = Boolean(order?.claimedBy && order.claimedBy === context.currentEmployeeId);
+
+    if (isCancellationRequested(order)) {
+      return {
+        disabled: true,
+        label: 'Cannot start this order',
+        note: `Cancellation requested — resolve it in ${String(order?.platform || 'the marketplace')}.`
+      };
+    }
+    if (isInstantManualLifecycle(order) && !order?.labelBacked) {
+      return {
+        disabled: true,
+        label: 'Shipment arrangement required',
+        note: 'Accept and arrange the shipment from the order card before starting fulfillment.'
+      };
+    }
+    if (pausedUnarranged) {
+      return {
+        disabled: true,
+        label: 'Shipment not arranged',
+        note: 'Automatic arrangement is paused. Arrange this order in the marketplace first.'
+      };
+    }
+    if (order?.locked && order?.currentEmployeeCanWork === false) {
+      return {
+        disabled: true,
+        label: 'Order is locked',
+        note: order?.claimedByName
+          ? `${order.claimedByName} is currently working on this order.`
+          : 'Another operator is currently working on this order.'
+      };
+    }
+    return {
+      disabled: false,
+      label: order?.claimStale ? 'Reclaim order' : (claimedBySelf ? 'Resume order' : 'Start order'),
+      note: claimedBySelf
+        ? 'Continue to the product pick list.'
+        : 'Starting claims this order and opens the product pick list.'
+    };
+  };
 
   global.JGStoreOrderPresentation = Object.freeze({
     normalizeDeadline,
@@ -83,7 +128,8 @@
     isInstantManualLifecycle,
     formatHandoverSlot,
     filterOrdersByHandover,
-    shouldShowOrderLoading
+    shouldShowOrderLoading,
+    previewActionState
   });
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -105,6 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const modal = document.querySelector('[data-fulfillment-modal]');
   const modalTitle = document.querySelector('[data-modal-title]');
   const modalStepLabel = document.querySelector('[data-modal-step-label]');
+  const previewStage = document.querySelector('[data-order-preview]');
   const pickStage = document.querySelector('[data-pick-stage]');
   const orderSummary = document.querySelector('[data-order-summary]');
   const pickList = document.querySelector('[data-pick-list]');
@@ -192,6 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const scannerBarcodeWaitMs = scannerBarcodeWaitSeconds * 1000;
   let state = {
     orders: [],
+    previewOrderId: '',
     activeOrderId: '',
     scans: new Map()
   };
@@ -1208,6 +1256,7 @@ document.addEventListener('DOMContentLoaded', () => {
       sourceAccountKey: String(order.sourceAccountKey || order.account_key || ''),
       partnerCode: String(order.partnerCode || order.partner_code || ''),
       partnerName: String(order.partnerName || order.partner_name || ''),
+      customerName: String(order.customerName || order.customer_name || order.customer?.name || order.buyerName || order.buyer_name || ''),
       status: String(order.status || 'IS_LISTED'),
       marketplaceStatus: String(order.marketplaceStatus || 'READY_TO_SHIP'),
       labelBacked: Boolean(order.labelBacked || order.label_backed),
@@ -2029,6 +2078,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (state.activeOrderId && (!currentActiveOrder || currentActiveOrder.fulfillmentStatus === 'FULFILLED' || currentActiveOrder.currentEmployeeCanWork === false)) {
       closeFulfillment();
     }
+    const currentPreviewOrder = state.orders.find((order) => order.id === state.previewOrderId);
+    if (state.previewOrderId && (!currentPreviewOrder || currentPreviewOrder.fulfillmentStatus === 'FULFILLED')) {
+      closeFulfillment();
+    } else if (currentPreviewOrder && modal?.dataset.mode === 'preview') {
+      renderOrderPreview(currentPreviewOrder);
+    }
     const allListedOrders = listedOrders();
     const orders = visibleListedOrders(allListedOrders);
     const { columnCount, rowCount } = boardDimensions(orders.length);
@@ -2110,6 +2165,7 @@ document.addEventListener('DOMContentLoaded', () => {
           ${sourceColor ? `data-source-color="${customSourceColor ? 'custom' : escapeHtml(sourceColor)}"` : ''}
           ${cardStyles ? `style="${cardStyles}"` : ''}
         >
+          <button type="button" class="admin-order-preview-trigger" data-preview-order="${escapeHtml(order.id)}" aria-label="Preview order ${escapeHtml(order.id)}"></button>
           <div class="admin-order-card-top">
             <span class="admin-order-id">${escapeHtml(order.id)}</span>
             ${isDropOff ? `<span class="admin-dropoff-badge" aria-label="${escapeHtml(handoverDescription)}" title="${escapeHtml(handoverDescription)}">Drop-off</span>` : ''}
@@ -2141,6 +2197,95 @@ document.addEventListener('DOMContentLoaded', () => {
   const scheduleBoardRender = () => {
     window.clearTimeout(boardResizeTimer);
     boardResizeTimer = window.setTimeout(renderBoard, 80);
+  };
+
+  const renderOrderPreview = (order) => {
+    if (!previewStage) return;
+    const unitCount = orderProductCount(order);
+    const lineCount = order.items.length;
+    const sourceLabel = sourceLabelFromOrder(order);
+    const action = orderPresentation.previewActionState(order, {
+      automaticArrangementPaused,
+      currentEmployeeId: currentEmployee.id
+    });
+    const pickupSlot = order.handoverMethod === 'PICKUP' ? orderPresentation.formatHandoverSlot(order) : '';
+    const handoverLabel = orderPresentation.isDropOff(order)
+      ? `Drop-off${order.shippingProviderName ? ` · ${order.shippingProviderName}` : ''}`
+      : (pickupSlot ? `Pickup · ${pickupSlot}` : 'Standard fulfillment');
+    const claimLabel = order.claimedByName
+      ? `${order.claimStale ? 'Stale claim' : 'Claimed'} · ${order.claimedByName}`
+      : 'Ready to claim';
+    const customerName = String(order.customerName || '').trim();
+    const packageNumber = String(order.packageNumber || '').trim();
+
+    if (modalTitle) modalTitle.textContent = order.id;
+    if (modalStepLabel) modalStepLabel.textContent = 'Order preview';
+    previewStage.innerHTML = `
+      <section class="admin-preview-hero">
+        <span class="admin-preview-hero-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M5 7.5 12 4l7 3.5v9L12 20l-7-3.5z"/><path d="m5 7.5 7 3.5 7-3.5M12 11v9"/></svg>
+        </span>
+        <div class="admin-preview-hero-copy">
+          <span>${escapeHtml(sourceLabel)}</span>
+          <strong>${lineCount} product line${lineCount === 1 ? '' : 's'} · ${unitCount} unit${unitCount === 1 ? '' : 's'}</strong>
+          <small>Review the complete order before assigning it to yourself.</small>
+        </div>
+        <div class="admin-preview-deadline ${isCriticalOrder(order) ? 'is-critical' : ''}">
+          <span>${escapeHtml(order.deadlineLabel)}</span>
+          <strong>${escapeHtml(formatDeadline(order))}</strong>
+        </div>
+      </section>
+
+      <div class="admin-preview-facts">
+        <div><span>Order status</span><strong>${escapeHtml(order.marketplaceStatus || order.status)}</strong></div>
+        <div><span>Assignment</span><strong>${escapeHtml(claimLabel)}</strong></div>
+        <div><span>Handover</span><strong>${escapeHtml(handoverLabel)}</strong></div>
+        ${customerName ? `<div><span>Customer</span><strong>${escapeHtml(customerName)}</strong></div>` : ''}
+        ${packageNumber ? `<div><span>Package</span><strong>${escapeHtml(packageNumber)}</strong></div>` : ''}
+      </div>
+
+      <section class="admin-preview-products">
+        <div class="admin-preview-section-head">
+          <div><span>Order breakdown</span><strong>Products to grab</strong></div>
+          <em>${unitCount} total</em>
+        </div>
+        <div class="admin-preview-product-list">
+          ${order.items.length ? order.items.map((item, index) => {
+            const productName = item.productName || item.scanProductName || 'Order item';
+            const sku = String(item.sourceSkus?.[0] || item.sku || item.tag || '').trim();
+            const quantity = Math.max(1, Number(item.quantity || 1));
+            return `
+              <article class="admin-preview-product">
+                <span class="admin-preview-product-index">${index + 1}</span>
+                <div><strong>${escapeHtml(productName)}</strong><small>${escapeHtml(sku || 'SKU unavailable')}</small></div>
+                <em>x${escapeHtml(quantity)}</em>
+              </article>
+            `;
+          }).join('') : '<p class="admin-preview-empty">No product details are available for this order.</p>'}
+        </div>
+      </section>
+
+      <div class="admin-preview-action-bar">
+        <div><strong>${escapeHtml(action.label)}</strong><span>${escapeHtml(action.note)}</span></div>
+        <button type="button" class="admin-primary-btn admin-preview-start" data-preview-start="${escapeHtml(order.id)}" ${action.disabled ? 'disabled' : ''}>
+          <span>${escapeHtml(action.label)}</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+        </button>
+      </div>
+    `;
+  };
+
+  const openOrderPreview = (orderId) => {
+    const order = state.orders.find((item) => item.id === orderId);
+    if (!order) return;
+    state.previewOrderId = order.id;
+    renderOrderPreview(order);
+    if (pickStage) pickStage.hidden = true;
+    if (previewStage) previewStage.hidden = false;
+    if (modal) {
+      modal.dataset.mode = 'preview';
+      modal.hidden = false;
+    }
   };
 
   const renderPickStage = (order) => {
@@ -2241,12 +2386,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (order.locked && !order.currentEmployeeCanWork) return;
     applyOptimisticClaim(order);
     state.activeOrderId = order.id;
+    state.previewOrderId = '';
     state.scans = new Map();
     saveOrders();
     refreshSiren();
     renderPickStage(order);
+    if (previewStage) previewStage.hidden = true;
     if (pickStage) pickStage.hidden = false;
-    if (modal) modal.hidden = false;
+    if (modal) {
+      modal.dataset.mode = 'pick';
+      modal.hidden = false;
+    }
     renderBoard();
     syncClaimInBackground(order, order.clientClaimRequestId);
   };
@@ -2278,6 +2428,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const closeFulfillment = (releaseClaim = false) => {
     const order = activeOrder();
     if (modal) modal.hidden = true;
+    if (previewStage) previewStage.hidden = true;
+    if (pickStage) pickStage.hidden = true;
+    state.previewOrderId = '';
     state.activeOrderId = '';
     state.scans = new Map();
     if (releaseClaim && order?.clientClaimPending) {
@@ -2307,9 +2460,20 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     const button = target?.closest('[data-start-order]');
-    if (!(button instanceof HTMLButtonElement)) return;
-    if (button.disabled) return;
-    openFulfillment(button.dataset.startOrder || '');
+    if (button instanceof HTMLButtonElement) {
+      if (!button.disabled) openFulfillment(button.dataset.startOrder || '');
+      return;
+    }
+    const card = target?.closest('[data-preview-order]');
+    if (!(card instanceof HTMLElement)) return;
+    openOrderPreview(card.dataset.previewOrder || '');
+  });
+
+  previewStage?.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const button = target?.closest('[data-preview-start]');
+    if (!(button instanceof HTMLButtonElement) || button.disabled) return;
+    openFulfillment(button.dataset.previewStart || '');
   });
 
   document.querySelector('[data-next-scan]')?.addEventListener('click', async (event) => {
@@ -2535,6 +2699,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('pointerdown', unlockAudio, { once: true });
   document.addEventListener('keydown', unlockAudio, { once: true });
   document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && modal && !modal.hidden) {
+      closeFulfillment(true);
+      return;
+    }
     if (event.key === 'Escape' && reprintModal && !reprintModal.hidden) {
       closeReprintModal();
       return;
