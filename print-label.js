@@ -309,10 +309,9 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const setPrintEnabled = (enabled) => {
-    const button = optionsNode?.querySelector('[data-print-shopee-label]');
-    if (button instanceof HTMLButtonElement) {
-      button.disabled = !enabled;
-    }
+    root.querySelectorAll('[data-print-shopee-label]').forEach((button) => {
+      if (button instanceof HTMLButtonElement) button.disabled = !enabled;
+    });
   };
 
   const loadLabel = async () => {
@@ -378,7 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (labelUrl) URL.revokeObjectURL(labelUrl);
   });
 
-  optionsNode?.addEventListener('click', (event) => {
+  root.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
     const button = target?.closest('[data-print-shopee-label]');
     if (!(button instanceof HTMLButtonElement)) return;

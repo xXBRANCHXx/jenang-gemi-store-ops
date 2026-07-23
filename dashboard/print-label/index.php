@@ -55,7 +55,21 @@ $printLabelJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/print-label.j
                 <p class="admin-form-error" data-print-error hidden></p>
                 <div class="admin-label-option-grid" data-label-options></div>
                 <div class="admin-label-preview" data-label-preview hidden>
-                    <iframe class="admin-shopee-label-frame" data-label-frame title="Shipping label"></iframe>
+                    <div class="admin-label-frame-shell">
+                        <iframe class="admin-shopee-label-frame" data-label-frame title="Shipping label"></iframe>
+                        <button
+                            type="button"
+                            class="admin-label-viewer-print"
+                            data-print-shopee-label
+                            aria-label="Print shipping label and complete order"
+                            title="Print"
+                            disabled
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 14h10v7H7z"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </section>
         </main>

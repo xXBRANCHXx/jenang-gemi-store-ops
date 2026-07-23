@@ -2398,12 +2398,61 @@ button, input {
   display: none;
 }
 
-.admin-shopee-label-frame {
+.admin-label-frame-shell {
+  position: relative;
   width: min(100%, 900px);
   height: min(72svh, 920px);
+}
+
+.admin-shopee-label-frame {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   background: #fff;
+}
+
+.admin-label-viewer-print {
+  position: absolute;
+  z-index: 2;
+  top: 9px;
+  right: 48px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #323639;
+  color: #f1f3f4;
+  cursor: pointer;
+}
+
+.admin-label-viewer-print:hover,
+.admin-label-viewer-print:focus-visible {
+  background: #484b4d;
+}
+
+.admin-label-viewer-print:focus-visible {
+  outline: 2px solid #8ab4f8;
+  outline-offset: -2px;
+}
+
+.admin-label-viewer-print:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.admin-label-viewer-print svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 
 .admin-label-sheet {
@@ -8271,6 +8320,7 @@ button.admin-store-sidebar-profile:hover {
   .admin-print-label-page .admin-topbar,
   .admin-print-label-page .admin-scan-head,
   .admin-print-label-page .admin-label-option-grid,
+  .admin-label-viewer-print,
   .admin-print-label-page .admin-form-error {
     display: none !important;
   }
@@ -8294,9 +8344,13 @@ button.admin-store-sidebar-profile:hover {
     break-inside: avoid;
   }
 
+  .admin-label-frame-shell,
   .admin-shopee-label-frame {
     width: 100vw;
     height: 100vh;
+  }
+
+  .admin-shopee-label-frame {
     border: 0;
     border-radius: 0;
   }
