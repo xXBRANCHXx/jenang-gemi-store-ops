@@ -54,17 +54,6 @@ $printLabelJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/print-label.j
                 </div>
                 <p class="admin-form-error" data-print-error hidden></p>
                 <div class="admin-label-option-grid" data-label-options></div>
-                <section class="admin-label-print-confirmation" data-print-confirmation aria-live="polite" hidden>
-                    <div>
-                        <span>Print check</span>
-                        <strong data-print-confirmation-title>Did the shipping label print correctly?</strong>
-                        <p data-print-confirmation-detail>The order stays listed until you confirm the printed label.</p>
-                    </div>
-                    <div class="admin-label-print-confirmation-actions">
-                        <button type="button" class="admin-ghost-btn" data-print-again>Print again</button>
-                        <button type="button" class="admin-primary-btn" data-confirm-label-printed>Confirm label printed</button>
-                    </div>
-                </section>
                 <div class="admin-label-preview" data-label-preview hidden>
                     <iframe class="admin-shopee-label-frame" data-label-frame title="Shipping label"></iframe>
                 </div>
