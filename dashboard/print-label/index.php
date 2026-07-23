@@ -54,6 +54,17 @@ $printLabelJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/print-label.j
                 </div>
                 <p class="admin-form-error" data-print-error hidden></p>
                 <div class="admin-label-option-grid" data-label-options></div>
+                <section class="admin-label-print-confirmation" data-print-confirmation aria-live="polite" hidden>
+                    <div>
+                        <span>Print confirmation</span>
+                        <strong>Did the shipping label print successfully?</strong>
+                        <p data-print-confirmation-detail>The order is already removed from Listed. Confirming only closes this tab.</p>
+                    </div>
+                    <div class="admin-label-print-confirmation-actions">
+                        <button type="button" class="admin-ghost-btn" data-print-again>Print again</button>
+                        <button type="button" class="admin-primary-btn" data-confirm-label-printed>Printed successfully — close tab</button>
+                    </div>
+                </section>
                 <div class="admin-label-preview" data-label-preview hidden>
                     <div class="admin-label-frame-shell">
                         <iframe class="admin-shopee-label-frame" data-label-frame title="Shipping label"></iframe>

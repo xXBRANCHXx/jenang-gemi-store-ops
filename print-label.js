@@ -11,6 +11,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusNode = document.querySelector('[data-print-status]');
   const errorNode = document.querySelector('[data-print-error]');
   const optionsNode = document.querySelector('[data-label-options]');
+  const confirmationNode = document.querySelector('[data-print-confirmation]');
+  const confirmationDetailNode = document.querySelector('[data-print-confirmation-detail]');
+  const confirmPrintedButton = document.querySelector('[data-confirm-label-printed]');
+  const printAgainButton = document.querySelector('[data-print-again]');
   const previewNode = document.querySelector('[data-label-preview]');
   const labelFrame = document.querySelector('[data-label-frame]');
 
@@ -55,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
   } : null);
   const sourceAccount = requestedAccount || String(order?.sourceAccountKey || '');
   const packageNumber = String(order?.packageNumber || order?.package_number || params.get('package') || params.get('package_id') || '');
-  let printFinishTimer = 0;
+  let printConfirmationTimer = 0;
   let printInProgress = false;
   let labelUrl = '';
   let labelLoaded = false;
@@ -210,17 +214,56 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
-  const finishPrinting = () => {
+  const setConfirmationActionsDisabled = (disabled) => {
+    if (confirmPrintedButton instanceof HTMLButtonElement) confirmPrintedButton.disabled = disabled;
+    if (printAgainButton instanceof HTMLButtonElement) printAgainButton.disabled = disabled;
+  };
+
+  const showPrintConfirmation = () => {
     if (!printInProgress) return;
     printInProgress = false;
-    window.clearTimeout(printFinishTimer);
-    if (statusNode) statusNode.textContent = isReprint ? 'Reprint recorded' : 'Order completed';
-    if (isReprint) setPrintEnabled(true);
+    window.clearTimeout(printConfirmationTimer);
+    setConfirmationActionsDisabled(false);
+    if (confirmationNode) confirmationNode.hidden = false;
+    if (confirmationDetailNode) {
+      confirmationDetailNode.textContent = 'The order is already removed from Listed. Confirming only closes this tab.';
+    }
+    if (statusNode) statusNode.textContent = 'Confirm print';
+  };
+
+  const openPrintDialog = () => {
+    if (!labelLoaded || printInProgress) return;
+    window.clearTimeout(printConfirmationTimer);
+    if (confirmationNode) confirmationNode.hidden = true;
+    setConfirmationActionsDisabled(true);
+    setError('');
+    printInProgress = true;
+    if (statusNode) statusNode.textContent = 'Printing';
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        try {
+          const frameWindow = labelFrame instanceof HTMLIFrameElement ? labelFrame.contentWindow : null;
+          if (frameWindow) {
+            frameWindow.focus();
+            frameWindow.print();
+          } else {
+            window.print();
+          }
+          printConfirmationTimer = window.setTimeout(() => {
+            showPrintConfirmation();
+          }, 1500);
+        } catch (_error) {
+          showPrintConfirmation();
+          if (statusNode) statusNode.textContent = 'Print dialog failed';
+          setError('The order was removed from Listed, but the browser could not open the print dialog. Use Print again.');
+        }
+      });
+    });
   };
 
   const printLabel = async () => {
     if (!order || !labelLoaded || printInProgress) return;
-    window.clearTimeout(printFinishTimer);
+    window.clearTimeout(printConfirmationTimer);
     setPrintEnabled(false);
     setError('');
     if (statusNode) statusNode.textContent = isReprint ? 'Recording reprint' : 'Completing order';
@@ -235,28 +278,22 @@ document.addEventListener('DOMContentLoaded', () => {
       setError(error instanceof Error ? error.message : 'Unable to update the order before printing.');
       return;
     }
-    printInProgress = true;
-    if (statusNode) statusNode.textContent = 'Printing';
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        try {
-          const frameWindow = labelFrame instanceof HTMLIFrameElement ? labelFrame.contentWindow : null;
-          if (frameWindow) {
-            frameWindow.focus();
-            frameWindow.print();
-          } else {
-            window.print();
-          }
-          printFinishTimer = window.setTimeout(() => {
-            finishPrinting();
-          }, 1500);
-        } catch (_error) {
-          printInProgress = false;
-          if (statusNode) statusNode.textContent = isReprint ? 'Reprint recorded' : 'Order completed';
-          setError('The order was updated, but the browser could not open the print dialog.');
-        }
-      });
-    });
+    openPrintDialog();
+  };
+
+  const closeConfirmedPrintTab = () => {
+    setConfirmationActionsDisabled(true);
+    if (statusNode) statusNode.textContent = 'Print confirmed';
+    try {
+      if (window.opener && !window.opener.closed) window.opener.focus();
+    } catch (_error) {
+      // Closing the print tab does not depend on focusing its opener.
+    }
+    window.close();
+    window.setTimeout(() => {
+      setConfirmationActionsDisabled(false);
+      setError('Print confirmed. Your browser prevented automatic closing; you can close this tab.');
+    }, 250);
   };
 
   const platformLabel = (value) => {
@@ -346,7 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  window.addEventListener('afterprint', finishPrinting);
+  window.addEventListener('afterprint', showPrintConfirmation);
   window.addEventListener('beforeunload', () => {
     if (labelUrl) URL.revokeObjectURL(labelUrl);
   });
@@ -358,4 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!order || button.disabled) return;
     printLabel();
   });
+
+  printAgainButton?.addEventListener('click', openPrintDialog);
+  confirmPrintedButton?.addEventListener('click', closeConfirmedPrintTab);
 });
