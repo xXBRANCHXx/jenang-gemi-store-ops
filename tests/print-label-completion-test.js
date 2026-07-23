@@ -19,6 +19,7 @@ assert.match(printFlow[0], /await markPrintedOnServer\(\);[\s\S]*await markFulfi
 assert.match(script, /currentOrder\.status = 'FULFILLED';[\s\S]*currentOrder\.fulfillmentStatus = 'FULFILLED'/, 'the local order cache should hide a completed order immediately');
 assert.match(script, /root\.querySelectorAll\('\[data-print-shopee-label\]'\)/, 'all visible print actions should share the same enabled state');
 assert.match(script, /root\.addEventListener\('click'[\s\S]*closest\('\[data-print-shopee-label\]'\)[\s\S]*printLabel\(\)/, 'the viewer print icon should use the completion-first print flow');
-assert.match(script, /window\.addEventListener\('afterprint', returnToDashboard\)/, 'closing the print dialog should return to the dashboard without another confirmation');
+assert.match(script, /window\.addEventListener\('afterprint', finishPrinting\)/, 'closing the print dialog should finish the print state without another confirmation');
+assert.doesNotMatch(script, /window\.close\(\)|location\.replace\(/, 'printing should keep the print-label tab open');
 
 console.log('print-label-completion-test: ok');

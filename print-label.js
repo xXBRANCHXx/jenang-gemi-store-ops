@@ -55,21 +55,10 @@ document.addEventListener('DOMContentLoaded', () => {
   } : null);
   const sourceAccount = requestedAccount || String(order?.sourceAccountKey || '');
   const packageNumber = String(order?.packageNumber || order?.package_number || params.get('package') || params.get('package_id') || '');
-  let returnTimer = 0;
+  let printFinishTimer = 0;
   let printInProgress = false;
   let labelUrl = '';
   let labelLoaded = false;
-  let returningToDashboard = false;
-  const dashboardUrl = (() => {
-    try {
-      if (window.opener && !window.opener.closed && window.opener.location) {
-        return window.opener.location.href || '../';
-      }
-    } catch (_error) {
-      // Cross-window reads can fail; fall back to the dashboard path.
-    }
-    return '../';
-  })();
 
   const normalizeSourceKey = (value) => String(value || '')
     .trim()
@@ -221,32 +210,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
-  const returnToDashboard = () => {
-    if (!printInProgress || returningToDashboard) return;
-    returningToDashboard = true;
+  const finishPrinting = () => {
+    if (!printInProgress) return;
     printInProgress = false;
-    window.clearTimeout(returnTimer);
-    try {
-      if (window.opener && !window.opener.closed) {
-        window.opener.focus();
-      }
-    } catch (_error) {
-      // Ignore cross-window focus issues.
-    }
-    try {
-      window.open('', '_self');
-    } catch (_error) {
-      // Ignore close-prep issues.
-    }
-    window.close();
-    window.setTimeout(() => {
-      window.location.replace(dashboardUrl);
-    }, 150);
+    window.clearTimeout(printFinishTimer);
+    if (statusNode) statusNode.textContent = isReprint ? 'Reprint recorded' : 'Order completed';
+    if (isReprint) setPrintEnabled(true);
   };
 
   const printLabel = async () => {
-    if (!order || !labelLoaded || returningToDashboard) return;
-    window.clearTimeout(returnTimer);
+    if (!order || !labelLoaded || printInProgress) return;
+    window.clearTimeout(printFinishTimer);
     setPrintEnabled(false);
     setError('');
     if (statusNode) statusNode.textContent = isReprint ? 'Recording reprint' : 'Completing order';
@@ -273,8 +247,8 @@ document.addEventListener('DOMContentLoaded', () => {
           } else {
             window.print();
           }
-          returnTimer = window.setTimeout(() => {
-            returnToDashboard();
+          printFinishTimer = window.setTimeout(() => {
+            finishPrinting();
           }, 1500);
         } catch (_error) {
           printInProgress = false;
@@ -372,7 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  window.addEventListener('afterprint', returnToDashboard);
+  window.addEventListener('afterprint', finishPrinting);
   window.addEventListener('beforeunload', () => {
     if (labelUrl) URL.revokeObjectURL(labelUrl);
   });
