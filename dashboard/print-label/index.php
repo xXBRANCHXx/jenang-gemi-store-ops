@@ -56,9 +56,9 @@ $printLabelJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/print-label.j
                 <div class="admin-label-option-grid" data-label-options></div>
                 <section class="admin-label-print-confirmation" data-print-confirmation aria-live="polite" hidden>
                     <div>
-                        <span>Print confirmation</span>
+                        <span>Automatic close fallback</span>
                         <strong>Did the shipping label print successfully?</strong>
-                        <p data-print-confirmation-detail>The order is already removed from Listed. Confirming only closes this tab.</p>
+                        <p data-print-confirmation-detail>Automatic confirmation did not arrive. The order is already removed from Listed.</p>
                     </div>
                     <div class="admin-label-print-confirmation-actions">
                         <button type="button" class="admin-ghost-btn" data-print-again>Print again</button>
