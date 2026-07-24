@@ -63,6 +63,38 @@ website_ops_expect(
     'Store Ops must freeze only normalized account-level marketplace sources.'
 );
 website_ops_expect(
+    JG_STORE_OPS_ZERO_SCOPE_AFTER,
+    jg_store_ops_zero_scope_expansion(
+        '2026-07-24T05:15:24.846138Z',
+        JG_STORE_OPS_ZERO_SCOPE_BEFORE
+    ),
+    'The authorized live cutover must add both ZERO platforms to automatic Store Ops handling.'
+);
+website_ops_expect(
+    JG_STORE_OPS_ZERO_SCOPE_BEFORE,
+    jg_store_ops_zero_scope_expansion(
+        '2026-07-24T05:15:24.846139Z',
+        JG_STORE_OPS_ZERO_SCOPE_BEFORE
+    ),
+    'A different cutover timestamp must not widen the automatic Store Ops scope.'
+);
+website_ops_expect(
+    [
+        'shopee:jenang-gemi-shopee',
+        'tiktok:jenang-gemi-tiktok',
+        'tiktok:zfit-tiktok',
+    ],
+    jg_store_ops_zero_scope_expansion(
+        '2026-07-24T05:15:24.846138Z',
+        [
+            'shopee:jenang-gemi-shopee',
+            'tiktok:jenang-gemi-tiktok',
+            'tiktok:zfit-tiktok',
+        ]
+    ),
+    'The ZERO expansion must never admit or alter a scope containing ZFIT.'
+);
+website_ops_expect(
     ['shopee:jenang-gemi-shopee', 'tiktok:jenang-gemi-tiktok'],
     jg_store_ops_website_activation_sources(
         ['TIKTOK:jenang-gemi-tiktok', 'shopee:jenang-gemi-shopee'],

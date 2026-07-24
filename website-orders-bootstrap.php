@@ -5,6 +5,17 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/store-ops-fulfillment-runtime.php';
 
 const JG_STORE_OPS_WEBSITE_PLATFORMS = ['zero_website', 'jenang_gemi_website'];
+const JG_STORE_OPS_ZERO_SCOPE_CUTOVER = '2026-07-24 05:15:24.846138';
+const JG_STORE_OPS_ZERO_SCOPE_BEFORE = [
+    'shopee:jenang-gemi-shopee',
+    'tiktok:jenang-gemi-tiktok',
+];
+const JG_STORE_OPS_ZERO_SCOPE_AFTER = [
+    'shopee:jenang-gemi-shopee',
+    'shopee:zero-shopee',
+    'tiktok:jenang-gemi-tiktok',
+    'tiktok:zero-tiktok',
+];
 
 function jg_store_ops_website_config(string $envKey, string $configKey, string $default = ''): string
 {
@@ -64,6 +75,29 @@ function jg_store_ops_normalize_marketplace_sources(mixed $value): array
     $sources = array_values($sources);
     sort($sources);
     return $sources;
+}
+
+/**
+ * Expand only the explicitly authorized live Big Set cutover. The original
+ * timestamp remains the eligibility boundary, so older ZERO orders stay
+ * manual-era and ZFIT can never be admitted by this migration.
+ *
+ * @return array<int,string>
+ */
+function jg_store_ops_zero_scope_expansion(mixed $activatedAt, mixed $currentSources): array
+{
+    $currentSources = jg_store_ops_normalize_marketplace_sources($currentSources);
+    if ($currentSources !== JG_STORE_OPS_ZERO_SCOPE_BEFORE) {
+        return $currentSources;
+    }
+    try {
+        if (!jg_store_ops_website_cutover_matches($activatedAt, JG_STORE_OPS_ZERO_SCOPE_CUTOVER)) {
+            return $currentSources;
+        }
+    } catch (Throwable) {
+        return $currentSources;
+    }
+    return JG_STORE_OPS_ZERO_SCOPE_AFTER;
 }
 
 /** @return array<int,string> */
@@ -303,6 +337,30 @@ function jg_store_ops_website_ensure_schema(PDO $pdo): void
          VALUES (1, 0, NULL, "", :updated_at)
          ON DUPLICATE KEY UPDATE id = id'
     )->execute([':updated_at' => jg_store_ops_website_now()]);
+
+    $row = $pdo->query(
+        'SELECT enabled, activated_at, automatic_sources_json
+         FROM store_ops_website_ingestion WHERE id = 1'
+    )->fetch();
+    if ((bool) (int) ($row['enabled'] ?? 0)) {
+        $storedSources = json_decode((string) ($row['automatic_sources_json'] ?? ''), true);
+        $storedSources = jg_store_ops_normalize_marketplace_sources(is_array($storedSources) ? $storedSources : []);
+        $expandedSources = jg_store_ops_zero_scope_expansion($row['activated_at'] ?? '', $storedSources);
+        if ($expandedSources !== $storedSources) {
+            $encoded = json_encode($expandedSources, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            if (!is_string($encoded)) {
+                throw new RuntimeException('Unable to encode the authorized ZERO automatic source expansion.');
+            }
+            $pdo->prepare(
+                'UPDATE store_ops_website_ingestion
+                 SET automatic_sources_json = :automatic_sources_json, updated_at = :updated_at
+                 WHERE id = 1 AND enabled = 1'
+            )->execute([
+                ':automatic_sources_json' => $encoded,
+                ':updated_at' => jg_store_ops_website_now(),
+            ]);
+        }
+    }
 }
 
 function jg_store_ops_website_state(PDO $pdo, bool $forUpdate = false): array
