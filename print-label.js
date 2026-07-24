@@ -118,18 +118,30 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   const postOrderAction = async (action, extra = {}, options = {}) => {
-    const response = await fetch(ordersEndpoint, {
-      method: 'POST',
-      credentials: 'same-origin',
-      keepalive: Boolean(options.keepalive),
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(orderActionPayload(action, extra))
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || payload.ok === false) {
-      throw new Error(payload.error || 'Unable to update fulfillment state.');
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(ordersEndpoint, {
+        method: 'POST',
+        credentials: 'same-origin',
+        keepalive: Boolean(options.keepalive),
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(orderActionPayload(action, extra))
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok === false) {
+        throw new Error(payload.error || 'Unable to update fulfillment state.');
+      }
+      return payload;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Store Ops took too long to update this order. Confirm again to retry.');
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeout);
     }
-    return payload;
   };
 
   const flushPendingScanQueueForOrder = async () => {
@@ -207,14 +219,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!order) return;
     await postOrderAction(isReprint ? 'reprint_label' : 'label_printed', {
       printed_at: new Date().toISOString()
-    });
+    }, { keepalive: true });
   };
 
   const markFulfilledOnServer = async () => {
     if (!order || isReprint) return;
     await postOrderAction('fulfill_order', {
       fulfilled_at: new Date().toISOString()
-    });
+    }, { keepalive: true });
   };
 
   const beginPrintFinalization = () => {
@@ -223,7 +235,6 @@ document.addEventListener('DOMContentLoaded', () => {
       await flushPendingScanQueueForOrder();
       await markPrintedOnServer();
       await markFulfilledOnServer();
-      if (!isReprint) markPrinted();
     })();
     printFinalizationPromise = pending.catch((error) => {
       printFinalizationPromise = null;
@@ -256,7 +267,8 @@ document.addEventListener('DOMContentLoaded', () => {
     printClosing = true;
     resetPrintLifecycle();
     setConfirmationActionsDisabled(true);
-    if (statusNode) statusNode.textContent = 'Finalizing order';
+    if (!isReprint) markPrinted();
+    if (statusNode) statusNode.textContent = isReprint ? 'Finalizing reprint' : 'Removed from Listed · finalizing';
     setError('');
     try {
       await beginPrintFinalization();
@@ -264,7 +276,9 @@ document.addEventListener('DOMContentLoaded', () => {
       printClosing = false;
       setConfirmationActionsDisabled(false);
       if (confirmationNode) confirmationNode.hidden = false;
-      if (confirmationDetailNode) confirmationDetailNode.textContent = 'The label print dialog opened, but Store Ops could not finish updating this order. Try confirming again.';
+      if (confirmationDetailNode) confirmationDetailNode.textContent = isReprint
+        ? 'The reprint was confirmed, but Store Ops could not record it. Confirm again to retry.'
+        : 'The order was removed from Listed, but Store Ops could not finish the server update. Confirm again to retry.';
       if (statusNode) statusNode.textContent = 'Update failed';
       setError(error instanceof Error ? error.message : 'Unable to finish updating the printed order.');
       return;
@@ -294,7 +308,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmAfterPrint = () => {
       if (!printInProgress) return;
       window.setTimeout(() => {
-        if (printInProgress) closeConfirmedPrintTab().catch(() => {});
+        if (printInProgress) {
+          showPrintConfirmationFallback('The print dialog closed. Confirm that the shipping label printed successfully.');
+        }
       }, 120);
     };
     const addEvent = (target, eventName, listener) => {
@@ -406,6 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
       setPrintEnabled(true);
       return;
     }
+    showPrintConfirmationFallback('The print dialog closed. Confirm that the shipping label printed successfully.');
     beginPrintFinalization().catch((error) => {
       showPrintConfirmationFallback('The print dialog opened, but Store Ops could not finish updating this order. Confirm again to retry.');
       if (statusNode) statusNode.textContent = 'Update failed';
@@ -418,6 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
     printInProgress = false;
     printClosing = false;
     if (!openPrintDialog()) return;
+    showPrintConfirmationFallback('The print dialog closed. Confirm that the shipping label printed successfully.');
     beginPrintFinalization().catch((error) => {
       showPrintConfirmationFallback('The print dialog opened, but Store Ops could not finish updating this order. Confirm again to retry.');
       if (statusNode) statusNode.textContent = 'Update failed';

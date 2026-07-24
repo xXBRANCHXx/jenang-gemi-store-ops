@@ -664,6 +664,10 @@ function jg_store_ops_fulfillment_mark_label_printed(PDO $pdo, array $key, strin
     try {
         jg_store_ops_fulfillment_insert_order_if_missing($pdo, $key);
         $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, true);
+        if (!$isReprint && strtoupper((string) ($row['status'] ?? '')) === 'FULFILLED') {
+            $pdo->commit();
+            return $row;
+        }
         if (!$isReprint) {
             jg_store_ops_fulfillment_assert_can_work($row, $employeeId);
             $required = max(0, (int) ($row['scan_required'] ?? 0));
@@ -707,6 +711,10 @@ function jg_store_ops_fulfillment_mark_fulfilled(PDO $pdo, array $key, string $e
     $pdo->beginTransaction();
     try {
         $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, true);
+        if (is_array($row) && strtoupper((string) ($row['status'] ?? '')) === 'FULFILLED') {
+            $pdo->commit();
+            return $row;
+        }
         jg_store_ops_fulfillment_assert_can_work($row, $employeeId);
         $now = jg_store_ops_fulfillment_now();
         $stmt = $pdo->prepare(

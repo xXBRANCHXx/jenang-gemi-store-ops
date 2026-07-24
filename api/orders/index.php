@@ -1059,17 +1059,18 @@ if ($method === 'POST') {
 
         if ($action === 'label_printed') {
             $row = jg_store_ops_fulfillment_mark_label_printed($pdo, $key, $employeeId, $employeeName, false);
-            if ($key['source_platform'] === 'partner') {
+            $alreadyFulfilled = strtoupper((string) ($row['status'] ?? '')) === 'FULFILLED';
+            if (!$alreadyFulfilled && $key['source_platform'] === 'partner') {
                 jg_store_ops_orders_partner_update_status($key['order_id'], 'IS_BEING_FULFILLED');
             }
-            if (in_array($key['source_platform'], JG_STORE_OPS_WEBSITE_PLATFORMS, true)) {
+            if (!$alreadyFulfilled && in_array($key['source_platform'], JG_STORE_OPS_WEBSITE_PLATFORMS, true)) {
                 try {
                     jg_store_ops_website_callback($pdo, $key['source_platform'], $key['order_id'], 'IS_BEING_FULFILLED');
                 } catch (Throwable $callbackError) {
                     error_log('Website order fulfillment callback failed: ' . $callbackError->getMessage());
                 }
             }
-            if (in_array($key['source_platform'], ['shopee', 'tiktok'], true)) {
+            if (!$alreadyFulfilled && in_array($key['source_platform'], ['shopee', 'tiktok'], true)) {
                 try {
                     jg_store_ops_orders_marketplace_status_callback($key, 'LABEL_PRINTED');
                 } catch (Throwable $callbackError) {
