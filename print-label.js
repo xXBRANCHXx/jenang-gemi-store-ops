@@ -114,6 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
     order_id: String(order?.id || orderId || ''),
     source_platform: normalizeSourceKey(order?.platform || ''),
     source_account: sourceKeyFromOrder(order),
+    label_backed: labelLoaded || Boolean(order?.labelBacked || order?.label_backed),
     ...extra
   });
 
@@ -188,7 +189,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (storedOrder) {
       mutator(storedOrder);
       writeOrders(orders);
+      return;
     }
+    const cachedOrder = { ...order, id: String(order.id || orderId || '') };
+    mutator(cachedOrder);
+    orders.push(cachedOrder);
+    writeOrders(orders);
   };
 
   const markPrinted = () => {
@@ -230,11 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const beginPrintFinalization = () => {
     if (printFinalizationPromise) return printFinalizationPromise;
-    const pending = (async () => {
-      await flushPendingScanQueueForOrder();
-      await markPrintedOnServer();
-      await markFulfilledOnServer();
-    })();
+    const pending = isReprint ? markPrintedOnServer() : markFulfilledOnServer();
     printFinalizationPromise = pending.catch((error) => {
       printFinalizationPromise = null;
       throw error;

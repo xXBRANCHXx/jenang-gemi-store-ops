@@ -4,6 +4,7 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const script = fs.readFileSync(path.join(root, 'print-label.js'), 'utf8');
+const storeHome = fs.readFileSync(path.join(root, 'store-home.js'), 'utf8');
 const markup = fs.readFileSync(path.join(root, 'dashboard/print-label/index.php'), 'utf8');
 const ordersApi = fs.readFileSync(path.join(root, 'api/orders-v2/index.php'), 'utf8');
 const legacyOrdersApi = fs.readFileSync(path.join(root, 'api/orders/index.php'), 'utf8');
@@ -19,8 +20,11 @@ const printFlow = script.match(/const printLabel = \(\) => \{[\s\S]*?\n  \};\n\n
 assert.ok(printFlow, 'the label print flow should be present');
 assert.match(printFlow[0], /openPrintDialog\(\)[\s\S]*markPrinted\(\);[\s\S]*showPrintConfirmationFallback\([\s\S]*beginPrintFinalization\(\)/, 'the completed print dialog should remove the order locally and enable confirmation before asynchronous finalization');
 assert.doesNotMatch(printFlow[0], /\bawait\b/, 'the user-activated print path should not wait before opening the print dialog');
-assert.match(script, /const beginPrintFinalization = \(\) => \{[\s\S]*await flushPendingScanQueueForOrder\(\);[\s\S]*await markPrintedOnServer\(\);[\s\S]*await markFulfilledOnServer\(\)/, 'printing should still sync scans, record the label, and fulfill the order');
+assert.match(script, /const beginPrintFinalization = \(\) => \{[\s\S]*isReprint \? markPrintedOnServer\(\) : markFulfilledOnServer\(\)/, 'a successful first print should use one keepalive fulfillment request instead of blocking on scan-history synchronization');
 assert.match(script, /currentOrder\.status = 'FULFILLED';[\s\S]*currentOrder\.fulfillmentStatus = 'FULFILLED'/, 'the local order cache should hide a completed order immediately');
+assert.match(script, /const cachedOrder = \{ \.\.\.order, id:[\s\S]*orders\.push\(cachedOrder\);[\s\S]*writeOrders\(orders\)/, 'confirmation should persist a printed-order exclusion even if the label tab opened without a cached board row');
+assert.match(script, /label_backed: labelLoaded \|\| Boolean\(order\?\.labelBacked/, 'a loaded shipping label should remain fulfillable while automatic arrangement is paused');
+assert.match(storeHome, /const locallyPrinted = Boolean\(printedLabel && printedLabel\.printedAt\);[\s\S]*status: 'FULFILLED',[\s\S]*fulfillmentStatus: 'FULFILLED'/, 'refresh merging should keep printed orders durably excluded from Listed');
 assert.match(script, /root\.querySelectorAll\('\[data-print-shopee-label\]'\)/, 'all visible print actions should share the same enabled state');
 assert.match(script, /root\.addEventListener\('click'[\s\S]*closest\('\[data-print-shopee-label\]'\)[\s\S]*printLabel\(\)/, 'the viewer print icon should use the user-activated print flow');
 assert.match(script, /const openPrintDialog = \(\) => \{[\s\S]*armAutomaticPrintConfirmation\(frameWindow\);[\s\S]*(?:frameWindow|window)\.print\(\)/, 'printing should arm confirmation before opening the dialog');

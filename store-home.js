@@ -1240,9 +1240,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const mergeLocalOrderState = (order, storedById) => {
     const stored = storedById.get(String(order.id || ''));
     if (!stored) return order;
+    const printedLabel = stored.printedLabel || order.printedLabel || null;
+    const locallyPrinted = Boolean(printedLabel && printedLabel.printedAt);
     return {
       ...order,
-      printedLabel: stored.printedLabel || order.printedLabel || null
+      printedLabel,
+      ...(locallyPrinted ? {
+        status: 'FULFILLED',
+        fulfillmentStatus: 'FULFILLED',
+        started: false
+      } : {})
     };
   };
 
