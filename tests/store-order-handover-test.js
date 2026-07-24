@@ -41,6 +41,18 @@ assert(
   'Shopee IN_CANCEL orders must receive the cancellation hold.'
 );
 assert(
+  presentation.isShippedOrder({ marketplaceStatus: 'Shipped' }),
+  'A shipped marketplace order must be excluded from the browser queue.'
+);
+assert(
+  presentation.isShippedOrder({ shipping_status: 'SHIPPED' }),
+  'The browser shipped-order guard must recognize normalized shipping status fields.'
+);
+assert(
+  !presentation.isShippedOrder({ marketplaceStatus: 'READY_TO_SHIP' }),
+  'An order that is ready to ship must remain distinct from an already shipped order.'
+);
+assert(
   presentation.requiresManualInstantArrangement({ instant: true, manualArrangementRequired: true }),
   'Instant orders must expose their manual arrangement action.'
 );
@@ -102,6 +114,11 @@ assert(
 assert(
   adminCss.includes('.admin-order-card.is-instant') && adminCss.includes('@keyframes admin-instant-pulse'),
   'Instant cards must always receive their red pulse treatment.'
+);
+assert(
+  adminCss.includes(":root[data-admin-theme='light'] .admin-order-card.is-instant")
+    && adminCss.includes('--instant-pulse-alert-bg: #fee2e2'),
+  'Light mode must use a readable light-red Instant pulse instead of the dark-theme maroon frame.'
 );
 
 console.log('store-order-handover-test: ok');

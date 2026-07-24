@@ -1308,7 +1308,24 @@ button, input {
 }
 
 .admin-order-card.is-instant {
+  --instant-pulse-rest-bg: var(--admin-surface-soft);
+  --instant-pulse-alert-bg: rgba(74, 10, 18, 0.98);
+  --instant-pulse-rest-border: rgba(248, 113, 113, 0.62);
+  --instant-pulse-alert-border: #ff3030;
   animation: admin-instant-pulse 0.78s ease-in-out infinite;
+}
+
+:root[data-admin-theme='light'] .admin-order-card.is-instant {
+  --admin-muted: #7f1d1d;
+  --instant-pulse-rest-bg: #fff7f7;
+  --instant-pulse-alert-bg: #fee2e2;
+  --instant-pulse-rest-border: rgba(220, 38, 38, 0.68);
+  --instant-pulse-alert-border: #dc2626;
+  color: #450a0a;
+}
+
+:root[data-admin-theme='light'] .admin-order-card.is-instant .admin-order-deadline > small {
+  color: #9f1239;
 }
 
 .admin-order-card.is-instant.is-locked {
@@ -1329,13 +1346,13 @@ button, input {
 
 @keyframes admin-instant-pulse {
   0%, 100% {
-    border-color: rgba(248, 113, 113, 0.62);
-    background: var(--admin-surface-soft);
+    border-color: var(--instant-pulse-rest-border);
+    background: var(--instant-pulse-rest-bg);
     box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.08), 0 10px 24px rgba(0, 0, 0, 0.18);
   }
   50% {
-    border-color: #ff3030;
-    background: rgba(74, 10, 18, 0.98);
+    border-color: var(--instant-pulse-alert-border);
+    background: var(--instant-pulse-alert-bg);
     box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.24), 0 10px 28px rgba(127, 29, 29, 0.42);
   }
 }
@@ -1438,9 +1455,9 @@ button, input {
 }
 
 :root[data-admin-theme='light'] .admin-instant-badge {
-  --instant-icon-ink: var(--admin-accent-secondary);
-  --instant-icon-fill: color-mix(in srgb, var(--admin-accent-secondary) 10%, transparent);
-  --instant-icon-border: color-mix(in srgb, var(--admin-accent-secondary) 28%, transparent);
+  --instant-icon-ink: #991b1b;
+  --instant-icon-fill: rgba(254, 202, 202, 0.7);
+  --instant-icon-border: rgba(220, 38, 38, 0.42);
 }
 
 :root[data-admin-theme='glass'] .admin-instant-badge,

@@ -65,8 +65,34 @@ function jg_store_ops_marketplace_status(array $order): string
     return '';
 }
 
+function jg_store_ops_marketplace_shipped(array $order): bool
+{
+    foreach ([
+        'marketplaceStatus',
+        'marketplace_status',
+        'orderStatus',
+        'order_status',
+        'shippingStatus',
+        'shipping_status',
+        'status',
+    ] as $key) {
+        $value = $order[$key] ?? null;
+        if (!is_scalar($value)) {
+            continue;
+        }
+        $status = trim((string) preg_replace('/[^A-Z0-9]+/', '_', strtoupper(trim((string) $value))), '_');
+        if ($status === 'SHIPPED') {
+            return true;
+        }
+    }
+    return false;
+}
+
 function jg_store_ops_marketplace_pre_activation_visible(array $order, string $sourcePlatform): bool
 {
+    if (jg_store_ops_marketplace_shipped($order)) {
+        return false;
+    }
     if (jg_store_ops_marketplace_label_backed($order)) {
         return false;
     }
@@ -93,6 +119,9 @@ function jg_store_ops_marketplace_order_visible(
     bool $preActivationOnly = false
 ): bool
 {
+    if (jg_store_ops_marketplace_shipped($order)) {
+        return false;
+    }
     if ($preActivationOnly) {
         return jg_store_ops_marketplace_pre_activation_visible($order, $sourcePlatform);
     }

@@ -41,6 +41,19 @@
       .toUpperCase();
     return ['IN_CANCEL', 'CANCEL_REQUESTED', 'CANCELLATION_REQUESTED', 'CANCEL_PENDING', 'CANCELLATION_PENDING'].includes(status);
   };
+  const isShippedOrder = (order) => [
+    order?.marketplaceStatus,
+    order?.marketplace_status,
+    order?.orderStatus,
+    order?.order_status,
+    order?.shippingStatus,
+    order?.shipping_status,
+    order?.status
+  ].some((value) => String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') === 'SHIPPED');
   const requiresManualInstantArrangement = (order) => Boolean(
     order?.instant && (order?.manualArrangementRequired || order?.manual_arrangement_required)
   );
@@ -124,6 +137,7 @@
     normalizeHandoverMethod,
     isDropOff,
     isCancellationRequested,
+    isShippedOrder,
     requiresManualInstantArrangement,
     isInstantManualLifecycle,
     formatHandoverSlot,
@@ -1265,7 +1279,7 @@ document.addEventListener('DOMContentLoaded', () => {
       partnerName: String(order.partnerName || order.partner_name || ''),
       customerName: String(order.customerName || order.customer_name || order.customer?.name || order.buyerName || order.buyer_name || ''),
       status: String(order.status || 'IS_LISTED'),
-      marketplaceStatus: String(order.marketplaceStatus || 'READY_TO_SHIP'),
+      marketplaceStatus: String(order.marketplaceStatus || order.marketplace_status || 'READY_TO_SHIP'),
       labelBacked: Boolean(order.labelBacked || order.label_backed),
       packageNumber: String(order.packageNumber || ''),
       instant: Boolean(order.instant),
@@ -1307,7 +1321,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return stored
       .map((order) => normalizeOrder(order, catalogRows, storedById))
       .filter((order) => {
-        if (!order.id) return false;
+        if (!order.id || orderPresentation.isShippedOrder(order)) return false;
         const platform = normalizeSourceKey(order.platform);
         return !['shopee', 'tiktok'].includes(platform)
           || automaticArrangementPaused
@@ -1394,7 +1408,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const catalogRows = catalogLookup();
     const nextOrders = (Array.isArray(payload.orders) ? payload.orders : [])
       .map((order) => normalizeOrder(order, catalogRows, storedById))
-      .filter((order) => order.id);
+      .filter((order) => order.id && !orderPresentation.isShippedOrder(order));
     if (!nextOrders.length && state.orders.length) {
       if (degradedRefresh) {
         throw new Error('Order refresh was incomplete; keeping the current board.');
@@ -1445,7 +1459,11 @@ document.addEventListener('DOMContentLoaded', () => {
     .replaceAll("'", '&#039;');
 
   const listedOrders = () => state.orders
-    .filter((order) => order.status !== 'FULFILLED' && order.fulfillmentStatus !== 'FULFILLED')
+    .filter((order) => (
+      order.status !== 'FULFILLED'
+      && order.fulfillmentStatus !== 'FULFILLED'
+      && !orderPresentation.isShippedOrder(order)
+    ))
     .sort((a, b) => a.deadlineAt - b.deadlineAt);
 
   const visibleListedOrders = (orders = listedOrders()) => orderPresentation.filterOrdersByHandover(orders, dropOffOnly);
