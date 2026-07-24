@@ -254,16 +254,20 @@ document.addEventListener('DOMContentLoaded', () => {
     printLifecycleCleanup = () => {};
   };
 
-  const showPrintConfirmationFallback = (message = 'Automatic print confirmation did not arrive. Confirm only if the label printed successfully.') => {
-    if (!printInProgress) return;
+  const showPrintConfirmationFallback = (
+    message = 'Automatic print confirmation did not arrive. Confirm only if the label printed successfully.',
+    status = 'Confirm print'
+  ) => {
+    if (!printInProgress && !labelLoaded) return;
     setConfirmationActionsDisabled(false);
     if (confirmationNode) confirmationNode.hidden = false;
     if (confirmationDetailNode) confirmationDetailNode.textContent = message;
-    if (statusNode) statusNode.textContent = 'Confirm print';
+    if (statusNode) statusNode.textContent = status;
   };
 
   const closeConfirmedPrintTab = async () => {
-    if (!printInProgress || printClosing) return;
+    if ((!printInProgress && !labelLoaded) || printClosing) return;
+    printInProgress = true;
     printClosing = true;
     resetPrintLifecycle();
     setConfirmationActionsDisabled(true);
@@ -502,13 +506,19 @@ document.addEventListener('DOMContentLoaded', () => {
       labelFrame.addEventListener('load', () => {
         labelLoaded = true;
         setPrintEnabled(true);
-        if (statusNode) statusNode.textContent = 'Ready';
+        showPrintConfirmationFallback(
+          'If this label already printed successfully, confirm it here to remove the order from Listed without printing again.',
+          'Ready'
+        );
       }, { once: true });
       labelFrame.src = labelUrl;
     } else {
       labelLoaded = true;
       setPrintEnabled(true);
-      if (statusNode) statusNode.textContent = 'Ready';
+      showPrintConfirmationFallback(
+        'If this label already printed successfully, confirm it here to remove the order from Listed without printing again.',
+        'Ready'
+      );
     }
     if (previewNode) previewNode.hidden = false;
   };

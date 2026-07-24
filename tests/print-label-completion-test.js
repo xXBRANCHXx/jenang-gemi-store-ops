@@ -31,6 +31,8 @@ assert.match(script, /const confirmAfterPrint = \(\) => \{[\s\S]*showPrintConfir
 assert.match(script, /matchMedia\?\.\('print'\)[\s\S]*visibilitychange[\s\S]*showPrintConfirmationFallback/, 'automatic confirmation should use browser lifecycle signals with a manual fallback');
 assert.match(script, /confirmPrintedButton\?\.addEventListener\('click', closeConfirmedPrintTab\)/, 'manual fallback confirmation should close the tab');
 assert.match(script, /const closeConfirmedPrintTab = async \(\) => \{[\s\S]*markPrinted\(\);[\s\S]*await beginPrintFinalization\(\);[\s\S]*window\.close\(\)/, 'confirmation should remove the order locally before waiting for the server update and closing the tab');
+assert.match(script, /const closeConfirmedPrintTab = async \(\) => \{[\s\S]*!printInProgress && !labelLoaded/, 'a loaded label should remain confirmable after refreshing an older print tab');
+assert.match(script, /const loadLabel = async \(\) => \{[\s\S]*labelLoaded = true;[\s\S]*showPrintConfirmationFallback\([\s\S]*without printing again/, 'loading a label should expose recovery confirmation without requiring a duplicate print');
 assert.match(script, /new AbortController\(\)[\s\S]*controller\.abort\(\), 15000[\s\S]*signal: controller\.signal/, 'order updates should time out instead of disabling confirmation indefinitely');
 assert.match(script, /markPrintedOnServer[\s\S]*keepalive: true[\s\S]*markFulfilledOnServer[\s\S]*keepalive: true/, 'label and fulfillment updates should survive normal tab lifecycle changes');
 assert.match(fulfillmentRuntime, /function jg_store_ops_fulfillment_mark_label_printed[\s\S]*status[\s\S]*FULFILLED[\s\S]*return \$row/, 'repeated label confirmation should accept an already fulfilled order');
