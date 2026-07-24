@@ -61,6 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const packageNumber = String(order?.packageNumber || order?.package_number || params.get('package') || params.get('package_id') || '');
   let printConfirmationTimer = 0;
   let printLifecycleCleanup = () => {};
+  let printFinalizationPromise = null;
+  let printClosing = false;
   let printInProgress = false;
   let labelUrl = '';
   let labelLoaded = false;
@@ -215,6 +217,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
+  const beginPrintFinalization = () => {
+    if (printFinalizationPromise) return printFinalizationPromise;
+    const pending = (async () => {
+      await flushPendingScanQueueForOrder();
+      await markPrintedOnServer();
+      await markFulfilledOnServer();
+      if (!isReprint) markPrinted();
+    })();
+    printFinalizationPromise = pending.catch((error) => {
+      printFinalizationPromise = null;
+      throw error;
+    });
+    return printFinalizationPromise;
+  };
+
   const setConfirmationActionsDisabled = (disabled) => {
     if (confirmPrintedButton instanceof HTMLButtonElement) confirmPrintedButton.disabled = disabled;
     if (printAgainButton instanceof HTMLButtonElement) printAgainButton.disabled = disabled;
@@ -234,11 +251,26 @@ document.addEventListener('DOMContentLoaded', () => {
     if (statusNode) statusNode.textContent = 'Confirm print';
   };
 
-  const closeConfirmedPrintTab = () => {
-    if (!printInProgress) return;
-    printInProgress = false;
+  const closeConfirmedPrintTab = async () => {
+    if (!printInProgress || printClosing) return;
+    printClosing = true;
     resetPrintLifecycle();
     setConfirmationActionsDisabled(true);
+    if (statusNode) statusNode.textContent = 'Finalizing order';
+    setError('');
+    try {
+      await beginPrintFinalization();
+    } catch (error) {
+      printClosing = false;
+      setConfirmationActionsDisabled(false);
+      if (confirmationNode) confirmationNode.hidden = false;
+      if (confirmationDetailNode) confirmationDetailNode.textContent = 'The label print dialog opened, but Store Ops could not finish updating this order. Try confirming again.';
+      if (statusNode) statusNode.textContent = 'Update failed';
+      setError(error instanceof Error ? error.message : 'Unable to finish updating the printed order.');
+      return;
+    }
+    printInProgress = false;
+    printClosing = false;
     if (statusNode) statusNode.textContent = 'Print confirmed';
     try {
       if (window.opener && !window.opener.closed) window.opener.focus();
@@ -262,7 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmAfterPrint = () => {
       if (!printInProgress) return;
       window.setTimeout(() => {
-        if (printInProgress) closeConfirmedPrintTab();
+        if (printInProgress) closeConfirmedPrintTab().catch(() => {});
       }, 120);
     };
     const addEvent = (target, eventName, listener) => {
@@ -340,57 +372,57 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const openPrintDialog = () => {
-    if (!labelLoaded || printInProgress) return;
+    if (!labelLoaded || printInProgress) return false;
     resetPrintLifecycle();
     if (confirmationNode) confirmationNode.hidden = true;
     setConfirmationActionsDisabled(true);
     setError('');
     printInProgress = true;
     if (statusNode) statusNode.textContent = 'Printing';
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        try {
-          const frameWindow = labelFrame instanceof HTMLIFrameElement ? labelFrame.contentWindow : null;
-          armAutomaticPrintConfirmation(frameWindow);
-          if (frameWindow) {
-            frameWindow.focus();
-            frameWindow.print();
-          } else {
-            window.print();
-          }
-        } catch (_error) {
-          showPrintConfirmationFallback('The browser could not open the print dialog. Use Print again.');
-          if (statusNode) statusNode.textContent = 'Print dialog failed';
-          setError('The order was removed from Listed, but the browser could not open the print dialog. Use Print again.');
-        }
-      });
-    });
+    try {
+      const frameWindow = labelFrame instanceof HTMLIFrameElement ? labelFrame.contentWindow : null;
+      armAutomaticPrintConfirmation(frameWindow);
+      if (frameWindow) {
+        frameWindow.focus();
+        frameWindow.print();
+      } else {
+        window.print();
+      }
+      return true;
+    } catch (_error) {
+      showPrintConfirmationFallback('The browser could not open the print dialog. Use Print again.');
+      if (statusNode) statusNode.textContent = 'Print dialog failed';
+      setError('The browser could not open the print dialog. Use Print again.');
+      return false;
+    }
   };
 
-  const printLabel = async () => {
+  const printLabel = () => {
     if (!order || !labelLoaded || printInProgress) return;
     resetPrintLifecycle();
     setPrintEnabled(false);
     setError('');
-    if (statusNode) statusNode.textContent = isReprint ? 'Recording reprint' : 'Completing order';
-    try {
-      await flushPendingScanQueueForOrder();
-      await markPrintedOnServer();
-      await markFulfilledOnServer();
-      if (!isReprint) markPrinted();
-    } catch (error) {
+    if (!openPrintDialog()) {
       setPrintEnabled(true);
-      if (statusNode) statusNode.textContent = 'Ready';
-      setError(error instanceof Error ? error.message : 'Unable to update the order before printing.');
       return;
     }
-    openPrintDialog();
+    beginPrintFinalization().catch((error) => {
+      showPrintConfirmationFallback('The print dialog opened, but Store Ops could not finish updating this order. Confirm again to retry.');
+      if (statusNode) statusNode.textContent = 'Update failed';
+      setError(error instanceof Error ? error.message : 'Unable to finish updating the printed order.');
+    });
   };
 
   const retryPrintDialog = () => {
     resetPrintLifecycle();
     printInProgress = false;
-    openPrintDialog();
+    printClosing = false;
+    if (!openPrintDialog()) return;
+    beginPrintFinalization().catch((error) => {
+      showPrintConfirmationFallback('The print dialog opened, but Store Ops could not finish updating this order. Confirm again to retry.');
+      if (statusNode) statusNode.textContent = 'Update failed';
+      setError(error instanceof Error ? error.message : 'Unable to finish updating the printed order.');
+    });
   };
 
   const platformLabel = (value) => {
