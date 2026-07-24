@@ -41,15 +41,23 @@ assert(
   'Shopee IN_CANCEL orders must receive the cancellation hold.'
 );
 assert(
-  presentation.isShippedOrder({ marketplaceStatus: 'Shipped' }),
+  presentation.isCompletedMarketplaceOrder({ marketplaceStatus: 'Shipped' }),
   'A shipped marketplace order must be excluded from the browser queue.'
 );
 assert(
-  presentation.isShippedOrder({ shipping_status: 'SHIPPED' }),
+  presentation.isCompletedMarketplaceOrder({ shipping_status: 'SHIPPED' }),
   'The browser shipped-order guard must recognize normalized shipping status fields.'
 );
 assert(
-  !presentation.isShippedOrder({ marketplaceStatus: 'READY_TO_SHIP' }),
+  presentation.isCompletedMarketplaceOrder({ marketplaceStatus: 'PROCESSED' }),
+  'A processed marketplace order must be excluded from the browser queue.'
+);
+assert(
+  presentation.isCompletedMarketplaceOrder({ marketplaceStatus: 'to confirm receive' }),
+  'An order awaiting receipt confirmation must be excluded regardless of status punctuation.'
+);
+assert(
+  !presentation.isCompletedMarketplaceOrder({ marketplaceStatus: 'READY_TO_SHIP' }),
   'An order that is ready to ship must remain distinct from an already shipped order.'
 );
 assert(
