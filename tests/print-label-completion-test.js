@@ -17,7 +17,7 @@ assert.match(legacyOrdersApi, /function jg_store_ops_orders_partner_status_is_vi
 
 const printFlow = script.match(/const printLabel = \(\) => \{[\s\S]*?\n  \};\n\n  const retryPrintDialog/);
 assert.ok(printFlow, 'the label print flow should be present');
-assert.match(printFlow[0], /openPrintDialog\(\)[\s\S]*showPrintConfirmationFallback\([\s\S]*beginPrintFinalization\(\)/, 'the print dialog should open directly from the user click, then immediately enable confirmation before asynchronous finalization');
+assert.match(printFlow[0], /openPrintDialog\(\)[\s\S]*markPrinted\(\);[\s\S]*showPrintConfirmationFallback\([\s\S]*beginPrintFinalization\(\)/, 'the completed print dialog should remove the order locally and enable confirmation before asynchronous finalization');
 assert.doesNotMatch(printFlow[0], /\bawait\b/, 'the user-activated print path should not wait before opening the print dialog');
 assert.match(script, /const beginPrintFinalization = \(\) => \{[\s\S]*await flushPendingScanQueueForOrder\(\);[\s\S]*await markPrintedOnServer\(\);[\s\S]*await markFulfilledOnServer\(\)/, 'printing should still sync scans, record the label, and fulfill the order');
 assert.match(script, /currentOrder\.status = 'FULFILLED';[\s\S]*currentOrder\.fulfillmentStatus = 'FULFILLED'/, 'the local order cache should hide a completed order immediately');
@@ -30,10 +30,14 @@ assert.doesNotMatch(openDialogFlow[0], /requestAnimationFrame|\bawait\b/, 'the b
 assert.match(script, /const confirmAfterPrint = \(\) => \{[\s\S]*showPrintConfirmationFallback\([\s\S]*addEvent\(window, 'afterprint', confirmAfterPrint\);[\s\S]*addEvent\(frameWindow, 'afterprint', confirmAfterPrint\)/, 'print lifecycle signals should reveal an enabled confirmation instead of starting an unbounded automatic close');
 assert.match(script, /matchMedia\?\.\('print'\)[\s\S]*visibilitychange[\s\S]*showPrintConfirmationFallback/, 'automatic confirmation should use browser lifecycle signals with a manual fallback');
 assert.match(script, /confirmPrintedButton\?\.addEventListener\('click', closeConfirmedPrintTab\)/, 'manual fallback confirmation should close the tab');
-assert.match(script, /const closeConfirmedPrintTab = async \(\) => \{[\s\S]*markPrinted\(\);[\s\S]*await beginPrintFinalization\(\);[\s\S]*window\.close\(\)/, 'confirmation should remove the order locally before waiting for the server update and closing the tab');
-assert.match(script, /const closeConfirmedPrintTab = async \(\) => \{[\s\S]*!printInProgress && !labelLoaded/, 'a loaded label should remain confirmable after refreshing an older print tab');
+const closeFlow = script.match(/const closeConfirmedPrintTab = \(\) => \{[\s\S]*?\n  \};\n\n  const armAutomaticPrintConfirmation/);
+assert.ok(closeFlow, 'the direct confirmation-close flow should be present');
+assert.match(closeFlow[0], /markPrinted\(\);[\s\S]*beginPrintFinalization\(\);[\s\S]*window\.close\(\);/, 'confirmation should remove the order, start finalization, and close in the original click call stack');
+assert.doesNotMatch(closeFlow[0], /\bawait\b/, 'tab closing must not wait for network activity and lose the user activation');
+assert.match(closeFlow[0], /!printInProgress && !labelLoaded/, 'a loaded label should remain confirmable after refreshing an older print tab');
 assert.match(script, /const loadLabel = async \(\) => \{[\s\S]*labelLoaded = true;[\s\S]*showPrintConfirmationFallback\([\s\S]*without printing again/, 'loading a label should expose recovery confirmation without requiring a duplicate print');
 assert.match(script, /new AbortController\(\)[\s\S]*controller\.abort\(\), 15000[\s\S]*signal: controller\.signal/, 'order updates should time out instead of disabling confirmation indefinitely');
+assert.doesNotMatch(script, /statusNode\) statusNode\.textContent = 'Syncing scans'/, 'background scan-history upload should not replace the operator-facing print status');
 assert.match(script, /markPrintedOnServer[\s\S]*keepalive: true[\s\S]*markFulfilledOnServer[\s\S]*keepalive: true/, 'label and fulfillment updates should survive normal tab lifecycle changes');
 assert.match(fulfillmentRuntime, /function jg_store_ops_fulfillment_mark_label_printed[\s\S]*status[\s\S]*FULFILLED[\s\S]*return \$row/, 'repeated label confirmation should accept an already fulfilled order');
 assert.equal(fulfillmentSource, fulfillmentRuntime, 'the source and deployed fulfillment runtimes should stay synchronized');

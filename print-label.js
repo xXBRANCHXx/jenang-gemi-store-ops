@@ -166,7 +166,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const progress = queue.progress && typeof queue.progress === 'object'
       ? queue.progress
       : { completed: 0, required: 0 };
-    if (statusNode) statusNode.textContent = 'Syncing scans';
     await postOrderAction('claim_order', {}, { keepalive: true });
     if (events.length) {
       await postOrderAction('record_scan', { events, progress });
@@ -265,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (statusNode) statusNode.textContent = status;
   };
 
-  const closeConfirmedPrintTab = async () => {
+  const closeConfirmedPrintTab = () => {
     if ((!printInProgress && !labelLoaded) || printClosing) return;
     printInProgress = true;
     printClosing = true;
@@ -274,9 +273,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!isReprint) markPrinted();
     if (statusNode) statusNode.textContent = isReprint ? 'Finalizing reprint' : 'Removed from Listed · finalizing';
     setError('');
+    const finalization = beginPrintFinalization();
+    printInProgress = false;
+    if (statusNode) statusNode.textContent = 'Print confirmed';
     try {
-      await beginPrintFinalization();
-    } catch (error) {
+      if (window.opener && !window.opener.closed) window.opener.focus();
+    } catch (_error) {
+      // Closing the print tab does not depend on focusing its opener.
+    }
+    window.close();
+    finalization.then(() => {
+      printClosing = false;
+    }).catch((error) => {
+      printInProgress = true;
       printClosing = false;
       setConfirmationActionsDisabled(false);
       if (confirmationNode) confirmationNode.hidden = false;
@@ -285,17 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
         : 'The order was removed from Listed, but Store Ops could not finish the server update. Confirm again to retry.';
       if (statusNode) statusNode.textContent = 'Update failed';
       setError(error instanceof Error ? error.message : 'Unable to finish updating the printed order.');
-      return;
-    }
-    printInProgress = false;
-    printClosing = false;
-    if (statusNode) statusNode.textContent = 'Print confirmed';
-    try {
-      if (window.opener && !window.opener.closed) window.opener.focus();
-    } catch (_error) {
-      // Closing the print tab does not depend on focusing its opener.
-    }
-    window.close();
+    });
     window.setTimeout(() => {
       setConfirmationActionsDisabled(false);
       setError('Print confirmed. Your browser prevented automatic closing; you can close this tab.');
@@ -426,6 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
       setPrintEnabled(true);
       return;
     }
+    if (!isReprint) markPrinted();
     showPrintConfirmationFallback('The print dialog closed. Confirm that the shipping label printed successfully.');
     beginPrintFinalization().catch((error) => {
       showPrintConfirmationFallback('The print dialog opened, but Store Ops could not finish updating this order. Confirm again to retry.');
