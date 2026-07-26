@@ -164,6 +164,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const boardOverflow = document.querySelector('[data-board-overflow]');
   const boardClock = document.querySelector('[data-board-clock]');
   const dropOffFilter = document.querySelector('[data-dropoff-filter]');
+  const automationPauseNotice = document.querySelector('[data-automation-pause-notice]');
+  const automationPauseCopy = document.querySelector('[data-automation-pause-copy]');
   const reprintModal = document.querySelector('[data-reprint-modal]');
   const reprintForm = document.querySelector('[data-reprint-form]');
   const reprintError = document.querySelector('[data-reprint-error]');
@@ -202,10 +204,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const profileSettingsEndpoint = '../api/profile-settings/';
   const scanBridgeEndpoint = '../api/scan-bridge/';
   const scanSerialEndpoint = '../api/scan-serial/';
-  const boardBaseRows = 6;
-  const boardMaxColumns = 8;
-  const boardMinColumnWidth = 128;
-  const boardColumnGap = 7;
   const ordersRefreshIntervalMs = 15000;
   const ordersRefreshMinGapMs = 3500;
   const cachedStartupRefreshDelayMs = 0;
@@ -2033,33 +2031,24 @@ document.addEventListener('DOMContentLoaded', () => {
         ? `Showing ${dropOffCount} drop-off order${dropOffCount === 1 ? '' : 's'}. Click to show all ${listed.length} listed orders.`
         : `Show only ${dropOffCount} drop-off order${dropOffCount === 1 ? '' : 's'}. This does not change any order status.`;
     }
-  };
-
-  const availableBoardColumns = () => {
-    const boardWidth = Number(board?.clientWidth || board?.parentElement?.clientWidth || 0);
-    if (!Number.isFinite(boardWidth) || boardWidth <= 0) return boardMaxColumns;
-    return Math.max(1, Math.min(
-      boardMaxColumns,
-      Math.floor((boardWidth + boardColumnGap) / (boardMinColumnWidth + boardColumnGap))
-    ));
-  };
-
-  const boardDimensions = (orderCount) => {
-    const columnLimit = availableBoardColumns();
-    const columnCount = Math.max(1, Math.min(columnLimit, Math.ceil((orderCount || 1) / boardBaseRows)));
-    const rowCount = Math.max(boardBaseRows, Math.ceil((orderCount || 1) / columnCount));
-    return { columnCount, rowCount };
-  };
-
-  const orderGridPositionStyle = (index, rowCount) => {
-    return `grid-row: ${(index % rowCount) + 1}; grid-column: ${Math.floor(index / rowCount) + 1};`;
+    const waitingForArrangement = listed.filter((order) => {
+      const platform = normalizeSourceKey(order.platform);
+      return ['shopee', 'tiktok'].includes(platform)
+        && !order.labelBacked
+        && !orderPresentation.isInstantManualLifecycle(order)
+        && !orderPresentation.isCancellationRequested(order);
+    }).length;
+    if (automationPauseNotice) automationPauseNotice.hidden = !automaticArrangementPaused;
+    if (automationPauseCopy) {
+      automationPauseCopy.textContent = waitingForArrangement
+        ? `${waitingForArrangement} order${waitingForArrangement === 1 ? '' : 's'} still need marketplace arrangement. Arranged orders can be processed normally.`
+        : 'All visible marketplace orders are arranged and can be processed normally.';
+    }
   };
 
   const renderBoardMessage = (message, options = {}) => {
     if (!board) return;
     board.setAttribute('aria-busy', options.loading ? 'true' : 'false');
-    board.style.setProperty('--order-rows', String(boardBaseRows));
-    board.style.setProperty('--order-columns', '1');
     if (options.loading) {
       board.innerHTML = `
         <div class="admin-board-empty admin-board-loading" role="status" aria-live="polite">
@@ -2096,12 +2085,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const allListedOrders = listedOrders();
     const orders = visibleListedOrders(allListedOrders);
-    const { columnCount, rowCount } = boardDimensions(orders.length);
-    board.style.setProperty('--order-rows', String(rowCount));
-    board.style.setProperty('--order-columns', String(columnCount));
-
-    if (boardDensity) boardDensity.textContent = `${columnCount} columns x ${rowCount} rows`;
-    if (boardOverflow) boardOverflow.hidden = rowCount <= boardBaseRows;
+    if (boardDensity) boardDensity.textContent = `${orders.length} visible orders`;
+    if (boardOverflow) boardOverflow.hidden = true;
 
     if (!orders.length) {
       board.innerHTML = dropOffOnly && allListedOrders.length
@@ -2130,6 +2115,15 @@ document.addEventListener('DOMContentLoaded', () => {
         && !instantManualLifecycle
         && !cancellationRequested;
       const instantState = String(order.instantArrangementState || '').trim().toLowerCase();
+      const itemLines = order.items.slice(0, 2).map((item) => {
+        const quantity = Math.max(1, Number(item.quantity || item.qty || 1));
+        const productName = String(item.productName || item.scanProductName || item.sku || 'Order item').trim();
+        return `<span title="${escapeHtml(productName)}"><b>${quantity}×</b>${escapeHtml(productName)}</span>`;
+      });
+      const additionalSkuCount = Math.max(0, order.items.length - itemLines.length);
+      const productSummary = itemLines.length
+        ? `${itemLines.join('')}${additionalSkuCount ? `<small>+${additionalSkuCount} more SKU${additionalSkuCount === 1 ? '' : 's'}</small>` : ''}`
+        : '<span class="is-muted">Product details unavailable</span>';
       const pickupSlotLabel = order.handoverMethod === 'PICKUP' ? orderPresentation.formatHandoverSlot(order) : '';
       const handoverDescription = order.shippingProviderName
         ? `Drop-off order via ${order.shippingProviderName}`
@@ -2139,10 +2133,9 @@ document.addEventListener('DOMContentLoaded', () => {
         ? 'Cancellation requested'
         : (order.claimedByName ? `${order.claimStale ? 'Stale' : 'Claimed'} by ${order.claimedByName}` : order.marketplaceStatus);
       const buttonLabel = order.claimStale ? 'Reclaim' : (claimedBySelf ? 'Resume' : (index === 0 ? 'Start Next' : 'Start'));
-      const cardStyles = [
-        orderGridPositionStyle(index, rowCount),
-        customSourceColor ? `--order-source-accent: ${escapeHtml(customSourceColor)}; --order-source-border: ${escapeHtml(customSourceColor)}; --order-source-border-hover: ${escapeHtml(customSourceColor)}` : ''
-      ].filter(Boolean).join(' ');
+      const cardStyles = customSourceColor
+        ? `--order-source-accent: ${escapeHtml(customSourceColor)}; --order-source-border: ${escapeHtml(customSourceColor)}; --order-source-border-hover: ${escapeHtml(customSourceColor)}`
+        : '';
       const buttonIcon = isLocked
         ? '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>'
         : (order.claimStale
@@ -2165,11 +2158,11 @@ document.addEventListener('DOMContentLoaded', () => {
               : (instantState === 'failed' ? 'Retry accept + arrange' : 'Accept + arrange shipment')));
         actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-instant-action" data-arrange-instant="${escapeHtml(order.id)}" ${instantDisabled ? 'disabled' : ''}><span>${escapeHtml(instantLabel)}</span></button>`;
       } else if (pausedUnarranged) {
-        actionButton = '<button type="button" class="admin-start-order-btn admin-manual-order-btn" disabled><span>Automation paused · arrange in marketplace</span></button>';
+        actionButton = '<button type="button" class="admin-start-order-btn admin-paused-order-btn" disabled><span>Arrange in marketplace</span></button>';
       }
       return `
         <article
-          class="admin-order-card ${isCritical && !isLocked ? 'is-critical' : ''} ${order.instant ? 'is-instant' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${(instantManualLifecycle || cancellationRequested || pausedUnarranged) ? 'has-manual-action' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
+          class="admin-order-card ${isCritical && !isLocked ? 'is-critical' : ''} ${order.instant ? 'is-instant' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${(instantManualLifecycle || cancellationRequested) ? 'has-manual-action' : ''} ${pausedUnarranged ? 'is-awaiting-arrangement' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
           data-source-key="${escapeHtml(sourceKey)}"
           ${order.handoverMethod ? `data-handover-method="${escapeHtml(order.handoverMethod)}"` : ''}
           ${sourceColor ? `data-source-color="${customSourceColor ? 'custom' : escapeHtml(sourceColor)}"` : ''}
@@ -2181,14 +2174,14 @@ document.addEventListener('DOMContentLoaded', () => {
             ${isDropOff ? `<span class="admin-dropoff-badge" aria-label="${escapeHtml(handoverDescription)}" title="${escapeHtml(handoverDescription)}">Drop-off</span>` : ''}
             ${order.instant ? '<span class="admin-instant-badge" role="img" aria-label="Instant shipping order" title="Instant shipping order"><svg viewBox="0 0 32 20" aria-hidden="true" focusable="false"><path class="admin-instant-badge-speed" d="M2 6h5.5M1 10h5M3 14h4.5"/><path class="admin-instant-badge-truck" d="M8.5 6.5h11v7.5h-11zM19.5 9.2h4.1l3.1 3.2V14h-7.2zM22.1 9.2v3.2h4.6"/><circle class="admin-instant-badge-wheel" cx="11.5" cy="15" r="2"/><circle class="admin-instant-badge-wheel" cx="23.5" cy="15" r="2"/></svg><span class="admin-instant-badge-label">Instant</span></span>' : ''}
           </div>
+          <div class="admin-order-products">${productSummary}</div>
           <div class="admin-order-deadline"><span>${escapeHtml(order.deadlineLabel)}</span>${escapeHtml(formatDeadline(order))}${pickupSlotLabel ? `<small>Pickup ${escapeHtml(pickupSlotLabel)}</small>` : ''}</div>
           <div class="admin-order-meta">
             <span>${escapeHtml(sourceLabel)}</span>
             <span>${escapeHtml(claimLabel)}</span>
-            <span>${itemCount} product${itemCount === 1 ? '' : 's'}</span>
+            <span>${itemCount} unit${itemCount === 1 ? '' : 's'} · ${order.items.length} SKU${order.items.length === 1 ? '' : 's'}</span>
           </div>
           ${cancellationRequested ? `<div class="admin-cancellation-alert">Cancellation requested — do not process. Resolve it in ${escapeHtml(String(order.platform || 'the marketplace'))}.</div>` : ''}
-          ${pausedUnarranged ? '<div class="admin-cancellation-alert">Automatic shipment arrangement is paused. This order is visible for tracking; arrange it in the marketplace before processing.</div>' : ''}
           ${instantState === 'failed' && order.instantArrangementError ? `<div class="admin-instant-action-error">${escapeHtml(order.instantArrangementError)}</div>` : ''}
           ${actionButton}
         </article>

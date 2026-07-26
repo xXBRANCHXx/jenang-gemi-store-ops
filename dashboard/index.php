@@ -12,7 +12,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 header('Expires: 0');
 
-$assetVersionPrefix = 'store-ops-arranged-recovery-v1';
+$assetVersionPrefix = 'store-ops-queue-density-v1';
 $adminCssVersion = $assetVersionPrefix . '-' . (string) @filemtime(dirname(__DIR__) . '/admin.css');
 $storeHomeJsVersion = $assetVersionPrefix . '-' . (string) @filemtime(dirname(__DIR__) . '/store-home.js');
 $currentEmployeeId = jg_admin_current_employee_id();
@@ -34,7 +34,7 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
     <link rel="stylesheet" href="../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
 <body class="admin-body is-dashboard is-store-home">
-    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.20</div>
+    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.21</div>
     <div
         class="admin-app admin-store-home"
         data-store-home
@@ -181,6 +181,13 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
             <main class="admin-layout">
                 <section class="admin-panel admin-panel-wide admin-fulfillment-panel">
                     <div class="admin-order-board-wrap">
+                        <div class="admin-queue-notice" data-automation-pause-notice role="status" hidden>
+                            <span class="admin-queue-notice-icon" aria-hidden="true">!</span>
+                            <div>
+                                <strong>Automatic arrangement is paused</strong>
+                                <span data-automation-pause-copy>Unarranged marketplace orders stay visible for manual follow-up.</span>
+                            </div>
+                        </div>
                         <div class="admin-order-board" data-order-board aria-busy="true" style="--order-rows: 6; --order-columns: 1;">
                             <div class="admin-board-empty admin-board-loading" role="status" aria-live="polite">
                                 <strong>Loading Orders</strong>

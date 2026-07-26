@@ -93,6 +93,11 @@ assert(
     && dashboardTemplate.includes('admin-board-empty admin-board-loading'),
   'The server-rendered queue must show loading before Store Ops JavaScript starts.'
 );
+assert(
+  dashboardTemplate.includes('data-automation-pause-notice')
+    && dashboardTemplate.includes('data-automation-pause-copy'),
+  'The queue must explain the global pause once instead of repeating a warning on every order.'
+);
 const storeHome = fs.readFileSync(path.join(__dirname, '../store-home.js'), 'utf8');
 const adminCss = fs.readFileSync(path.join(__dirname, '../admin.css'), 'utf8');
 assert(
@@ -102,6 +107,18 @@ assert(
 assert(
   !storeHome.includes('isCompletedMarketplaceOrder'),
   'Arranged or shipped orders must stay in Listed until Store Ops records FULFILLED.'
+);
+assert(
+  storeHome.includes('class="admin-order-products"')
+    && storeHome.includes('Arrange in marketplace')
+    && !storeHome.includes('This order is visible for tracking'),
+  'Dense cards must show product details and use a compact manual-arrangement action.'
+);
+assert(
+  adminCss.includes('repeat(auto-fill, minmax(min(270px, 100%), 1fr))')
+    && adminCss.includes('grid-auto-flow: row')
+    && adminCss.includes('.is-store-home .admin-store-home .admin-order-board'),
+  'The operational queue must use readable row-major cards instead of narrow fixed columns.'
 );
 assert(
   storeHome.includes('Handle cancellation in ${escapeHtml(marketplaceName)}') && storeHome.includes('do not process'),
