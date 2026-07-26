@@ -303,7 +303,7 @@ function jg_store_ops_website_ensure_schema(PDO $pdo): void
             activated_at DATETIME(6) NULL DEFAULT NULL,
             activated_by VARCHAR(160) NOT NULL DEFAULT "",
             automatic_sources_json LONGTEXT NULL DEFAULT NULL,
-            automation_paused TINYINT(1) NOT NULL DEFAULT 0,
+            automation_paused TINYINT(1) NOT NULL DEFAULT 1,
             automation_paused_at DATETIME NULL DEFAULT NULL,
             automation_paused_by VARCHAR(160) NOT NULL DEFAULT "",
             updated_at DATETIME NOT NULL
@@ -315,7 +315,7 @@ function jg_store_ops_website_ensure_schema(PDO $pdo): void
         'automatic_sources_json',
         'LONGTEXT NULL DEFAULT NULL AFTER activated_by'
     );
-    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_website_ingestion', 'automation_paused', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER automatic_sources_json');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_website_ingestion', 'automation_paused', 'TINYINT(1) NOT NULL DEFAULT 1 AFTER automatic_sources_json');
     jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_website_ingestion', 'automation_paused_at', 'DATETIME NULL DEFAULT NULL AFTER automation_paused');
     jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_website_ingestion', 'automation_paused_by', 'VARCHAR(160) NOT NULL DEFAULT "" AFTER automation_paused_at');
     $pdo->exec(
@@ -360,6 +360,19 @@ function jg_store_ops_website_ensure_schema(PDO $pdo): void
                 ':updated_at' => jg_store_ops_website_now(),
             ]);
         }
+        $now = jg_store_ops_website_now();
+        $pdo->prepare(
+            'UPDATE store_ops_website_ingestion
+             SET automation_paused = 1,
+                 automation_paused_at = COALESCE(automation_paused_at, :automation_paused_at),
+                 automation_paused_by = :automation_paused_by,
+                 updated_at = :updated_at
+             WHERE id = 1 AND enabled = 1 AND automation_paused = 0'
+        )->execute([
+            ':automation_paused_at' => $now,
+            ':automation_paused_by' => 'Permanent automation safety lock',
+            ':updated_at' => $now,
+        ]);
     }
 }
 
@@ -379,7 +392,7 @@ function jg_store_ops_website_state(PDO $pdo, bool $forUpdate = false): array
         'activated_at' => isset($row['activated_at']) ? (string) $row['activated_at'] : null,
         'activated_by' => (string) ($row['activated_by'] ?? ''),
         'automatic_sources' => jg_store_ops_normalize_marketplace_sources(is_array($automaticSources) ? $automaticSources : []),
-        'automation_paused' => (bool) (int) ($row['automation_paused'] ?? 0),
+        'automation_paused' => !empty($row['enabled']),
         'automation_paused_at' => !empty($row['automation_paused_at']) ? (string) $row['automation_paused_at'] : null,
         'automation_paused_by' => (string) ($row['automation_paused_by'] ?? ''),
         'updated_at' => (string) ($row['updated_at'] ?? ''),
@@ -458,13 +471,16 @@ function jg_store_ops_website_activate(PDO $pdo, array $payload): array
             'UPDATE store_ops_website_ingestion
              SET enabled = 1, activated_at = :activated_at, activated_by = :activated_by,
                  automatic_sources_json = :automatic_sources_json,
-                 automation_paused = 0, automation_paused_at = NULL, automation_paused_by = "",
+                 automation_paused = 1, automation_paused_at = :automation_paused_at,
+                 automation_paused_by = :automation_paused_by,
                  updated_at = :updated_at
              WHERE id = 1 AND enabled = 0'
         )->execute([
             ':activated_at' => $formatted,
             ':activated_by' => $actor,
             ':automatic_sources_json' => $sourcesJson,
+            ':automation_paused_at' => jg_store_ops_website_now(),
+            ':automation_paused_by' => 'Permanent automation safety lock',
             ':updated_at' => jg_store_ops_website_now(),
         ]);
         $pdo->commit();
@@ -484,12 +500,15 @@ function jg_store_ops_website_set_automation_paused(PDO $pdo, array $payload): a
     if ($paused === null) {
         throw new InvalidArgumentException('The automatic shipment pause state is invalid.');
     }
+    if (!$paused) {
+        throw new RuntimeException('Automatic shipment arrangement is permanently paused and cannot be resumed.');
+    }
     jg_store_ops_website_ensure_schema($pdo);
     $pdo->beginTransaction();
     try {
         $state = jg_store_ops_website_state($pdo, true);
         if (empty($state['enabled']) || empty($state['activated_at'])) {
-            throw new RuntimeException('Big Set must be activated before automatic shipment arrangement can be paused or resumed.');
+            throw new RuntimeException('Big Set must be activated before automatic shipment arrangement can be paused.');
         }
         if (!jg_store_ops_website_cutover_matches(
             (string) $state['activated_at'],

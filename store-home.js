@@ -41,21 +41,6 @@
       .toUpperCase();
     return ['IN_CANCEL', 'CANCEL_REQUESTED', 'CANCELLATION_REQUESTED', 'CANCEL_PENDING', 'CANCELLATION_PENDING'].includes(status);
   };
-  const isCompletedMarketplaceOrder = (order) => [
-    order?.marketplaceStatus,
-    order?.marketplace_status,
-    order?.orderStatus,
-    order?.order_status,
-    order?.shippingStatus,
-    order?.shipping_status,
-    order?.status
-  ].some((value) => ['SHIPPED', 'PROCESSED', 'TO_CONFIRM_RECEIVE'].includes(
-    String(value || '')
-      .trim()
-      .toUpperCase()
-      .replace(/[^A-Z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '')
-  ));
   const requiresManualInstantArrangement = (order) => Boolean(
     order?.instant && (order?.manualArrangementRequired || order?.manual_arrangement_required)
   );
@@ -139,7 +124,6 @@
     normalizeHandoverMethod,
     isDropOff,
     isCancellationRequested,
-    isCompletedMarketplaceOrder,
     requiresManualInstantArrangement,
     isInstantManualLifecycle,
     formatHandoverSlot,
@@ -1323,7 +1307,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return stored
       .map((order) => normalizeOrder(order, catalogRows, storedById))
       .filter((order) => {
-        if (!order.id || orderPresentation.isCompletedMarketplaceOrder(order)) return false;
+        if (!order.id) return false;
         const platform = normalizeSourceKey(order.platform);
         return !['shopee', 'tiktok'].includes(platform)
           || automaticArrangementPaused
@@ -1410,7 +1394,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const catalogRows = catalogLookup();
     const nextOrders = (Array.isArray(payload.orders) ? payload.orders : [])
       .map((order) => normalizeOrder(order, catalogRows, storedById))
-      .filter((order) => order.id && !orderPresentation.isCompletedMarketplaceOrder(order));
+      .filter((order) => order.id);
     if (!nextOrders.length && state.orders.length) {
       if (degradedRefresh) {
         throw new Error('Order refresh was incomplete; keeping the current board.');
@@ -1464,7 +1448,6 @@ document.addEventListener('DOMContentLoaded', () => {
     .filter((order) => (
       order.status !== 'FULFILLED'
       && order.fulfillmentStatus !== 'FULFILLED'
-      && !orderPresentation.isCompletedMarketplaceOrder(order)
     ))
     .sort((a, b) => a.deadlineAt - b.deadlineAt);
 

@@ -41,24 +41,8 @@ assert(
   'Shopee IN_CANCEL orders must receive the cancellation hold.'
 );
 assert(
-  presentation.isCompletedMarketplaceOrder({ marketplaceStatus: 'Shipped' }),
-  'A shipped marketplace order must be excluded from the browser queue.'
-);
-assert(
-  presentation.isCompletedMarketplaceOrder({ shipping_status: 'SHIPPED' }),
-  'The browser shipped-order guard must recognize normalized shipping status fields.'
-);
-assert(
-  presentation.isCompletedMarketplaceOrder({ marketplaceStatus: 'PROCESSED' }),
-  'A processed marketplace order must be excluded from the browser queue.'
-);
-assert(
-  presentation.isCompletedMarketplaceOrder({ marketplaceStatus: 'to confirm receive' }),
-  'An order awaiting receipt confirmation must be excluded regardless of status punctuation.'
-);
-assert(
-  !presentation.isCompletedMarketplaceOrder({ marketplaceStatus: 'READY_TO_SHIP' }),
-  'An order that is ready to ship must remain distinct from an already shipped order.'
+  typeof presentation.isCompletedMarketplaceOrder === 'undefined',
+  'Browser presentation must never treat marketplace shipment status as Store Ops completion.'
 );
 assert(
   presentation.requiresManualInstantArrangement({ instant: true, manualArrangementRequired: true }),
@@ -114,6 +98,10 @@ const adminCss = fs.readFileSync(path.join(__dirname, '../admin.css'), 'utf8');
 assert(
   storeHome.includes('data-arrange-instant') && storeHome.includes('Accept + arrange shipment'),
   'The Instant card must provide one combined acceptance and arrangement button.'
+);
+assert(
+  !storeHome.includes('isCompletedMarketplaceOrder'),
+  'Arranged or shipped orders must stay in Listed until Store Ops records FULFILLED.'
 );
 assert(
   storeHome.includes('Handle cancellation in ${escapeHtml(marketplaceName)}') && storeHome.includes('do not process'),
