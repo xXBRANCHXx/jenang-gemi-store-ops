@@ -109,16 +109,21 @@ assert(
   'Arranged or shipped orders must stay in Listed until Store Ops records FULFILLED.'
 );
 assert(
-  storeHome.includes('class="admin-order-products"')
+  !storeHome.includes('class="admin-order-products"')
     && storeHome.includes('Arrange in marketplace')
     && !storeHome.includes('This order is visible for tracking'),
-  'Dense cards must show product details and use a compact manual-arrangement action.'
+  'Compact cards must leave product details in the order preview and use a short arrangement action.'
 );
 assert(
-  adminCss.includes('repeat(auto-fill, minmax(min(270px, 100%), 1fr))')
+  adminCss.includes('repeat(auto-fill, minmax(min(190px, 100%), 1fr))')
     && adminCss.includes('grid-auto-flow: row')
     && adminCss.includes('.is-store-home .admin-store-home .admin-order-board'),
   'The operational queue must use readable row-major cards instead of narrow fixed columns.'
+);
+assert(
+  storeHome.includes("!order.instant ? 'is-deadline-urgent' : ''")
+    && !storeHome.includes("!isLocked ? 'is-critical' : ''"),
+  'Non-Instant urgent orders must use the amber deadline cue; red is reserved for Instant orders.'
 );
 assert(
   storeHome.includes('Handle cancellation in ${escapeHtml(marketplaceName)}') && storeHome.includes('do not process'),

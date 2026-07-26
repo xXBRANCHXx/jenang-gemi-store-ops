@@ -2099,7 +2099,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     board.innerHTML = orders.map((order, index) => {
       const isCritical = isCriticalOrder(order);
-      const itemCount = orderProductCount(order);
       const sourceKey = sourceKeyFromOrder(order);
       const sourceLabel = sourceLabelFromOrder(order);
       const sourceColor = colorForSource(sourceKey);
@@ -2115,15 +2114,6 @@ document.addEventListener('DOMContentLoaded', () => {
         && !instantManualLifecycle
         && !cancellationRequested;
       const instantState = String(order.instantArrangementState || '').trim().toLowerCase();
-      const itemLines = order.items.slice(0, 2).map((item) => {
-        const quantity = Math.max(1, Number(item.quantity || item.qty || 1));
-        const productName = String(item.productName || item.scanProductName || item.sku || 'Order item').trim();
-        return `<span title="${escapeHtml(productName)}"><b>${quantity}×</b>${escapeHtml(productName)}</span>`;
-      });
-      const additionalSkuCount = Math.max(0, order.items.length - itemLines.length);
-      const productSummary = itemLines.length
-        ? `${itemLines.join('')}${additionalSkuCount ? `<small>+${additionalSkuCount} more SKU${additionalSkuCount === 1 ? '' : 's'}</small>` : ''}`
-        : '<span class="is-muted">Product details unavailable</span>';
       const pickupSlotLabel = order.handoverMethod === 'PICKUP' ? orderPresentation.formatHandoverSlot(order) : '';
       const handoverDescription = order.shippingProviderName
         ? `Drop-off order via ${order.shippingProviderName}`
@@ -2162,7 +2152,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       return `
         <article
-          class="admin-order-card ${isCritical && !isLocked ? 'is-critical' : ''} ${order.instant ? 'is-instant' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${(instantManualLifecycle || cancellationRequested) ? 'has-manual-action' : ''} ${pausedUnarranged ? 'is-awaiting-arrangement' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
+          class="admin-order-card ${isCritical && !isLocked && !order.instant ? 'is-deadline-urgent' : ''} ${order.instant ? 'is-instant' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${(instantManualLifecycle || cancellationRequested) ? 'has-manual-action' : ''} ${pausedUnarranged ? 'is-awaiting-arrangement' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
           data-source-key="${escapeHtml(sourceKey)}"
           ${order.handoverMethod ? `data-handover-method="${escapeHtml(order.handoverMethod)}"` : ''}
           ${sourceColor ? `data-source-color="${customSourceColor ? 'custom' : escapeHtml(sourceColor)}"` : ''}
@@ -2174,12 +2164,10 @@ document.addEventListener('DOMContentLoaded', () => {
             ${isDropOff ? `<span class="admin-dropoff-badge" aria-label="${escapeHtml(handoverDescription)}" title="${escapeHtml(handoverDescription)}">Drop-off</span>` : ''}
             ${order.instant ? '<span class="admin-instant-badge" role="img" aria-label="Instant shipping order" title="Instant shipping order"><svg viewBox="0 0 32 20" aria-hidden="true" focusable="false"><path class="admin-instant-badge-speed" d="M2 6h5.5M1 10h5M3 14h4.5"/><path class="admin-instant-badge-truck" d="M8.5 6.5h11v7.5h-11zM19.5 9.2h4.1l3.1 3.2V14h-7.2zM22.1 9.2v3.2h4.6"/><circle class="admin-instant-badge-wheel" cx="11.5" cy="15" r="2"/><circle class="admin-instant-badge-wheel" cx="23.5" cy="15" r="2"/></svg><span class="admin-instant-badge-label">Instant</span></span>' : ''}
           </div>
-          <div class="admin-order-products">${productSummary}</div>
           <div class="admin-order-deadline"><span>${escapeHtml(order.deadlineLabel)}</span>${escapeHtml(formatDeadline(order))}${pickupSlotLabel ? `<small>Pickup ${escapeHtml(pickupSlotLabel)}</small>` : ''}</div>
           <div class="admin-order-meta">
             <span>${escapeHtml(sourceLabel)}</span>
             <span>${escapeHtml(claimLabel)}</span>
-            <span>${itemCount} unit${itemCount === 1 ? '' : 's'} · ${order.items.length} SKU${order.items.length === 1 ? '' : 's'}</span>
           </div>
           ${cancellationRequested ? `<div class="admin-cancellation-alert">Cancellation requested — do not process. Resolve it in ${escapeHtml(String(order.platform || 'the marketplace'))}.</div>` : ''}
           ${instantState === 'failed' && order.instantArrangementError ? `<div class="admin-instant-action-error">${escapeHtml(order.instantArrangementError)}</div>` : ''}
@@ -2233,7 +2221,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <strong>${lineCount} product line${lineCount === 1 ? '' : 's'} · ${unitCount} unit${unitCount === 1 ? '' : 's'}</strong>
           <small>Review the complete order before assigning it to yourself.</small>
         </div>
-        <div class="admin-preview-deadline ${isCriticalOrder(order) ? 'is-critical' : ''}">
+        <div class="admin-preview-deadline ${isCriticalOrder(order) && !order.instant ? 'is-deadline-urgent' : ''}">
           <span>${escapeHtml(order.deadlineLabel)}</span>
           <strong>${escapeHtml(formatDeadline(order))}</strong>
         </div>
