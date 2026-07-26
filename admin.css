@@ -3212,7 +3212,7 @@ button, input {
   grid-auto-rows: auto;
   gap: 8px;
   height: auto;
-  align-items: stretch;
+  align-items: start;
 }
 
 .is-store-home .admin-store-home .admin-order-card {
@@ -3220,7 +3220,9 @@ button, input {
   grid-template-rows: auto auto auto;
   align-content: stretch;
   gap: 4px 8px;
+  width: 100%;
   min-height: 88px;
+  align-self: start;
   padding: 8px 9px;
   border-width: 1px 1px 1px 4px;
   border-radius: 12px;
@@ -3293,16 +3295,12 @@ button, input {
   opacity: 1;
 }
 
-.is-store-home .admin-store-home .admin-order-card.has-manual-action {
-  grid-template-rows: auto auto auto auto;
-}
-
-.is-store-home .admin-store-home .admin-order-card.has-manual-action .admin-order-meta,
-.is-store-home .admin-store-home .admin-order-card.has-manual-action .admin-cancellation-alert,
-.is-store-home .admin-store-home .admin-order-card.has-manual-action .admin-instant-action-error,
-.is-store-home .admin-store-home .admin-order-card.has-manual-action .admin-manual-order-btn {
-  grid-column: 1 / -1;
-  grid-row: auto;
+.is-store-home .admin-store-home .admin-manual-order-btn {
+  grid-column: 2;
+  grid-row: 2;
+  width: auto;
+  max-width: 104px;
+  white-space: nowrap;
 }
 
 .is-store-home .admin-store-home .admin-order-card.is-deadline-urgent .admin-order-deadline,

@@ -80,7 +80,7 @@
       return {
         disabled: true,
         label: 'Cannot start this order',
-        note: `Cancellation requested — resolve it in ${String(order?.platform || 'the marketplace')}.`
+        note: `Cancellation requested — do not process. Resolve it in ${String(order?.platform || 'the marketplace')}.`
       };
     }
     if (isInstantManualLifecycle(order) && !order?.labelBacked) {
@@ -2136,23 +2136,23 @@ document.addEventListener('DOMContentLoaded', () => {
       let actionButton = `<button type="button" class="admin-start-order-btn ${claimedBySelf ? 'is-resume' : ''} ${order.claimStale ? 'is-reclaim' : ''}" data-start-order="${escapeHtml(order.id)}" ${isLocked ? 'disabled' : ''}>${buttonIcon}<span>${escapeHtml(isLocked ? 'Locked' : buttonLabel)}</span></button>`;
       if (cancellationRequested) {
         const marketplaceName = String(order.platform || 'marketplace').trim() || 'marketplace';
-        actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-cancellation" disabled><span>Handle cancellation in ${escapeHtml(marketplaceName)}</span></button>`;
+        actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-cancellation" title="Cancellation requested — do not process. Resolve it in ${escapeHtml(marketplaceName)}." disabled><span>Handle in ${escapeHtml(marketplaceName)}</span></button>`;
       } else if (instantManualLifecycle) {
         const instantDisabled = !bigSetEnabled || isLocked || ['requested', 'label_pending'].includes(instantState);
         const instantLabel = !bigSetEnabled
-          ? 'Big Set OFF · arrangement locked'
+          ? 'Big Set locked'
           : (instantState === 'requested'
-            ? 'Accepting + arranging…'
+            ? 'Arranging…'
             : (instantState === 'label_pending'
-              ? 'Arranged · preparing label…'
-              : (instantState === 'failed' ? 'Retry accept + arrange' : 'Accept + arrange shipment')));
+              ? 'Preparing label…'
+              : (instantState === 'failed' ? 'Retry arrange' : 'Accept + arrange')));
         actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-instant-action" data-arrange-instant="${escapeHtml(order.id)}" ${instantDisabled ? 'disabled' : ''}><span>${escapeHtml(instantLabel)}</span></button>`;
       } else if (pausedUnarranged) {
         actionButton = '<button type="button" class="admin-start-order-btn admin-paused-order-btn" disabled><span>Arrange in marketplace</span></button>';
       }
       return `
         <article
-          class="admin-order-card ${isCritical && !isLocked && !order.instant ? 'is-deadline-urgent' : ''} ${order.instant ? 'is-instant' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${(instantManualLifecycle || cancellationRequested) ? 'has-manual-action' : ''} ${pausedUnarranged ? 'is-awaiting-arrangement' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
+          class="admin-order-card ${isCritical && !isLocked && !order.instant ? 'is-deadline-urgent' : ''} ${order.instant ? 'is-instant' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${pausedUnarranged ? 'is-awaiting-arrangement' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
           data-source-key="${escapeHtml(sourceKey)}"
           ${order.handoverMethod ? `data-handover-method="${escapeHtml(order.handoverMethod)}"` : ''}
           ${sourceColor ? `data-source-color="${customSourceColor ? 'custom' : escapeHtml(sourceColor)}"` : ''}
@@ -2169,7 +2169,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>${escapeHtml(sourceLabel)}</span>
             <span>${escapeHtml(claimLabel)}</span>
           </div>
-          ${cancellationRequested ? `<div class="admin-cancellation-alert">Cancellation requested — do not process. Resolve it in ${escapeHtml(String(order.platform || 'the marketplace'))}.</div>` : ''}
           ${instantState === 'failed' && order.instantArrangementError ? `<div class="admin-instant-action-error">${escapeHtml(order.instantArrangementError)}</div>` : ''}
           ${actionButton}
         </article>

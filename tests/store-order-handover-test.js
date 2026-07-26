@@ -101,7 +101,7 @@ assert(
 const storeHome = fs.readFileSync(path.join(__dirname, '../store-home.js'), 'utf8');
 const adminCss = fs.readFileSync(path.join(__dirname, '../admin.css'), 'utf8');
 assert(
-  storeHome.includes('data-arrange-instant') && storeHome.includes('Accept + arrange shipment'),
+  storeHome.includes('data-arrange-instant') && storeHome.includes('Accept + arrange'),
   'The Instant card must provide one combined acceptance and arrangement button.'
 );
 assert(
@@ -126,8 +126,13 @@ assert(
   'Non-Instant urgent orders must use the amber deadline cue; red is reserved for Instant orders.'
 );
 assert(
-  storeHome.includes('Handle cancellation in ${escapeHtml(marketplaceName)}') && storeHome.includes('do not process'),
+  storeHome.includes('Handle in ${escapeHtml(marketplaceName)}') && storeHome.includes('do not process'),
   'Cancellation-requested cards must visibly direct staff to Shopee and block processing.'
+);
+assert(
+  adminCss.includes('align-items: start')
+    && adminCss.includes('.is-store-home .admin-store-home .admin-manual-order-btn'),
+  'A taller exception card must not stretch the other compact cards in its grid row.'
 );
 assert(
   adminCss.includes('.admin-order-card.is-instant') && adminCss.includes('@keyframes admin-instant-pulse'),
