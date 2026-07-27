@@ -325,11 +325,32 @@ function jg_store_ops_website_ensure_schema(PDO $pdo): void
             order_id VARCHAR(40) NOT NULL,
             payload_json LONGTEXT NOT NULL,
             status VARCHAR(48) NOT NULL DEFAULT "IS_LISTED",
+            stock_deducted_at DATETIME NULL DEFAULT NULL,
             source_created_at DATETIME(6) NOT NULL,
             created_at DATETIME NOT NULL,
             updated_at DATETIME NOT NULL,
             UNIQUE KEY uniq_store_ops_website_order (source_platform, order_id),
             KEY idx_store_ops_website_status (status, source_created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+    jg_store_ops_fulfillment_ensure_column(
+        $pdo,
+        'store_ops_website_orders',
+        'stock_deducted_at',
+        'DATETIME NULL DEFAULT NULL AFTER status'
+    );
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS store_ops_order_stock_deductions (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            source_platform VARCHAR(40) NOT NULL,
+            order_id VARCHAR(40) NOT NULL,
+            sku VARCHAR(24) NOT NULL,
+            quantity INT UNSIGNED NOT NULL,
+            stock_before INT NOT NULL,
+            stock_after INT NOT NULL,
+            created_at DATETIME NOT NULL,
+            UNIQUE KEY uniq_store_ops_order_stock_sku (source_platform, order_id, sku),
+            KEY idx_store_ops_order_stock_created (created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
     $pdo->prepare(
@@ -690,6 +711,110 @@ function jg_store_ops_website_find(PDO $pdo, string $platform, string $orderId):
     if (!is_array($payload)) return null;
     $payload['status'] = (string) $row['status'];
     return $payload;
+}
+
+function jg_store_ops_website_stock_lines(array $payload): array
+{
+    $lines = [];
+    foreach ((array) ($payload['items'] ?? []) as $item) {
+        if (!is_array($item)) continue;
+        $sku = strtoupper(trim((string) ($item['sku'] ?? '')));
+        $quantity = (int) ($item['quantity'] ?? 0);
+        if ($sku === '' || $quantity < 1 || $quantity > 9999) {
+            throw new InvalidArgumentException('WhatsApp order contains an invalid stock line.');
+        }
+        $lines[$sku] = ($lines[$sku] ?? 0) + $quantity;
+        if ($lines[$sku] > 9999) {
+            throw new InvalidArgumentException('WhatsApp order stock quantity is too large.');
+        }
+    }
+    if ($lines === []) {
+        throw new InvalidArgumentException('WhatsApp order does not contain stock lines.');
+    }
+    ksort($lines, SORT_STRING);
+    return $lines;
+}
+
+function jg_store_ops_website_deduct_stock(PDO $pdo, string $platform, string $orderId): bool
+{
+    $platform = strtolower(trim($platform));
+    $orderId = trim($orderId);
+    if ($platform !== 'whatsapp') return false;
+    if ($orderId === '') throw new InvalidArgumentException('WhatsApp order ID is required for stock deduction.');
+    jg_store_ops_website_ensure_schema($pdo);
+
+    $pdo->beginTransaction();
+    try {
+        $orderStmt = $pdo->prepare(
+            'SELECT payload_json, stock_deducted_at
+             FROM store_ops_website_orders
+             WHERE source_platform = :platform AND order_id = :order_id
+             LIMIT 1 FOR UPDATE'
+        );
+        $orderStmt->execute([':platform' => $platform, ':order_id' => $orderId]);
+        $order = $orderStmt->fetch();
+        if (!is_array($order)) throw new RuntimeException('WhatsApp order is missing from Store Ops.');
+        if (!empty($order['stock_deducted_at'])) {
+            $pdo->commit();
+            return false;
+        }
+        $payload = json_decode((string) $order['payload_json'], true);
+        if (!is_array($payload)) throw new RuntimeException('WhatsApp order payload is invalid.');
+        $lines = jg_store_ops_website_stock_lines($payload);
+        $stockStmt = $pdo->prepare('SELECT sku, current_stock FROM sku_skus WHERE sku = :sku LIMIT 1 FOR UPDATE');
+        $updateStock = $pdo->prepare(
+            'UPDATE sku_skus SET current_stock = :stock_after, updated_at = :updated_at WHERE sku = :sku'
+        );
+        $insertDeduction = $pdo->prepare(
+            'INSERT INTO store_ops_order_stock_deductions
+                (source_platform, order_id, sku, quantity, stock_before, stock_after, created_at)
+             VALUES (:source_platform, :order_id, :sku, :quantity, :stock_before, :stock_after, :created_at)'
+        );
+        $now = jg_store_ops_website_now();
+        foreach ($lines as $sku => $quantity) {
+            $stockStmt->execute([':sku' => $sku]);
+            $stock = $stockStmt->fetch();
+            if (!is_array($stock)) throw new RuntimeException("{$sku} is missing from the Store Ops SKU catalog.");
+            $stockBefore = max(0, (int) ($stock['current_stock'] ?? 0));
+            if ($quantity > $stockBefore) {
+                throw new RuntimeException(sprintf(
+                    'Cannot fulfill %s: %s needs %d unit%s but only %d remain in stock.',
+                    $orderId,
+                    $sku,
+                    $quantity,
+                    $quantity === 1 ? '' : 's',
+                    $stockBefore
+                ));
+            }
+            $stockAfter = $stockBefore - $quantity;
+            $updateStock->execute([':stock_after' => $stockAfter, ':updated_at' => $now, ':sku' => $sku]);
+            $insertDeduction->execute([
+                ':source_platform' => $platform,
+                ':order_id' => $orderId,
+                ':sku' => $sku,
+                ':quantity' => $quantity,
+                ':stock_before' => $stockBefore,
+                ':stock_after' => $stockAfter,
+                ':created_at' => $now,
+            ]);
+        }
+        $pdo->prepare('UPDATE sku_meta SET updated_at = :updated_at WHERE meta_key = "version"')
+            ->execute([':updated_at' => $now]);
+        $pdo->prepare(
+            'UPDATE store_ops_website_orders SET stock_deducted_at = :deducted_at, updated_at = :updated_at
+             WHERE source_platform = :platform AND order_id = :order_id'
+        )->execute([
+            ':deducted_at' => $now,
+            ':updated_at' => $now,
+            ':platform' => $platform,
+            ':order_id' => $orderId,
+        ]);
+        $pdo->commit();
+        return true;
+    } catch (Throwable $error) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $error;
+    }
 }
 
 function jg_store_ops_website_callback(PDO $pdo, string $platform, string $orderId, string $status): void

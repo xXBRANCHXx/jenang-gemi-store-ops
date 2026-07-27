@@ -161,5 +161,21 @@ website_ops_expect(
     'The deployed Executive Dashboard token fallback must be deterministic.'
 );
 website_ops_expect('', jg_store_ops_website_derive_token(''), 'An empty shared seed must not create a bearer token.');
+website_ops_expect(
+    ['010101000001' => 3, '020202000002' => 1],
+    jg_store_ops_website_stock_lines(['items' => [
+        ['sku' => '010101000001', 'quantity' => 1],
+        ['sku' => '020202000002', 'quantity' => 1],
+        ['sku' => '010101000001', 'quantity' => 2],
+    ]]),
+    'WhatsApp stock deduction must aggregate duplicate SKU quantities deterministically.'
+);
+$invalidStockLineRejected = false;
+try {
+    jg_store_ops_website_stock_lines(['items' => [['sku' => '010101000001', 'quantity' => 0]]]);
+} catch (InvalidArgumentException) {
+    $invalidStockLineRejected = true;
+}
+website_ops_expect(true, $invalidStockLineRejected, 'WhatsApp stock deduction must reject invalid quantities.');
 
 echo "website-orders-test: ok\n";

@@ -1086,6 +1086,9 @@ if ($method === 'POST') {
         }
 
         if ($action === 'fulfill_order') {
+            if ($key['source_platform'] === 'whatsapp') {
+                jg_store_ops_website_deduct_stock($pdo, $key['source_platform'], $key['order_id']);
+            }
             $row = jg_store_ops_fulfillment_mark_fulfilled($pdo, $key, $employeeId, $employeeName);
             if ($key['source_platform'] === 'partner') {
                 jg_store_ops_orders_partner_update_status($key['order_id'], 'FULFILLED');

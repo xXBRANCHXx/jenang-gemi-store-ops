@@ -10,7 +10,7 @@ not remove it until the live server has been migrated to an ignored runtime
 file with the same values. Use `config.local.example.php` only as a template for
 new deployments.
 
-Store Ops persists website orders idempotently, re-verifies every order against the token-authenticated executive feed and cutover timestamp, resolves item SKUs through the existing SKU DB, and proxies the executive-uploaded PDF through authenticated endpoints. Executive-built WhatsApp orders use the same authenticated transport but remain available independently of Big Set; their shipping cost stays in Executive and is never copied into Store Ops.
+Store Ops persists website orders idempotently, re-verifies every order against the token-authenticated executive feed and cutover timestamp, resolves item SKUs through the existing SKU DB, and proxies the executive-uploaded PDF through authenticated endpoints. Executive-built WhatsApp orders use the same authenticated transport but remain available independently of Big Set; their shipping cost stays in Executive and is never copied into Store Ops. When a WhatsApp order is fulfilled, Store Ops locks each SKU row, rejects insufficient stock, records the before/after quantities, and deducts stock exactly once even if fulfillment is retried.
 
 Operational backend for `store.jenanggemi.com`.
 
