@@ -143,5 +143,17 @@ assert(
     && adminCss.includes('--instant-pulse-alert-bg: #fee2e2'),
   'Light mode must use a readable light-red Instant pulse instead of the dark-theme maroon frame.'
 );
+assert(
+  storeHome.includes("Number(Boolean(b.weekendDependent)) - Number(Boolean(a.weekendDependent))")
+    && storeHome.includes('Weekend Dependent')
+    && storeHome.includes('Arrange manually now')
+    && storeHome.includes("isWeekendDependent ? 'is-weekend-dependent' : ''"),
+  'Weekend Dependent orders must sort first, receive an urgent badge, and direct manual handling after cutoff.'
+);
+assert(
+  adminCss.includes('.admin-order-card.is-weekend-dependent')
+    && adminCss.includes('@keyframes admin-weekend-dependent-pulse'),
+  'Weekend Dependent orders must blink with their own amber treatment.'
+);
 
 console.log('store-order-handover-test: ok');

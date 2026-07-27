@@ -1272,6 +1272,9 @@ document.addEventListener('DOMContentLoaded', () => {
       shipmentArranged: Boolean(order.shipmentArranged || order.shipment_arranged),
       instantArrangementState: String(order.instantArrangementState || order.instant_arrangement_state || ''),
       instantArrangementError: String(order.instantArrangementError || order.instant_arrangement_error || ''),
+      weekendDependent: Boolean(order.weekendDependent || order.weekend_dependent),
+      weekendDependentAutoWindowOpen: Boolean(order.weekendDependentAutoWindowOpen || order.weekend_dependent_auto_window_open),
+      weekendDependentCutoff: String(order.weekendDependentCutoff || order.weekend_dependent_cutoff || ''),
       handoverMethod: orderPresentation.normalizeHandoverMethod(order),
       shippingProviderName: String(order.shippingProviderName || order.shipping_provider_name || ''),
       handoverScheduledStartAt: String(order.handoverScheduledStartAt || order.handover_scheduled_start_at || ''),
@@ -1447,7 +1450,8 @@ document.addEventListener('DOMContentLoaded', () => {
       order.status !== 'FULFILLED'
       && order.fulfillmentStatus !== 'FULFILLED'
     ))
-    .sort((a, b) => a.deadlineAt - b.deadlineAt);
+    .sort((a, b) => Number(Boolean(b.weekendDependent)) - Number(Boolean(a.weekendDependent))
+      || a.deadlineAt - b.deadlineAt);
 
   const visibleListedOrders = (orders = listedOrders()) => orderPresentation.filterOrdersByHandover(orders, dropOffOnly);
 
@@ -2105,6 +2109,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const customSourceColor = isCustomSourceColor(sourceColor) ? sourceColor.toUpperCase() : '';
       const isLocked = order.locked && !order.currentEmployeeCanWork;
       const isDropOff = orderPresentation.isDropOff(order);
+      const isWeekendDependent = Boolean(order.weekendDependent);
       const cancellationRequested = orderPresentation.isCancellationRequested(order);
       const instantManualLifecycle = orderPresentation.isInstantManualLifecycle(order) && !order.labelBacked;
       const marketplacePlatform = normalizeSourceKey(order.platform);
@@ -2148,11 +2153,13 @@ document.addEventListener('DOMContentLoaded', () => {
               : (instantState === 'failed' ? 'Retry arrange' : 'Accept + arrange')));
         actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-instant-action" data-arrange-instant="${escapeHtml(order.id)}" ${instantDisabled ? 'disabled' : ''}><span>${escapeHtml(instantLabel)}</span></button>`;
       } else if (pausedUnarranged) {
-        actionButton = '<button type="button" class="admin-start-order-btn admin-paused-order-btn" disabled><span>Arrange in marketplace</span></button>';
+        actionButton = isWeekendDependent
+          ? `<button type="button" class="admin-start-order-btn admin-paused-order-btn is-weekend-dependent-action" disabled><span>${order.weekendDependentAutoWindowOpen ? 'Weekend auto-arranging' : 'Arrange manually now'}</span></button>`
+          : '<button type="button" class="admin-start-order-btn admin-paused-order-btn" disabled><span>Arrange in marketplace</span></button>';
       }
       return `
         <article
-          class="admin-order-card ${isCritical && !isLocked && !order.instant ? 'is-deadline-urgent' : ''} ${order.instant ? 'is-instant' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${pausedUnarranged ? 'is-awaiting-arrangement' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
+          class="admin-order-card ${isCritical && !isLocked && !order.instant ? 'is-deadline-urgent' : ''} ${order.instant ? 'is-instant' : ''} ${isWeekendDependent ? 'is-weekend-dependent' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${pausedUnarranged ? 'is-awaiting-arrangement' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
           data-source-key="${escapeHtml(sourceKey)}"
           ${order.handoverMethod ? `data-handover-method="${escapeHtml(order.handoverMethod)}"` : ''}
           ${sourceColor ? `data-source-color="${customSourceColor ? 'custom' : escapeHtml(sourceColor)}"` : ''}
@@ -2161,6 +2168,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <button type="button" class="admin-order-preview-trigger" data-preview-order="${escapeHtml(order.id)}" aria-label="Preview order ${escapeHtml(order.id)}"></button>
           <div class="admin-order-card-top">
             <span class="admin-order-id">${escapeHtml(order.id)}</span>
+            ${isWeekendDependent ? `<span class="admin-weekend-dependent-badge" title="Must be arranged on Saturday before ${escapeHtml(order.weekendDependentCutoff || '11:30')}">Weekend Dependent</span>` : ''}
             ${isDropOff ? `<span class="admin-dropoff-badge" aria-label="${escapeHtml(handoverDescription)}" title="${escapeHtml(handoverDescription)}">Drop-off</span>` : ''}
             ${order.instant ? '<span class="admin-instant-badge" role="img" aria-label="Instant shipping order" title="Instant shipping order"><svg viewBox="0 0 32 20" aria-hidden="true" focusable="false"><path class="admin-instant-badge-speed" d="M2 6h5.5M1 10h5M3 14h4.5"/><path class="admin-instant-badge-truck" d="M8.5 6.5h11v7.5h-11zM19.5 9.2h4.1l3.1 3.2V14h-7.2zM22.1 9.2v3.2h4.6"/><circle class="admin-instant-badge-wheel" cx="11.5" cy="15" r="2"/><circle class="admin-instant-badge-wheel" cx="23.5" cy="15" r="2"/></svg><span class="admin-instant-badge-label">Instant</span></span>' : ''}
           </div>

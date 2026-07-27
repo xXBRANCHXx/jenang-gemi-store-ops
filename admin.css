@@ -1307,6 +1307,40 @@ button, input {
   background: rgba(67, 28, 12, 0.82);
 }
 
+.admin-order-card.is-weekend-dependent {
+  --weekend-rest-bg: color-mix(in srgb, var(--admin-surface-soft) 90%, #f59e0b 10%);
+  --weekend-alert-bg: color-mix(in srgb, var(--admin-surface-soft) 70%, #f59e0b 30%);
+  animation: admin-weekend-dependent-pulse 0.82s ease-in-out infinite;
+  border-color: #f59e0b;
+}
+
+.admin-weekend-dependent-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #251400;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+@keyframes admin-weekend-dependent-pulse {
+  0%, 100% {
+    border-color: rgba(245, 158, 11, 0.65);
+    background: var(--weekend-rest-bg);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.08);
+  }
+  50% {
+    border-color: #fbbf24;
+    background: var(--weekend-alert-bg);
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.28);
+  }
+}
+
 .admin-order-card.is-instant {
   --instant-pulse-rest-bg: var(--admin-surface-soft);
   --instant-pulse-alert-bg: rgba(74, 10, 18, 0.98);
