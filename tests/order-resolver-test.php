@@ -38,6 +38,14 @@ $order = jg_store_ops_order_resolver_order_from_feed_order([
 
 order_resolver_expect('PARTNER-PO123', $order['order_id'], 'Feed orders should preserve Order ID.');
 order_resolver_expect('partner', $order['source']['key'], 'Feed partner orders should normalize source key.');
+order_resolver_expect('whatsapp', jg_store_ops_order_resolver_platform_key('WA'), 'Executive WhatsApp orders should normalize to the WhatsApp source.');
+order_resolver_expect('WhatsApp', jg_store_ops_order_resolver_source_label('whatsapp'), 'Executive WhatsApp orders should retain a clear source label.');
+$whatsappLabel = jg_store_ops_order_resolver_shipping_label([
+    'status' => 'IS_LISTED',
+    'source' => ['platform' => 'whatsapp', 'key' => 'whatsapp'],
+    'raw' => ['label_url' => 'https://admin.jenanggemi.com/api/whatsapp-orders/?action=store_ops_label&order=WAEXEC-1'],
+]);
+order_resolver_expect(true, $whatsappLabel['available'], 'Listed Executive WhatsApp orders should expose their PDF label in Store Ops.');
 order_resolver_expect('Ayu', $order['customer']['name'], 'Feed orders should normalize customer names.');
 order_resolver_expect(40000.0, $order['revenue']['total'], 'Feed orders should normalize revenue totals.');
 order_resolver_expect(2.0, $order['items'][0]['quantity'], 'Feed items should normalize quantity.');

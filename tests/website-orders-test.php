@@ -154,7 +154,7 @@ $_ENV['JG_SHOPEE_INGEST_SETUP_TOKEN'] = 'shopee-test-token';
 $_ENV['JG_TIKTOK_INGEST_SETUP_TOKEN'] = 'tiktok-test-token';
 website_ops_expect('shopee-test-token', jg_store_ops_marketplace_setup_token('shopee'), 'Shopee requests must use the Shopee setup credential.');
 website_ops_expect('tiktok-test-token', jg_store_ops_marketplace_setup_token('tiktok'), 'TikTok requests must use the TikTok setup credential when configured.');
-website_ops_expect(['zero_website', 'jenang_gemi_website'], JG_STORE_OPS_WEBSITE_PLATFORMS, 'Store Ops website sources must remain independent.');
+website_ops_expect(['zero_website', 'jenang_gemi_website', 'whatsapp'], JG_STORE_OPS_WEBSITE_PLATFORMS, 'Store Ops must accept both website sources and Executive WhatsApp orders.');
 website_ops_expect(
     hash_hmac('sha256', 'jenang-gemi-website-orders-v1', 'shared-seed'),
     jg_store_ops_website_derive_token('shared-seed'),

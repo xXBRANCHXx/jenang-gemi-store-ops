@@ -55,7 +55,11 @@ document.addEventListener('DOMContentLoaded', () => {
     packageNumber: params.get('package') || params.get('package_id') || '',
     platform: requestedPlatform || (orderId.toUpperCase().startsWith('PARTNER-')
       ? 'partner'
-      : (orderId.toUpperCase().startsWith('ZEROWEB-') ? 'zero_website' : (orderId.toUpperCase().startsWith('JGWEB-') ? 'jenang_gemi_website' : 'shopee')))
+      : (orderId.toUpperCase().startsWith('ZEROWEB-')
+        ? 'zero_website'
+        : (orderId.toUpperCase().startsWith('JGWEB-')
+          ? 'jenang_gemi_website'
+          : (orderId.toUpperCase().startsWith('WAEXEC-') ? 'whatsapp' : 'shopee'))))
   } : null);
   const sourceAccount = requestedAccount || String(order?.sourceAccountKey || '');
   const packageNumber = String(order?.packageNumber || order?.package_number || params.get('package') || params.get('package_id') || '');

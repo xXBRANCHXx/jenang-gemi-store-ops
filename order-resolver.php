@@ -4,7 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/partner-orders-bootstrap.php';
 
-const JG_STORE_OPS_ORDER_RESOLVER_WEBSITE_PLATFORMS = ['zero_website', 'jenang_gemi_website'];
+const JG_STORE_OPS_ORDER_RESOLVER_WEBSITE_PLATFORMS = ['zero_website', 'jenang_gemi_website', 'whatsapp'];
 
 function jg_store_ops_order_resolver_config(string $envKey, string $configKey, string $default = ''): string
 {
@@ -719,7 +719,7 @@ function jg_store_ops_order_resolver_shipping_label(array $order): array
     $platform = jg_store_ops_order_resolver_platform_key((string) ($source['platform'] ?? $source['key'] ?? ''));
     $status = (string) ($order['status'] ?? '');
     $cancelled = preg_match('/CANCEL|REFUND|RETURN|REJECT|FAILED|EXPIRED|CLOSED/i', $status) === 1;
-    $supported = !$cancelled && in_array($platform, ['shopee', 'tiktok', 'partner', 'zero_website', 'jenang_gemi_website'], true);
+    $supported = !$cancelled && in_array($platform, ['shopee', 'tiktok', 'partner', 'zero_website', 'jenang_gemi_website', 'whatsapp'], true);
     $raw = is_array($order['raw'] ?? null) ? $order['raw'] : [];
     $available = $supported;
     $availabilitySource = $supported ? 'source' : 'unavailable';

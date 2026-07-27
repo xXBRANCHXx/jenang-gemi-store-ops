@@ -1131,12 +1131,14 @@ if (isset($_GET['shipping_label'])) {
         jg_store_ops_orders_fail('Order number is required.');
     }
 
-    if (str_starts_with(strtoupper($orderSn), 'ZEROWEB-') || str_starts_with(strtoupper($orderSn), 'JGWEB-')) {
-        $platform = str_starts_with(strtoupper($orderSn), 'ZEROWEB-') ? 'zero_website' : 'jenang_gemi_website';
+    if (str_starts_with(strtoupper($orderSn), 'ZEROWEB-') || str_starts_with(strtoupper($orderSn), 'JGWEB-') || str_starts_with(strtoupper($orderSn), 'WAEXEC-')) {
+        $platform = str_starts_with(strtoupper($orderSn), 'ZEROWEB-')
+            ? 'zero_website'
+            : (str_starts_with(strtoupper($orderSn), 'WAEXEC-') ? 'whatsapp' : 'jenang_gemi_website');
         $websitePdo = jg_store_ops_fulfillment_db();
         $websiteOrder = jg_store_ops_website_find($websitePdo, $platform, $orderSn);
         if (!is_array($websiteOrder)) {
-            jg_store_ops_orders_fail('Website shipping label is not available for this order.', 404);
+            jg_store_ops_orders_fail('Executive shipping label is not available for this order.', 404);
         }
         try {
             jg_store_ops_website_proxy_label($websiteOrder);

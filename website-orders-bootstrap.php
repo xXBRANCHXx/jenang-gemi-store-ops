@@ -4,7 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/store-ops-fulfillment-runtime.php';
 
-const JG_STORE_OPS_WEBSITE_PLATFORMS = ['zero_website', 'jenang_gemi_website'];
+const JG_STORE_OPS_WEBSITE_PLATFORMS = ['zero_website', 'jenang_gemi_website', 'whatsapp'];
 const JG_STORE_OPS_ZERO_SCOPE_CUTOVER = '2026-07-24 05:15:24.846138';
 const JG_STORE_OPS_ZERO_SCOPE_BEFORE = [
     'shopee:jenang-gemi-shopee',
@@ -573,6 +573,12 @@ function jg_store_ops_website_feed(): array
     return jg_store_ops_website_request('GET', $base . '/api/website-orders/?action=feed');
 }
 
+function jg_store_ops_whatsapp_feed(): array
+{
+    $base = rtrim(jg_store_ops_website_config('JG_EXECUTIVE_DASHBOARD_URL', 'executive_dashboard_url', 'https://admin.jenanggemi.com'), '/');
+    return jg_store_ops_website_request('GET', $base . '/api/whatsapp-orders/?action=feed');
+}
+
 function jg_store_ops_website_verified_payload(array $candidate): array
 {
     $platform = strtolower(trim((string) ($candidate['platform'] ?? '')));
@@ -580,7 +586,16 @@ function jg_store_ops_website_verified_payload(array $candidate): array
     if (!in_array($platform, JG_STORE_OPS_WEBSITE_PLATFORMS, true) || $orderId === '') {
         throw new InvalidArgumentException('Website order source is invalid.');
     }
-    $feed = jg_store_ops_website_feed();
+    $feed = $platform === 'whatsapp' ? jg_store_ops_whatsapp_feed() : jg_store_ops_website_feed();
+    if ($platform === 'whatsapp') {
+        foreach ((array) ($feed['orders'] ?? []) as $order) {
+            if (!is_array($order)) continue;
+            if (($order['platform'] ?? '') === $platform && ($order['order_id'] ?? $order['id'] ?? '') === $orderId) {
+                return $order;
+            }
+        }
+        throw new RuntimeException('Executive feed did not confirm this WhatsApp order.');
+    }
     $hardSet = is_array($feed['hard_set'] ?? null) ? $feed['hard_set'] : [];
     if (empty($hardSet['enabled']) || empty($hardSet['activated_at_iso'])) {
         throw new RuntimeException('Executive Hard Set is not active.');
@@ -601,16 +616,17 @@ function jg_store_ops_website_verified_payload(array $candidate): array
 
 function jg_store_ops_website_ingest(PDO $pdo, array $candidate): array
 {
+    $candidatePlatform = strtolower(trim((string) ($candidate['platform'] ?? '')));
     $state = jg_store_ops_website_state($pdo);
-    if (empty($state['enabled']) || empty($state['activated_at'])) {
+    if ($candidatePlatform !== 'whatsapp' && (empty($state['enabled']) || empty($state['activated_at']))) {
         throw new RuntimeException('Website-order ingestion is disabled in Store Ops.');
     }
     $payload = jg_store_ops_website_verified_payload($candidate);
     $platform = (string) $payload['platform'];
     $orderId = (string) ($payload['order_id'] ?? $payload['id']);
     $created = jg_store_ops_website_parse_utc($payload['createdAt'] ?? '');
-    $activated = jg_store_ops_website_parse_utc((string) $state['activated_at']);
-    if ($created <= $activated) {
+    $activated = $platform === 'whatsapp' ? null : jg_store_ops_website_parse_utc((string) $state['activated_at']);
+    if ($activated instanceof DateTimeImmutable && $created <= $activated) {
         throw new RuntimeException('Store Ops rejected a pre-cutover website order.');
     }
     $now = jg_store_ops_website_now();
@@ -635,14 +651,23 @@ function jg_store_ops_website_ingest(PDO $pdo, array $candidate): array
 function jg_store_ops_website_orders(PDO $pdo): array
 {
     $state = jg_store_ops_website_state($pdo);
-    if (empty($state['enabled']) || empty($state['activated_at'])) return [];
-    $stmt = $pdo->prepare(
-        'SELECT source_platform, order_id, payload_json, status, source_created_at
-         FROM store_ops_website_orders
-         WHERE status IN ("IS_LISTED", "IS_BEING_FULFILLED") AND source_created_at > :activated_at
-         ORDER BY source_created_at'
-    );
-    $stmt->execute([':activated_at' => $state['activated_at']]);
+    if (!empty($state['enabled']) && !empty($state['activated_at'])) {
+        $stmt = $pdo->prepare(
+            'SELECT source_platform, order_id, payload_json, status, source_created_at
+             FROM store_ops_website_orders
+             WHERE status IN ("IS_LISTED", "IS_BEING_FULFILLED")
+               AND (source_platform = "whatsapp" OR source_created_at > :activated_at)
+             ORDER BY source_created_at'
+        );
+        $stmt->execute([':activated_at' => $state['activated_at']]);
+    } else {
+        $stmt = $pdo->query(
+            'SELECT source_platform, order_id, payload_json, status, source_created_at
+             FROM store_ops_website_orders
+             WHERE status IN ("IS_LISTED", "IS_BEING_FULFILLED") AND source_platform = "whatsapp"
+             ORDER BY source_created_at'
+        );
+    }
     $orders = [];
     foreach ($stmt->fetchAll() as $row) {
         $payload = json_decode((string) $row['payload_json'], true);
@@ -673,7 +698,8 @@ function jg_store_ops_website_callback(PDO $pdo, string $platform, string $order
     $status = strtoupper($status);
     if (!in_array($status, ['IS_BEING_FULFILLED', 'FULFILLED'], true)) return;
     $base = rtrim(jg_store_ops_website_config('JG_EXECUTIVE_DASHBOARD_URL', 'executive_dashboard_url', 'https://admin.jenanggemi.com'), '/');
-    jg_store_ops_website_request('POST', $base . '/api/website-orders/?action=status_callback', [
+    $callbackPath = $platform === 'whatsapp' ? '/api/whatsapp-orders/?action=status_callback' : '/api/website-orders/?action=status_callback';
+    jg_store_ops_website_request('POST', $base . $callbackPath, [
         'platform' => $platform,
         'order_id' => $orderId,
         'status' => $status,
