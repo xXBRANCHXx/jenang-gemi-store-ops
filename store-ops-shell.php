@@ -27,7 +27,6 @@ function jg_store_ops_shell_attr(array $attributes): string
 function jg_store_ops_shell_svg(string $name): string
 {
     $remoteIcons = [
-        'whatsapp-orders' => 'https://cdn.simpleicons.org/whatsapp',
         'invoice-records' => 'https://api.iconify.design/material-symbols:receipt-long-outline.svg',
         'invoice-printer' => 'https://api.iconify.design/material-symbols:print-outline.svg',
     ];
@@ -60,7 +59,6 @@ function jg_store_ops_shell_nav_items(string $rootPrefix): array
         ['key' => 'inventory', 'label' => 'Inventory', 'href' => $rootPrefix . 'inventory/', 'title' => 'Inventory'],
         ['key' => 'stock-adjust', 'label' => 'Stock Adjust', 'href' => $rootPrefix . 'stock-adjust/', 'title' => 'Stock Adjust'],
         ['key' => 'walk-ins', 'label' => 'Walk Ins', 'href' => $rootPrefix . 'walk-ins/', 'title' => 'Walk Ins'],
-        ['key' => 'whatsapp-orders', 'label' => 'WhatsApp Orders', 'href' => $rootPrefix . 'whatsapp-orders/', 'title' => 'WhatsApp Orders'],
         ['key' => 'invoice-printer', 'label' => 'Invoice Printer', 'href' => $rootPrefix . 'invoice-printer/', 'title' => 'Invoice Printer'],
         ['key' => 'invoice-records', 'label' => 'Invoice Records', 'href' => $rootPrefix . 'invoice-records/', 'title' => 'Invoice Records'],
         ['key' => 'integrations', 'label' => 'Integrations', 'href' => $rootPrefix . 'integrations/', 'title' => 'Integrations'],
@@ -103,7 +101,7 @@ function jg_store_ops_shell_open(array $options = []): void
         'data-scan-serial-endpoint' => $rootPrefix . 'api/scan-serial/',
     ], $appAttributes);
     ?>
-    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.26</div>
+    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.28</div>
     <div<?php echo jg_store_ops_shell_attr($attributes); ?>>
         <div class="admin-backdrop admin-backdrop-a"></div>
         <div class="admin-backdrop admin-backdrop-b"></div>

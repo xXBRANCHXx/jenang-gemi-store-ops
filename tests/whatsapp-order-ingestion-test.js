@@ -7,6 +7,8 @@ const bootstrap = fs.readFileSync(path.join(root, 'website-orders-bootstrap.php'
 const resolver = fs.readFileSync(path.join(root, 'order-resolver.php'), 'utf8');
 const ordersApi = fs.readFileSync(path.join(root, 'api', 'orders-v2', 'index.php'), 'utf8');
 const legacyOrdersApi = fs.readFileSync(path.join(root, 'api', 'orders', 'index.php'), 'utf8');
+const shell = fs.readFileSync(path.join(root, 'store-ops-shell.php'), 'utf8');
+const dashboard = fs.readFileSync(path.join(root, 'dashboard', 'index.php'), 'utf8');
 
 assert.match(bootstrap, /JG_STORE_OPS_WEBSITE_PLATFORMS = \['zero_website', 'jenang_gemi_website', 'whatsapp'\]/);
 assert.match(bootstrap, /function jg_store_ops_whatsapp_feed[\s\S]*?\/api\/whatsapp-orders\/\?action=feed/);
@@ -19,5 +21,7 @@ assert.match(bootstrap, /stock_deducted_at[\s\S]*?function jg_store_ops_website_
 assert.match(bootstrap, /FOR UPDATE[\s\S]*?current_stock = :stock_after[\s\S]*?stock_deducted_at = :deducted_at/);
 assert.match(ordersApi, /source_platform'] === 'whatsapp'[\s\S]*?jg_store_ops_website_deduct_stock/);
 assert.match(legacyOrdersApi, /source_platform'] === 'whatsapp'[\s\S]*?jg_store_ops_website_deduct_stock/);
+assert.doesNotMatch(shell, /'key' => 'whatsapp-orders'/, 'The shared Store Ops navigation must not show the legacy WhatsApp order-entry tab.');
+assert.doesNotMatch(dashboard, /href="\.\.\/whatsapp-orders\/"/, 'The Store Ops dashboard navigation must not show the legacy WhatsApp order-entry tab.');
 
 console.log('whatsapp-order-ingestion-test: ok');

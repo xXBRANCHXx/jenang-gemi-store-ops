@@ -34,7 +34,7 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
     <link rel="stylesheet" href="../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
 <body class="admin-body is-dashboard is-store-home">
-    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.27</div>
+    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.28</div>
     <div
         class="admin-app admin-store-home"
         data-store-home
@@ -68,10 +68,6 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
                 <a class="admin-store-nav-item" href="../walk-ins/" title="Walk Ins">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3"/></svg>
                     <span>Walk Ins</span>
-                </a>
-                <a class="admin-store-nav-item" href="../whatsapp-orders/" title="WhatsApp Orders">
-                    <span class="admin-store-nav-internet-icon" style="--admin-store-nav-icon: url(https://cdn.simpleicons.org/whatsapp);" aria-hidden="true"></span>
-                    <span>WhatsApp Orders</span>
                 </a>
                 <a class="admin-store-nav-item" href="../invoice-printer/" title="Invoice Printer">
                     <span class="admin-store-nav-internet-icon" style="--admin-store-nav-icon: url(https://api.iconify.design/material-symbols:print-outline.svg);" aria-hidden="true"></span>
