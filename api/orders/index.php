@@ -1289,7 +1289,7 @@ foreach ($marketplaceSources as $source) {
         $platform,
         $accountProcessedCollectionOrders,
         $requireLabelBacked,
-        !$localHardSetEnabled
+        $localAutomationPaused || !$localHardSetEnabled
     );
     $processedCollectionOrders += $accountProcessedCollectionOrders;
     $successfulAccounts++;

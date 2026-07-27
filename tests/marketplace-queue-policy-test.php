@@ -42,6 +42,16 @@ marketplace_queue_expect(false, jg_store_ops_marketplace_order_visible($offShope
 marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible($offTikTokPending, 'tiktok', false, true), 'Big Set OFF must show TikTok SHIPMENT_PENDING.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible($offTikTokAwaitingShipment, 'tiktok', false, true), 'Big Set OFF must show TikTok AWAITING_SHIPMENT.');
 marketplace_queue_expect(false, jg_store_ops_marketplace_order_visible($awaitingCollection, 'tiktok', false, true), 'Big Set OFF must hide TikTok AWAITING_COLLECTION.');
+$ordersApi = file_get_contents(dirname(__DIR__) . '/api/orders/index.php');
+$ordersV2Api = file_get_contents(dirname(__DIR__) . '/api/orders-v2/index.php');
+marketplace_queue_expect(
+    true,
+    is_string($ordersApi)
+        && is_string($ordersV2Api)
+        && str_contains($ordersApi, '$localAutomationPaused || !$localHardSetEnabled')
+        && str_contains($ordersV2Api, '$localAutomationPaused || !$localHardSetEnabled'),
+    'Hard Set PAUSED must use the same unarranged-only marketplace queue as Big Set OFF.'
+);
 marketplace_queue_expect(false, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee'], false), 'Big Set OFF must reject Shopee actions.');
 marketplace_queue_expect(false, jg_store_ops_marketplace_action_enabled(['source_platform' => 'tiktok'], false), 'Big Set OFF must reject TikTok actions.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_action_enabled(['source_platform' => 'partner'], false), 'Big Set OFF must not block unrelated partner work.');
