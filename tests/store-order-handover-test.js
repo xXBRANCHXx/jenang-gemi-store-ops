@@ -174,11 +174,12 @@ assert(
   'Light mode must use a readable light-red Instant pulse instead of the dark-theme maroon frame.'
 );
 assert(
-  storeHome.includes("Number(Boolean(b.weekendDependent)) - Number(Boolean(a.weekendDependent))")
+  storeHome.includes("Number(Boolean(b?.instant)) - Number(Boolean(a?.instant))")
+    && storeHome.includes("Number(Boolean(b?.weekendDependent)) - Number(Boolean(a?.weekendDependent))")
     && storeHome.includes('Weekend Dependent')
     && storeHome.includes('Arrange manually now')
     && storeHome.includes("isWeekendDependent ? 'is-weekend-dependent' : ''"),
-  'Weekend Dependent orders must sort first, receive an urgent badge, and direct manual handling after cutoff.'
+  'Instant orders must sort first, while Weekend Dependent orders retain their next-priority badge and manual cutoff handling.'
 );
 assert(
   adminCss.includes('.admin-order-card.is-weekend-dependent')

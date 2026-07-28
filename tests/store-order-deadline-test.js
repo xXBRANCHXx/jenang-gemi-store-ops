@@ -47,9 +47,8 @@ const arrangedShopee = presentation.normalizeDeadline({
   deadlineSource: 'ship_by_date'
 }, now);
 assert(arrangedShopee.deadlineSatisfied === true, 'Arrangement must satisfy Shopee\'s pre-arrangement ship-by deadline.');
-assert(arrangedShopee.deadlineLabel === 'Shipment deadline', 'An arranged Shopee order must identify the stored shipment deadline.');
-assert(presentation.formatDeadline(arrangedShopee, now).endsWith('WIB'), 'An arranged Shopee order must show its absolute Jakarta shipment deadline.');
-assert(!['Ready to process', 'Overdue'].includes(presentation.formatDeadline(arrangedShopee, now)), 'A satisfied shipment deadline must be shown without a false operational status.');
+assert(arrangedShopee.deadlineLabel === '', 'An arranged Shopee card must not waste space on a deadline label.');
+assert(presentation.formatDeadline(arrangedShopee, now) === '0h', 'A satisfied past deadline must show compact remaining hours without becoming overdue.');
 assert(presentation.isCriticalOrder(arrangedShopee, now) === false, 'A satisfied arrangement deadline must not count as critical.');
 assert(presentation.shouldSoundSiren(arrangedShopee, now) === false, 'A satisfied arrangement deadline must not sound the siren.');
 
@@ -70,6 +69,14 @@ const shortFlow = presentation.columnFirstBoardFlow(10, 1200);
 assert(shortFlow.columns === 6 && shortFlow.rows === 6, 'A short queue must retain the six-row urgency-first column.');
 const mobileFlow = presentation.columnFirstBoardFlow(20, 360);
 assert(mobileFlow.columns === 1 && mobileFlow.rows === 20, 'A narrow queue must remain one column and expand only downward.');
+
+const ranked = presentation.sortOrdersByUrgency([
+  { id: 'REGULAR-EARLY', deadlineAt: now + 30 * 60000 },
+  { id: 'WEEKEND', weekendDependent: true, deadlineAt: now + 10 * 60000 },
+  { id: 'INSTANT', instant: true, deadlineSatisfied: true, deadlineAt: now + 3 * 60 * 60000 },
+  { id: 'REGULAR-LATE', deadlineAt: now + 5 * 60 * 60000 }
+]);
+assert(ranked.map((order) => order.id).join(',') === 'INSTANT,WEEKEND,REGULAR-EARLY,REGULAR-LATE', 'Instant orders must rank first, followed by the existing urgency classes and deadline order.');
 
 assert(
   presentation.shouldSoundSiren({ instant: true, deadlineAt: now + 2 * 60 * 60000 }, now) === false,

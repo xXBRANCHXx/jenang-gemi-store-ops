@@ -22,7 +22,7 @@
     return {
       deadlineAt: Number.isFinite(deadlineAt) && deadlineAt > 0 ? deadlineAt : now + 86400000,
       deadlineType,
-      deadlineLabel: deadlineSatisfied ? 'Shipment deadline' : deadlineLabel,
+      deadlineLabel: deadlineSatisfied ? '' : deadlineLabel,
       deadlineSatisfied
     };
   };
@@ -36,22 +36,11 @@
     const remainingMs = Number(order?.deadlineAt || 0) - now;
     return remainingMs > 0 && remainingMs < thresholdMs;
   };
-  const formatAbsoluteDeadline = (order) => {
-    const deadlineAt = Number(order?.deadlineAt || order?.deadline_at || 0);
-    if (!Number.isFinite(deadlineAt) || deadlineAt <= 0) return 'Unavailable';
-    const parts = new Intl.DateTimeFormat('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-      timeZone: 'Asia/Jakarta'
-    }).formatToParts(new Date(deadlineAt));
-    const value = (type) => String(parts.find((part) => part.type === type)?.value || '');
-    return `${value('day')} ${value('month')} · ${value('hour')}:${value('minute')} WIB`;
-  };
   const formatDeadline = (order, now = Date.now()) => {
-    if (order?.deadlineSatisfied) return formatAbsoluteDeadline(order);
+    if (order?.deadlineSatisfied) {
+      const hours = Math.max(0, Math.ceil((Number(order?.deadlineAt || 0) - now) / 3600000));
+      return `${hours}h`;
+    }
     const minutes = minutesRemaining(order, now);
     if (minutes <= 0) return 'Overdue';
     if (minutes < 60) return `${minutes}m`;
@@ -119,6 +108,11 @@
       rows: Math.max(minimumRows, Math.ceil(count / columns) || 1)
     };
   };
+  const sortOrdersByUrgency = (orders) => (Array.isArray(orders) ? orders : [])
+    .slice()
+    .sort((a, b) => Number(Boolean(b?.instant)) - Number(Boolean(a?.instant))
+      || Number(Boolean(b?.weekendDependent)) - Number(Boolean(a?.weekendDependent))
+      || Number(a?.deadlineAt || Number.MAX_SAFE_INTEGER) - Number(b?.deadlineAt || Number.MAX_SAFE_INTEGER));
   const canCurrentEmployeeUnclaim = (order, currentEmployeeId) => {
     const claimant = String(order?.claimedBy || order?.claimed_by || '').trim();
     const employeeId = String(currentEmployeeId || '').trim();
@@ -187,6 +181,7 @@
     filterOrdersByHandover,
     shouldShowOrderLoading,
     columnFirstBoardFlow,
+    sortOrdersByUrgency,
     canCurrentEmployeeUnclaim,
     previewActionState
   });
@@ -1507,14 +1502,12 @@ document.addEventListener('DOMContentLoaded', () => {
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
 
-  const listedOrders = () => state.orders
-    .filter((order) => (
+  const listedOrders = () => orderPresentation.sortOrdersByUrgency(
+    state.orders.filter((order) => (
       order.status !== 'FULFILLED'
       && order.fulfillmentStatus !== 'FULFILLED'
     ))
-    .sort((a, b) => Number(Boolean(b.weekendDependent)) - Number(Boolean(a.weekendDependent))
-      || Number(Boolean(a.deadlineSatisfied)) - Number(Boolean(b.deadlineSatisfied))
-      || a.deadlineAt - b.deadlineAt);
+  );
 
   const visibleListedOrders = (orders = listedOrders()) => orderPresentation.filterOrdersByHandover(orders, dropOffOnly);
 
@@ -2245,7 +2238,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ${isDropOff ? `<span class="admin-dropoff-badge" aria-label="${escapeHtml(handoverDescription)}" title="${escapeHtml(handoverDescription)}">Drop-off</span>` : ''}
             ${order.instant ? '<span class="admin-instant-badge" role="img" aria-label="Instant shipping order" title="Instant shipping order"><svg viewBox="0 0 32 20" aria-hidden="true" focusable="false"><path class="admin-instant-badge-speed" d="M2 6h5.5M1 10h5M3 14h4.5"/><path class="admin-instant-badge-truck" d="M8.5 6.5h11v7.5h-11zM19.5 9.2h4.1l3.1 3.2V14h-7.2zM22.1 9.2v3.2h4.6"/><circle class="admin-instant-badge-wheel" cx="11.5" cy="15" r="2"/><circle class="admin-instant-badge-wheel" cx="23.5" cy="15" r="2"/></svg><span class="admin-instant-badge-label">Instant</span></span>' : ''}
           </div>
-          <div class="admin-order-deadline"><span>${escapeHtml(order.deadlineLabel)}</span>${escapeHtml(formatDeadline(order))}${pickupSlotLabel ? `<small>Pickup ${escapeHtml(pickupSlotLabel)}</small>` : ''}</div>
+          <div class="admin-order-deadline">${order.deadlineLabel ? `<span>${escapeHtml(order.deadlineLabel)}</span>` : ''}${escapeHtml(formatDeadline(order))}${pickupSlotLabel ? `<small>Pickup ${escapeHtml(pickupSlotLabel)}</small>` : ''}</div>
           <div class="admin-order-meta">
             <span>${escapeHtml(sourceLabel)}</span>
             <span>${escapeHtml(claimLabel)}</span>
@@ -2302,7 +2295,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <small>Review the complete order before assigning it to yourself.</small>
         </div>
         <div class="admin-preview-deadline ${isCriticalOrder(order) && !order.instant ? 'is-deadline-urgent' : ''}">
-          <span>${escapeHtml(order.deadlineLabel)}</span>
+          ${order.deadlineLabel ? `<span>${escapeHtml(order.deadlineLabel)}</span>` : ''}
           <strong>${escapeHtml(formatDeadline(order))}</strong>
         </div>
       </section>
@@ -2368,7 +2361,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <span><strong>Status</strong> ${escapeHtml(order.status)}</span>
         ${orderPresentation.isDropOff(order) ? `<span class="admin-dropoff-summary"><strong>Handover</strong> DROP-OFF${order.shippingProviderName ? ` · ${escapeHtml(order.shippingProviderName)}` : ''}</span>` : ''}
         ${order.handoverMethod === 'PICKUP' && orderPresentation.formatHandoverSlot(order) ? `<span><strong>Pickup</strong> ${escapeHtml(orderPresentation.formatHandoverSlot(order))}</span>` : ''}
-        <span><strong>${escapeHtml(order.deadlineLabel)}</strong> ${escapeHtml(formatDeadline(order))}</span>
+        <span>${order.deadlineLabel ? `<strong>${escapeHtml(order.deadlineLabel)}</strong> ` : ''}${escapeHtml(formatDeadline(order))}</span>
       `;
     }
     if (pickList) {
