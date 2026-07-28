@@ -32,16 +32,6 @@ try {
 website_ops_expect(true, $ambiguousTimestampRejected, 'Store Ops must reject ambiguous text as a permanent cutover timestamp.');
 website_ops_expect(true, jg_store_ops_website_activation_requires_readiness(['enabled' => false]), 'The first Store Ops projection must require readiness.');
 website_ops_expect(false, jg_store_ops_website_activation_requires_readiness(['enabled' => true]), 'An idempotent Store Ops projection retry must not reopen the readiness gate.');
-$resumeRejected = false;
-try {
-    jg_store_ops_website_set_automation_paused(
-        new PDO('sqlite::memory:'),
-        ['automation_paused' => false]
-    );
-} catch (RuntimeException $error) {
-    $resumeRejected = str_contains($error->getMessage(), 'permanently paused');
-}
-website_ops_expect(true, $resumeRejected, 'Store Ops must reject resume payloads before they can change persistent state.');
 website_ops_expect(
     true,
     jg_store_ops_website_cutover_matches('2026-06-23T01:00:00.123456Z', '2026-06-23 01:00:00.123456'),
