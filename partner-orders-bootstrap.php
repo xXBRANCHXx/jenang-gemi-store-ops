@@ -313,6 +313,30 @@ function jg_store_ops_partner_orders_fetch_feed(): ?array
     return $decoded;
 }
 
+function jg_store_ops_partner_orders_history_url(string $displayId): string
+{
+    $url = jg_store_ops_partner_orders_feed_url();
+    $separator = str_contains($url, '?') ? '&' : '?';
+    return $url . $separator . http_build_query([
+        'order_id' => jg_store_ops_partner_orders_original_id($displayId),
+    ]);
+}
+
+function jg_store_ops_partner_orders_fetch_history(string $displayId): ?array
+{
+    $token = jg_store_ops_partner_orders_feed_token();
+    if ($token === '') {
+        return null;
+    }
+
+    $decoded = jg_store_ops_partner_orders_fetch_json(
+        jg_store_ops_partner_orders_history_url($displayId),
+        ['X-Store-Ops-Token: ' . $token]
+    );
+    $order = is_array($decoded) && !empty($decoded['ok']) ? ($decoded['order'] ?? null) : null;
+    return is_array($order) ? jg_store_ops_partner_orders_enrich_order($order) : null;
+}
+
 function jg_store_ops_partner_orders_source_key(string $partnerCode): string
 {
     $normalized = strtolower(trim($partnerCode));
@@ -676,6 +700,11 @@ function jg_store_ops_partner_orders_find_any(string $displayId): ?array
     $originalId = jg_store_ops_partner_orders_original_id($displayId);
     if ($originalId === '') {
         return null;
+    }
+
+    $remoteOrder = jg_store_ops_partner_orders_fetch_history($displayId);
+    if (is_array($remoteOrder)) {
+        return $remoteOrder;
     }
 
     $pdo = jg_store_ops_partner_orders_db();

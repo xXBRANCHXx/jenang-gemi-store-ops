@@ -33,6 +33,7 @@ $fulfilledOrder = jg_store_ops_partner_orders_normalize([
 partner_order_lifecycle_expect(true, ($fulfilledOrder['status'] ?? '') === 'FULFILLED', 'Historical Partner normalization must retain fulfilled orders.');
 partner_order_lifecycle_expect(true, count((array) ($fulfilledOrder['items'] ?? [])) === 2, 'Historical Partner normalization must retain every processed product.');
 partner_order_lifecycle_expect(true, (($fulfilledOrder['items'][0]['productName'] ?? '') === 'ZERO Syrup Pistachio 550 ml'), 'Historical Partner products must retain their names.');
+partner_order_lifecycle_expect(true, str_ends_with(jg_store_ops_partner_orders_history_url('PARTNER-PO26072816040D97'), 'order_id=PO26072816040D97'), 'Historical Partner lookups must request the exact source order from the Partner API.');
 $resolverSource = file_get_contents(dirname(__DIR__) . '/order-resolver.php');
 partner_order_lifecycle_expect(true, is_string($resolverSource) && str_contains($resolverSource, 'jg_store_ops_partner_orders_find_any($orderId)'), 'The order resolver must use the any-status Partner history lookup.');
 partner_order_lifecycle_expect(true, jg_store_ops_partner_orders_has_labels([
