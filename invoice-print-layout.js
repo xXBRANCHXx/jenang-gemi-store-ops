@@ -222,7 +222,9 @@
         sku: item.sku || '',
         qty: item.quantity || 0,
         sale_price: item.unit_price || 0,
-        discount_rate: item.discount_total ? (Number(item.discount_total) / Math.max(1, Number(item.line_total || 0) + Number(item.discount_total))) * 100 : 0,
+        discount_rate: moneyValue(item.discount_rate) || (item.discount_total
+          ? (moneyValue(item.discount_total) / Math.max(1, moneyValue(item.line_total) + moneyValue(item.discount_total))) * 100
+          : 0),
         line_total: item.line_total || 0
       }))
     };

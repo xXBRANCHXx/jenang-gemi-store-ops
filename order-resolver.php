@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/partner-orders-bootstrap.php';
+require_once __DIR__ . '/website-orders-bootstrap.php';
 
 const JG_STORE_OPS_ORDER_RESOLVER_WEBSITE_PLATFORMS = ['zero_website', 'jenang_gemi_website', 'whatsapp'];
 
@@ -220,6 +221,8 @@ function jg_store_ops_order_resolver_item(array $item): array
     if ($lineTotal <= 0 && $unitPrice > 0) {
         $lineTotal = round($unitPrice * $quantity, 2);
     }
+    $discountTotal = jg_store_ops_order_resolver_money($item['discount_total'] ?? $item['discountTotal'] ?? 0);
+    $discountRate = jg_store_ops_order_resolver_money($item['discount_rate'] ?? $item['discountRate'] ?? 0);
 
     return [
         'sku' => $sku,
@@ -227,7 +230,8 @@ function jg_store_ops_order_resolver_item(array $item): array
         'quantity' => $quantity,
         'unit_price' => $unitPrice,
         'line_total' => $lineTotal,
-        'discount_total' => jg_store_ops_order_resolver_money($item['discount_total'] ?? 0),
+        'discount_rate' => $discountRate,
+        'discount_total' => $discountTotal,
         'cogs' => jg_store_ops_order_resolver_money($item['cogs'] ?? 0),
         'source_item_id' => jg_store_ops_order_resolver_string($item['sourceItemId'] ?? $item['item_key'] ?? '', 160),
     ];
@@ -245,6 +249,34 @@ function jg_store_ops_order_resolver_order_from_feed_order(array $order, string 
     $gross = jg_store_ops_order_resolver_money($financials['grossRevenue'] ?? $financials['gross_revenue'] ?? $order['revenueTotal'] ?? $order['total'] ?? $lineTotal);
     $net = jg_store_ops_order_resolver_money($financials['netRevenue'] ?? $financials['net_revenue'] ?? $gross);
     $fees = jg_store_ops_order_resolver_money($financials['marketplaceFees'] ?? $financials['marketplace_fees'] ?? max(0, $gross - $net));
+    $subtotal = $gross;
+    $discountTotal = 0.0;
+    $shippingCost = 0.0;
+    $total = $gross > 0 ? $gross : $net;
+    if ($sourceKey === 'whatsapp') {
+        $subtotal = jg_store_ops_order_resolver_money(
+            $financials['merchandiseSubtotal'] ?? $financials['merchandise_subtotal']
+                ?? $order['merchandise_subtotal'] ?? $gross
+        );
+        $net = jg_store_ops_order_resolver_money(
+            $financials['merchandiseTotal'] ?? $financials['merchandise_total']
+                ?? $order['merchandise_total'] ?? $lineTotal
+        );
+        $discountTotal = jg_store_ops_order_resolver_money(
+            $financials['discountTotal'] ?? $financials['discount_total']
+                ?? $order['discount_total'] ?? max(0, $subtotal - $net)
+        );
+        $shippingCost = jg_store_ops_order_resolver_money(
+            $financials['shippingCost'] ?? $financials['shipping_cost']
+                ?? $order['shipping_cost'] ?? 0
+        );
+        $total = jg_store_ops_order_resolver_money(
+            $financials['customerTotal'] ?? $financials['customer_total']
+                ?? $order['revenueTotal'] ?? $order['total'] ?? ($net + $shippingCost)
+        );
+        $gross = $subtotal;
+        $fees = 0.0;
+    }
 
     return [
         'order_id' => $orderId,
@@ -258,13 +290,14 @@ function jg_store_ops_order_resolver_order_from_feed_order(array $order, string 
         'items' => $items,
         'revenue' => [
             'currency' => jg_store_ops_order_resolver_string($financials['currency'] ?? $order['currency'] ?? 'IDR', 12) ?: 'IDR',
-            'subtotal' => $gross,
-            'discount_total' => 0.0,
+            'subtotal' => $subtotal,
+            'discount_total' => $discountTotal,
             'tax' => 0.0,
             'gross' => $gross,
             'net' => $net,
             'fees' => $fees,
-            'total' => $gross > 0 ? $gross : $net,
+            'shipping_cost' => $shippingCost,
+            'total' => $total,
         ],
         'timestamps' => [
             'ordered_at' => jg_store_ops_order_resolver_iso_datetime($order['createdAt'] ?? $order['created_at'] ?? ''),
@@ -390,6 +423,27 @@ function jg_store_ops_order_resolver_find_website(string $orderId): ?array
     $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
     if (!is_array($payload)) {
         $payload = [];
+    }
+    if (($row['source_platform'] ?? '') === 'whatsapp') {
+        $savedTotal = jg_store_ops_order_resolver_money(
+            $payload['revenueTotal'] ?? $payload['merchandise_total'] ?? $payload['total'] ?? 0
+        );
+        if ($savedTotal <= 0) {
+            try {
+                $feed = jg_store_ops_whatsapp_feed();
+                $target = jg_store_ops_order_resolver_id_key($orderId);
+                foreach ((array) ($feed['orders'] ?? []) as $freshOrder) {
+                    if (!is_array($freshOrder)) continue;
+                    $freshId = jg_store_ops_order_resolver_id_key((string) ($freshOrder['order_id'] ?? $freshOrder['id'] ?? ''));
+                    if ($freshId === $target) {
+                        $payload = $freshOrder;
+                        break;
+                    }
+                }
+            } catch (Throwable) {
+                // Preserve the locally saved order when the Executive feed is temporarily unavailable.
+            }
+        }
     }
     $payload['id'] = (string) ($row['order_id'] ?? ($payload['id'] ?? ''));
     $payload['platform'] = (string) ($row['source_platform'] ?? ($payload['platform'] ?? ''));

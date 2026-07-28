@@ -50,6 +50,30 @@ order_resolver_expect('Ayu', $order['customer']['name'], 'Feed orders should nor
 order_resolver_expect(40000.0, $order['revenue']['total'], 'Feed orders should normalize revenue totals.');
 order_resolver_expect(2.0, $order['items'][0]['quantity'], 'Feed items should normalize quantity.');
 
+$whatsappOrder = jg_store_ops_order_resolver_order_from_feed_order([
+    'id' => 'WAEXEC-TEST',
+    'platform' => 'whatsapp',
+    'merchandise_subtotal' => 457000,
+    'merchandise_total' => 381500,
+    'discount_total' => 75500,
+    'shipping_cost' => 17000,
+    'revenueTotal' => 398500,
+    'items' => [[
+        'sku' => '010155002701',
+        'product_name' => 'ZERO · Syrup · Pistachio',
+        'quantity' => 1,
+        'unit_price' => 77000,
+        'discount_rate' => 10,
+        'discount_total' => 7700,
+        'line_total' => 69300,
+    ]],
+], 'whatsapp');
+order_resolver_expect(77000.0, $whatsappOrder['items'][0]['unit_price'], 'WhatsApp invoice items should preserve unit prices.');
+order_resolver_expect(69300.0, $whatsappOrder['items'][0]['line_total'], 'WhatsApp invoice items should preserve discounted line totals.');
+order_resolver_expect(75500.0, $whatsappOrder['revenue']['discount_total'], 'WhatsApp invoices should preserve the order discount.');
+order_resolver_expect(17000.0, $whatsappOrder['revenue']['shipping_cost'], 'WhatsApp invoices should preserve shipping.');
+order_resolver_expect(398500.0, $whatsappOrder['revenue']['total'], 'WhatsApp customer totals should include shipping.');
+
 $tiktokOrder = jg_store_ops_order_resolver_order_from_feed_order([
     'id' => 'TT-ORDER-9',
     'platform' => 'TikTok Shop',

@@ -140,6 +140,11 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   };
 
+  const lookupOrder = async (orderId) => {
+    const payload = await requestJson(`${lookupEndpoint}?${new URLSearchParams({ action: 'order', order_id: orderId }).toString()}`, 'Order lookup failed.');
+    renderOrder(payload.order || {});
+  };
+
   const renderProfiles = (profiles) => {
     if (!profileResults) return;
     if (!profiles.length) {
@@ -178,8 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!orderId) return;
     if (orderPreview) orderPreview.innerHTML = '<p class="admin-empty">Loading order.</p>';
     try {
-      const payload = await requestJson(`${lookupEndpoint}?${new URLSearchParams({ action: 'order', order_id: orderId }).toString()}`, 'Order lookup failed.');
-      renderOrder(payload.order || {});
+      await lookupOrder(orderId);
     } catch (error) {
       activeOrder = null;
       if (orderPreview) orderPreview.innerHTML = '<p class="admin-empty">Order not loaded.</p>';
@@ -223,4 +227,22 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('focus', () => {
     if (!window.matchMedia || !window.matchMedia('print').matches) finishInvoicePrint();
   });
+
+  const initialParams = new URLSearchParams(window.location.search);
+  const initialOrderId = String(initialParams.get('order_id') || initialParams.get('order') || '').trim();
+  if (initialOrderId) {
+    const input = orderForm?.querySelector('input[name="order_id"]');
+    if (input instanceof HTMLInputElement) input.value = initialOrderId;
+    if (orderPreview) orderPreview.innerHTML = '<p class="admin-empty">Loading order.</p>';
+    lookupOrder(initialOrderId)
+      .then(() => {
+        if (initialParams.get('print') === '1') return printActiveOrder();
+        return undefined;
+      })
+      .catch((error) => {
+        activeOrder = null;
+        if (orderPreview) orderPreview.innerHTML = '<p class="admin-empty">Order not loaded.</p>';
+        setError(orderError, error instanceof Error ? error.message : 'Order lookup failed.');
+      });
+  }
 });
