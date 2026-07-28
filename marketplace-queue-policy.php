@@ -117,6 +117,12 @@ function jg_store_ops_marketplace_action_enabled(array $key, bool $localHardSetE
     if (!in_array($platform, ['shopee', 'tiktok'], true)) {
         return true;
     }
+    // Releasing a Store Ops claim changes only the local operator assignment.
+    // The owning profile must be able to unclaim even while marketplace
+    // automation is paused, disabled, or the order has a cancellation alert.
+    if (strtolower(trim((string) ($key['action'] ?? ''))) === 'release_order') {
+        return true;
+    }
     if (!$localHardSetEnabled || jg_store_ops_marketplace_cancellation_requested($key)) {
         return false;
     }

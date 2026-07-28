@@ -197,6 +197,13 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
             </main>
         </div>
 
+        <div class="admin-order-context-menu" data-order-context-menu role="menu" aria-label="Order claim actions" hidden>
+            <button type="button" class="admin-order-context-action" data-unclaim-order role="menuitem">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7 4 12l5 5M4 12h10a6 6 0 0 0 6-6"/></svg>
+                <span><strong>Unclaim</strong><small>Release for another profile</small></span>
+            </button>
+        </div>
+
         <div class="admin-modal-shell admin-fulfillment-modal" data-fulfillment-modal hidden>
             <div class="admin-modal-backdrop" data-close-fulfillment-modal></div>
             <div class="admin-modal-card admin-fulfillment-card" data-fulfillment-card role="dialog" aria-modal="true" aria-labelledby="store-order-modal-title">

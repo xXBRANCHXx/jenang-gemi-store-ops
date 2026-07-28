@@ -1289,6 +1289,79 @@ button, input {
   border-color: rgba(255, 212, 0, 0.26);
 }
 
+.admin-order-card[data-claim-owner='self'] .admin-order-preview-trigger {
+  cursor: context-menu;
+}
+
+.admin-order-context-menu {
+  position: fixed;
+  z-index: 13050;
+  display: grid;
+  min-width: 190px;
+  padding: 6px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--admin-surface) 94%, transparent);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.admin-order-context-menu[hidden] {
+  display: none;
+}
+
+.admin-order-context-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--admin-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.admin-order-context-action:hover,
+.admin-order-context-action:focus-visible {
+  outline: 0;
+  background: color-mix(in srgb, var(--admin-accent-primary) 12%, var(--admin-surface-soft));
+}
+
+.admin-order-context-action:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.admin-order-context-action svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: 0 0 20px;
+}
+
+.admin-order-context-action span {
+  display: grid;
+  gap: 1px;
+}
+
+.admin-order-context-action strong {
+  font-size: 12px;
+}
+
+.admin-order-context-action small {
+  color: var(--admin-muted);
+  font-size: 9px;
+}
+
 .admin-order-card.is-locked {
   opacity: 0.48;
   filter: grayscale(0.7);

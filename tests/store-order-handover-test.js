@@ -49,6 +49,18 @@ assert(
   'Instant orders must expose their manual arrangement action.'
 );
 assert(
+  presentation.canCurrentEmployeeUnclaim({ claimedBy: 'operator-1', fulfillmentStatus: 'CLAIMED' }, 'operator-1'),
+  'The profile that owns a live claim must be allowed to unclaim it.'
+);
+assert(
+  !presentation.canCurrentEmployeeUnclaim({ claimedBy: 'operator-2', fulfillmentStatus: 'CLAIMED' }, 'operator-1'),
+  'A different profile must not be offered the unclaim action.'
+);
+assert(
+  !presentation.canCurrentEmployeeUnclaim({ claimedBy: 'operator-1', fulfillmentStatus: 'FULFILLED' }, 'operator-1'),
+  'A fulfilled order must never be reopened by the unclaim action.'
+);
+assert(
   presentation.requiresManualInstantArrangement({ instant: true, shipmentArranged: false, labelBacked: false }),
   'Instant orders must retain the manual arrangement action when lifecycle flags are absent.'
 );
@@ -96,6 +108,8 @@ assert(
   'Cached orders must stay hidden until the first live refresh resolves.'
 );
 const dashboardTemplate = fs.readFileSync(path.join(__dirname, '../dashboard/index.php'), 'utf8');
+const storeHome = fs.readFileSync(path.join(__dirname, '../store-home.js'), 'utf8');
+const adminCss = fs.readFileSync(path.join(__dirname, '../admin.css'), 'utf8');
 assert(
   dashboardTemplate.includes('data-order-board aria-busy="true"')
     && dashboardTemplate.includes('admin-board-empty admin-board-loading'),
@@ -106,8 +120,13 @@ assert(
     && dashboardTemplate.includes('data-automation-pause-copy'),
   'The queue must explain the global pause once instead of repeating a warning on every order.'
 );
-const storeHome = fs.readFileSync(path.join(__dirname, '../store-home.js'), 'utf8');
-const adminCss = fs.readFileSync(path.join(__dirname, '../admin.css'), 'utf8');
+assert(
+  dashboardTemplate.includes('data-order-context-menu')
+    && dashboardTemplate.includes('data-unclaim-order')
+    && storeHome.includes("addEventListener('contextmenu'")
+    && storeHome.includes("postOrderAction('release_order', order)"),
+  'A profile must be able to right-click its claimed card and release it through the existing API.'
+);
 assert(
   storeHome.includes('data-arrange-instant') && storeHome.includes('Accept + arrange'),
   'The Instant card must provide one combined acceptance and arrangement button.'

@@ -93,6 +93,12 @@
     return dropOffOnly ? rows.filter((order) => isDropOff(order)) : rows.slice();
   };
   const shouldShowOrderLoading = (snapshotReady) => !snapshotReady;
+  const canCurrentEmployeeUnclaim = (order, currentEmployeeId) => {
+    const claimant = String(order?.claimedBy || order?.claimed_by || '').trim();
+    const employeeId = String(currentEmployeeId || '').trim();
+    const status = String(order?.fulfillmentStatus || order?.fulfillment_status || order?.status || '').trim().toUpperCase();
+    return claimant !== '' && employeeId !== '' && claimant === employeeId && status !== 'FULFILLED';
+  };
   const previewActionState = (order, context = {}) => {
     const platform = String(order?.platform || '').trim().toLowerCase();
     const pausedUnarranged = Boolean(context.automaticArrangementPaused)
@@ -154,6 +160,7 @@
     formatHandoverSlot,
     filterOrdersByHandover,
     shouldShowOrderLoading,
+    canCurrentEmployeeUnclaim,
     previewActionState
   });
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -191,6 +198,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const dropOffFilter = document.querySelector('[data-dropoff-filter]');
   const automationPauseNotice = document.querySelector('[data-automation-pause-notice]');
   const automationPauseCopy = document.querySelector('[data-automation-pause-copy]');
+  const orderContextMenu = document.querySelector('[data-order-context-menu]');
+  const unclaimOrderButton = document.querySelector('[data-unclaim-order]');
   const reprintModal = document.querySelector('[data-reprint-modal]');
   const reprintForm = document.querySelector('[data-reprint-form]');
   const reprintError = document.querySelector('[data-reprint-error]');
@@ -2189,7 +2198,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return `
         <article
           class="admin-order-card ${isCritical && !isLocked && !order.instant ? 'is-deadline-urgent' : ''} ${order.instant ? 'is-instant' : ''} ${isWeekendDependent ? 'is-weekend-dependent' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${pausedUnarranged ? 'is-awaiting-arrangement' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
+          data-order-id="${escapeHtml(order.id)}"
           data-source-key="${escapeHtml(sourceKey)}"
+          ${claimedBySelf ? 'data-claim-owner="self" title="Right-click for claim actions"' : ''}
           ${order.handoverMethod ? `data-handover-method="${escapeHtml(order.handoverMethod)}"` : ''}
           ${sourceColor ? `data-source-color="${customSourceColor ? 'custom' : escapeHtml(sourceColor)}"` : ''}
           ${cardStyles ? `style="${cardStyles}"` : ''}
@@ -2452,6 +2463,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  const closeOrderContextMenu = () => {
+    if (!orderContextMenu) return;
+    orderContextMenu.hidden = true;
+    orderContextMenu.removeAttribute('data-order-id');
+    if (unclaimOrderButton instanceof HTMLButtonElement) unclaimOrderButton.disabled = false;
+  };
+
+  const openOrderContextMenu = (order, clientX, clientY) => {
+    if (!orderContextMenu || !orderPresentation.canCurrentEmployeeUnclaim(order, currentEmployee.id)) return;
+    orderContextMenu.dataset.orderId = order.id;
+    orderContextMenu.hidden = false;
+    const bounds = orderContextMenu.getBoundingClientRect();
+    const margin = 8;
+    const left = Math.max(margin, Math.min(clientX, window.innerWidth - bounds.width - margin));
+    const top = Math.max(margin, Math.min(clientY, window.innerHeight - bounds.height - margin));
+    orderContextMenu.style.left = `${left}px`;
+    orderContextMenu.style.top = `${top}px`;
+    if (unclaimOrderButton instanceof HTMLButtonElement) {
+      unclaimOrderButton.disabled = false;
+      unclaimOrderButton.focus({ preventScroll: true });
+    }
+  };
+
+  const unclaimOrder = async (orderId) => {
+    const order = state.orders.find((item) => item.id === orderId);
+    if (!orderPresentation.canCurrentEmployeeUnclaim(order, currentEmployee.id)) {
+      closeOrderContextMenu();
+      return;
+    }
+    closeOrderContextMenu();
+    if (order.clientClaimPending) {
+      order.clientClaimReleaseRequested = true;
+      order.started = false;
+      saveOrders();
+      renderBoard();
+      return;
+    }
+    try {
+      const payload = await postOrderAction('release_order', order);
+      applyFulfillmentState(order, payload.fulfillment || payload.order);
+      if (state.activeOrderId === order.id) closeFulfillment(false);
+      saveOrders();
+      renderBoard();
+    } catch (error) {
+      await refreshOrders(false, { force: true }).catch(() => {});
+      showBoardAlert(error instanceof Error ? error.message : 'Unable to unclaim this order.');
+    }
+  };
+
   const closeFulfillment = (releaseClaim = false) => {
     const order = activeOrder();
     if (modal) modal.hidden = true;
@@ -2495,6 +2555,41 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!(card instanceof HTMLElement)) return;
     openOrderPreview(card.dataset.previewOrder || '');
   });
+
+  board?.addEventListener('contextmenu', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const card = target?.closest('.admin-order-card[data-order-id]');
+    if (!(card instanceof HTMLElement)) return;
+    const order = state.orders.find((item) => item.id === card.dataset.orderId);
+    if (!orderPresentation.canCurrentEmployeeUnclaim(order, currentEmployee.id)) {
+      closeOrderContextMenu();
+      return;
+    }
+    event.preventDefault();
+    const bounds = card.getBoundingClientRect();
+    openOrderContextMenu(
+      order,
+      event.clientX || bounds.left + Math.min(28, bounds.width / 2),
+      event.clientY || bounds.top + Math.min(28, bounds.height / 2)
+    );
+  });
+
+  unclaimOrderButton?.addEventListener('click', () => {
+    const orderId = String(orderContextMenu?.dataset.orderId || '');
+    if (unclaimOrderButton instanceof HTMLButtonElement) unclaimOrderButton.disabled = true;
+    unclaimOrder(orderId);
+  });
+
+  document.addEventListener('pointerdown', (event) => {
+    if (orderContextMenu?.hidden || orderContextMenu?.contains(event.target)) return;
+    closeOrderContextMenu();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeOrderContextMenu();
+  });
+  window.addEventListener('blur', closeOrderContextMenu);
+  window.addEventListener('resize', closeOrderContextMenu);
+  window.addEventListener('scroll', closeOrderContextMenu, true);
 
   previewStage?.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;

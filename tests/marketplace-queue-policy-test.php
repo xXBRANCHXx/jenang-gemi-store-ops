@@ -59,6 +59,7 @@ marketplace_queue_expect(false, jg_store_ops_marketplace_action_enabled(['source
 marketplace_queue_expect(false, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee'], true), 'An unarranged regular marketplace row must remain read-only.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee', 'label_backed' => true], true, true), 'Pausing automatic arrangement must not block work on an already arranged label-backed order.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee', 'instant' => true, 'action' => 'arrange_instant_shipment'], true, true), 'The explicit Instant arrangement button must remain available while automatic arrangement is paused.');
+marketplace_queue_expect(true, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee', 'action' => 'release_order'], false, true), 'A profile must be able to release its local claim even when marketplace automation is unavailable.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_action_enabled(['source_platform' => 'partner'], false, true), 'Pausing Big Set automation must not block unrelated Partner orders.');
 
 echo "marketplace-queue-policy-test: ok\n";
