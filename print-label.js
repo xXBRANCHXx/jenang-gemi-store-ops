@@ -231,8 +231,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const markFulfilledOnServer = async () => {
     if (!order || isReprint) return;
+    const items = (Array.isArray(order.items) ? order.items : []).map((item) => ({
+      sku: String(item.sku || item.tag || item.sourceSkus?.[0] || ''),
+      product_name: String(item.productName || item.scanProductName || item.product_name || ''),
+      quantity: Math.max(0, Number(item.quantity || item.qty || 0))
+    })).filter((item) => item.quantity > 0 && (item.sku || item.product_name));
     await postOrderAction('fulfill_order', {
-      fulfilled_at: new Date().toISOString()
+      fulfilled_at: new Date().toISOString(),
+      items
     }, { keepalive: true });
   };
 

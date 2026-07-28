@@ -252,7 +252,7 @@ function jg_store_ops_order_records_operators(PDO $pdo): array
 }
 
 /**
- * @return array{events:array<int,array<string,mixed>>,items:array<int,array{sku:string,quantity:float}>}
+ * @return array{events:array<int,array<string,mixed>>,items:array<int,array{sku:string,product_name:string,quantity:float}>,items_source:string}
  */
 function jg_store_ops_order_records_detail(PDO $pdo, string $platform, string $account, string $orderId): array
 {
@@ -264,7 +264,7 @@ function jg_store_ops_order_records_detail(PDO $pdo, string $platform, string $a
     }
 
     $processed = $pdo->prepare(
-        'SELECT COUNT(*)
+        'SELECT f.items_json
          FROM store_ops_order_fulfillment_v2 f
          WHERE f.source_platform = :platform
            AND f.source_account = :account
@@ -280,7 +280,8 @@ function jg_store_ops_order_records_detail(PDO $pdo, string $platform, string $a
     );
     $params = [':platform' => $platform, ':account' => $account, ':order_id' => $orderId];
     $processed->execute($params);
-    if ((int) $processed->fetchColumn() === 0) {
+    $itemsJson = $processed->fetchColumn();
+    if ($itemsJson === false) {
         throw new OutOfBoundsException('Processed order record was not found.');
     }
 
@@ -296,7 +297,10 @@ function jg_store_ops_order_records_detail(PDO $pdo, string $platform, string $a
     );
     $stmt->execute($params);
     $events = [];
-    $items = [];
+    $storedItems = json_decode(is_string($itemsJson) ? $itemsJson : '', true);
+    $items = is_array($storedItems) ? jg_store_ops_fulfillment_items_snapshot($storedItems) : [];
+    $itemsSource = $items !== [] ? 'snapshot' : '';
+    $scannedItems = [];
     foreach ($stmt->fetchAll() as $row) {
         if (!is_array($row)) continue;
         $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
@@ -314,15 +318,23 @@ function jg_store_ops_order_records_detail(PDO $pdo, string $platform, string $a
         ];
         $events[] = $event;
         if ($event['event_type'] === 'scan' && $event['sku'] !== '') {
-            $items[$event['sku']] = ($items[$event['sku']] ?? 0.0) + max(1.0, (float) $event['quantity']);
+            if (!isset($scannedItems[$event['sku']])) {
+                $scannedItems[$event['sku']] = [
+                    'sku' => $event['sku'],
+                    'product_name' => preg_replace('/\s+accepted$/i', '', $event['message']) ?: $event['sku'],
+                    'quantity' => 0.0,
+                ];
+            }
+            $scannedItems[$event['sku']]['quantity'] += max(1.0, (float) $event['quantity']);
         }
+    }
+    if ($items === [] && $scannedItems !== []) {
+        $items = array_values($scannedItems);
+        $itemsSource = 'scan_events';
     }
     return [
         'events' => $events,
-        'items' => array_map(
-            static fn (string $sku, float $quantity): array => ['sku' => $sku, 'quantity' => $quantity],
-            array_keys($items),
-            array_values($items)
-        ),
+        'items' => $items,
+        'items_source' => $itemsSource,
     ];
 }

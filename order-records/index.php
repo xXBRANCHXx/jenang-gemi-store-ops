@@ -144,9 +144,9 @@ $orderRecordsJsVersion = (string) @filemtime(dirname(__DIR__) . '/order-records.
                         </div>
                         <button type="button" class="admin-ghost-btn" data-order-records-drawer-close>Close</button>
                     </div>
-                    <section class="admin-order-records-detail-section" data-order-records-items hidden>
-                        <h4>Scanned products</h4>
-                        <div data-order-records-items-body></div>
+                    <section class="admin-order-records-detail-section" data-order-records-items>
+                        <h4>Products processed</h4>
+                        <div data-order-records-items-body><p class="admin-empty">Loading products.</p></div>
                     </section>
                     <section class="admin-order-records-detail-section">
                         <h4>Processing timeline</h4>

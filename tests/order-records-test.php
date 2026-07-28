@@ -25,6 +25,12 @@ order_records_expect('2026-07-28', $defaults['date_to'], 'The default range must
 order_records_expect('Whatsapp', jg_store_ops_order_records_source_label('whatsapp', 'jenang-gemi'), 'WhatsApp must override generic account labels.');
 order_records_expect('JG Shopee', jg_store_ops_order_records_source_label('shopee', 'jenang-gemi-shopee'), 'Known marketplace accounts must keep their friendly labels.');
 order_records_expect('1h 2m', jg_store_ops_order_records_duration_label(3725), 'Fulfillment duration must use a compact readable label.');
+$snapshot = jg_store_ops_fulfillment_items_snapshot([
+    ['sku' => '010155002701', 'productName' => 'ZERO Syrup Pistachio 550 ml', 'quantity' => 1, 'skipScan' => true],
+]);
+order_records_expect([
+    ['sku' => '010155002701', 'product_name' => 'ZERO Syrup Pistachio 550 ml', 'quantity' => 1.0],
+], $snapshot, 'Processed product snapshots must include Skip Scan items with names and ordered quantities.');
 
 $processedJoin = jg_store_ops_order_records_processed_join_sql();
 order_records_expect(true, str_contains($processedJoin, 'event_type = "fulfill"'), 'Order Records must require the real fulfill event.');

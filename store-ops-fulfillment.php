@@ -49,6 +49,7 @@ function jg_store_ops_fulfillment_ensure_schema(PDO $pdo): void
             fulfilled_at DATETIME NULL DEFAULT NULL,
             scan_required INT UNSIGNED NOT NULL DEFAULT 0,
             scan_completed INT UNSIGNED NOT NULL DEFAULT 0,
+            items_json LONGTEXT NULL DEFAULT NULL,
             created_at DATETIME NOT NULL,
             updated_at DATETIME NOT NULL,
             UNIQUE KEY uniq_store_ops_order (source_platform, source_account, order_id),
@@ -94,7 +95,8 @@ function jg_store_ops_fulfillment_ensure_schema(PDO $pdo): void
     jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment_v2', 'fulfilled_at', 'DATETIME NULL DEFAULT NULL AFTER label_printed_at');
     jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment_v2', 'scan_required', 'INT UNSIGNED NOT NULL DEFAULT 0 AFTER fulfilled_at');
     jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment_v2', 'scan_completed', 'INT UNSIGNED NOT NULL DEFAULT 0 AFTER scan_required');
-    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment_v2', 'created_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER scan_completed');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment_v2', 'items_json', 'LONGTEXT NULL DEFAULT NULL AFTER scan_completed');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment_v2', 'created_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER items_json');
     jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment_v2', 'updated_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER created_at');
 
     jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_events_v2', 'source_account', 'VARCHAR(96) NOT NULL DEFAULT "" AFTER source_platform');
@@ -383,6 +385,27 @@ function jg_store_ops_fulfillment_log_event(PDO $pdo, array $key, string $eventT
         ':payload_json' => is_string($encoded) ? $encoded : null,
         ':created_at' => jg_store_ops_fulfillment_now(),
     ]);
+}
+
+/**
+ * @return array<int, array{sku:string,product_name:string,quantity:float}>
+ */
+function jg_store_ops_fulfillment_items_snapshot(array $items): array
+{
+    $snapshot = [];
+    foreach (array_slice($items, 0, 500) as $item) {
+        if (!is_array($item)) continue;
+        $sku = substr(trim((string) ($item['sku'] ?? $item['tag'] ?? $item['source_sku'] ?? '')), 0, 80);
+        $name = substr(trim((string) ($item['product_name'] ?? $item['productName'] ?? $item['name'] ?? '')), 0, 240);
+        $quantity = (float) ($item['quantity'] ?? $item['qty'] ?? 0);
+        if ($quantity <= 0 || ($sku === '' && $name === '')) continue;
+        $snapshot[] = [
+            'sku' => $sku,
+            'product_name' => $name !== '' ? $name : ($sku !== '' ? $sku : 'Order item'),
+            'quantity' => min(9999, $quantity),
+        ];
+    }
+    return $snapshot;
 }
 
 function jg_store_ops_fulfillment_state_from_row(?array $row, string $currentEmployeeId, array $employeeMap = []): array
@@ -707,12 +730,19 @@ function jg_store_ops_fulfillment_mark_label_printed(PDO $pdo, array $key, strin
     }
 }
 
-function jg_store_ops_fulfillment_mark_fulfilled(PDO $pdo, array $key, string $employeeId, string $employeeName): array
+function jg_store_ops_fulfillment_mark_fulfilled(PDO $pdo, array $key, string $employeeId, string $employeeName, array $items = []): array
 {
     $pdo->beginTransaction();
     try {
         $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, true);
+        $snapshot = jg_store_ops_fulfillment_items_snapshot($items);
+        $itemsJson = $snapshot !== [] ? json_encode($snapshot, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : null;
         if (is_array($row) && strtoupper((string) ($row['status'] ?? '')) === 'FULFILLED') {
+            if (is_string($itemsJson) && trim((string) ($row['items_json'] ?? '')) === '') {
+                $stmt = $pdo->prepare('UPDATE store_ops_order_fulfillment_v2 SET items_json = :items_json, updated_at = :updated_at WHERE id = :id');
+                $stmt->execute([':items_json' => $itemsJson, ':updated_at' => jg_store_ops_fulfillment_now(), ':id' => (int) $row['id']]);
+                $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
+            }
             $pdo->commit();
             return $row;
         }
@@ -722,17 +752,22 @@ function jg_store_ops_fulfillment_mark_fulfilled(PDO $pdo, array $key, string $e
             'UPDATE store_ops_order_fulfillment_v2
              SET status = "FULFILLED",
                  fulfilled_at = COALESCE(fulfilled_at, :fulfilled_at),
+                 items_json = CASE WHEN :items_json_present = 1 THEN :items_json ELSE items_json END,
                  last_activity_at = :last_activity_at,
                  updated_at = :updated_at
              WHERE id = :id'
         );
         $stmt->execute([
             ':fulfilled_at' => $now,
+            ':items_json_present' => is_string($itemsJson) ? 1 : 0,
+            ':items_json' => $itemsJson,
             ':last_activity_at' => $now,
             ':updated_at' => $now,
             ':id' => (int) $row['id'],
         ]);
-        jg_store_ops_fulfillment_log_event($pdo, $key, 'fulfill', $employeeId, $employeeName);
+        jg_store_ops_fulfillment_log_event($pdo, $key, 'fulfill', $employeeId, $employeeName, [
+            'items' => $snapshot,
+        ]);
         $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
         $pdo->commit();
         return is_array($row) ? $row : [];

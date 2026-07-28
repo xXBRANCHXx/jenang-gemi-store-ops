@@ -147,11 +147,20 @@ document.addEventListener('DOMContentLoaded', () => {
     `).join('');
   };
 
-  const renderItems = (items = []) => {
+  const renderItems = (items = [], loading = false) => {
     if (!refs.items || !refs.itemsBody) return;
-    refs.items.hidden = !items.length;
+    refs.items.hidden = false;
+    if (!items.length) {
+      refs.itemsBody.innerHTML = loading
+        ? '<p class="admin-empty">Loading products.</p>'
+        : '<p class="admin-form-error">Product details could not be loaded for this processed order.</p>';
+      return;
+    }
     refs.itemsBody.innerHTML = items.map((item) => `
-      <div class="admin-order-record-item"><strong>${escapeHtml(item.sku)}</strong><span>x${escapeHtml(item.quantity)}</span></div>
+      <div class="admin-order-record-item">
+        <span><strong>${escapeHtml(item.product_name || item.name || item.sku || 'Order item')}</strong><small>${escapeHtml(item.sku || 'SKU unavailable')}</small></span>
+        <em>x${escapeHtml(item.quantity)}</em>
+      </div>
     `).join('');
   };
 
@@ -195,7 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (refs.drawerTitle) refs.drawerTitle.textContent = orderId;
     if (refs.drawerMeta) refs.drawerMeta.textContent = `${record.source_label} · ${record.processed_by_name || record.processed_by || 'Operator'} · ${formatTime(record.fulfilled_at)}`;
     if (refs.events) refs.events.innerHTML = '<p class="admin-empty">Loading processing timeline.</p>';
-    renderItems([]);
+    renderItems([], true);
     if (refs.drawer) refs.drawer.hidden = false;
     try {
       const payload = await request({

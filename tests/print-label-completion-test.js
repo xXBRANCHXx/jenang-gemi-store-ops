@@ -54,6 +54,7 @@ assert.match(loadFlow[0], /labelLoaded = true;[\s\S]*setPrintEnabled\(true\);[\s
 assert.match(script, /new AbortController\(\)[\s\S]*controller\.abort\(\), 15000[\s\S]*signal: controller\.signal/, 'order updates should time out instead of disabling confirmation indefinitely');
 assert.doesNotMatch(script, /statusNode\) statusNode\.textContent = 'Syncing scans'/, 'background scan-history upload should not replace the operator-facing print status');
 assert.match(script, /markPrintedOnServer[\s\S]*keepalive: true[\s\S]*markFulfilledOnServer[\s\S]*keepalive: true/, 'label and fulfillment updates should survive normal tab lifecycle changes');
+assert.match(script, /const items = \(Array\.isArray\(order\.items\)[\s\S]*product_name:[\s\S]*quantity:[\s\S]*fulfilled_at:[\s\S]*items/, 'completion must persist the full ordered-product snapshot, including products that skip scanning');
 assert.match(fulfillmentRuntime, /function jg_store_ops_fulfillment_mark_label_printed[\s\S]*status[\s\S]*FULFILLED[\s\S]*return \$row/, 'repeated label confirmation should accept an already fulfilled order');
 assert.equal(fulfillmentSource, fulfillmentRuntime, 'the source and deployed fulfillment runtimes should stay synchronized');
 assert.match(ordersApi, /\$alreadyFulfilled[\s\S]*!\$alreadyFulfilled && \$key\['source_platform'\] === 'partner'[\s\S]*!\$alreadyFulfilled && in_array\(\$key\['source_platform'\], \['shopee', 'tiktok'\]/, 'idempotent confirmation must not regress an already fulfilled upstream order');
