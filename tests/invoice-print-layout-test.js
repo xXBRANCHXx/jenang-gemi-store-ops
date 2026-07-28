@@ -24,9 +24,11 @@ assert(whatsappHtml.includes('Rp 25.000,00'), 'WhatsApp invoice should show ship
 assert(whatsappHtml.includes('Rp 125.000,00'), 'WhatsApp amount due should include the shipping cost.');
 
 const walkInHtml = global.JGInvoicePrintLayout.buildInvoiceHtml({
-  invoice: { invoice_number: 'WI-TEST', invoice_type: 'walk_in', total: 100000 },
+  invoice: { invoice_number: 'WI-TEST', invoice_type: 'walk_in', subtotal: 100000, discount_total: 10000, total: 90000 },
   items: []
 });
 
 assert(!walkInHtml.includes('Shipping Cost'), 'Walk-in invoice should not show shipping cost.');
+assert(walkInHtml.includes('Discount'), 'Discounted invoices should show a discount summary.');
+assert(walkInHtml.includes('-Rp 10.000,00'), 'The invoice should show the amount discounted.');
 console.log('invoice-print-layout-test: ok');

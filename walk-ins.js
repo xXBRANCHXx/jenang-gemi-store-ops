@@ -15,13 +15,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const refs = {
     catalogStatus: document.querySelector('[data-walkins-catalog-status]'),
     invoiceNumber: document.querySelector('[data-walkins-invoice-number]'),
-    scannerAction: document.querySelector('[data-walkins-scanner-action]'),
-    scannerTitle: document.querySelector('[data-walkins-scanner-title]'),
-    scannerDetail: document.querySelector('[data-walkins-scanner-detail]'),
     error: document.querySelector('[data-walkins-error]'),
     customerName: document.querySelector('[data-walkins-customer-name]'),
     customerPhone: document.querySelector('[data-walkins-customer-phone]'),
     customerEmail: document.querySelector('[data-walkins-customer-email]'),
+    clearCustomer: document.querySelector('[data-walkins-clear-customer]'),
+    discountValue: document.querySelector('[data-walkins-discount-value]'),
+    discountPrefix: document.querySelector('[data-walkins-discount-prefix]'),
+    discountHelp: document.querySelector('[data-walkins-discount-help]'),
     shippingCost: document.querySelector('[data-walkins-shipping-cost]'),
     itemCount: document.querySelector('[data-walkins-item-count]'),
     cartList: document.querySelector('[data-walkins-cart-list]'),
@@ -57,7 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
     busy: false,
     scannerReady: false,
     scannerLabel: '',
-    scannerSettings: { baud_rate: 9600 }
+    scannerSettings: { baud_rate: 9600 },
+    discountMode: 'percentage'
   };
 
   let scanBuffer = '';
@@ -104,6 +106,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const lineDiscount = (item) => Math.round(lineGross(item) * discountRateForItem(item)) / 100;
   const lineTotal = (item) => Math.max(0, lineGross(item) - lineDiscount(item));
 
+  const orderDiscount = (eligibleTotal) => {
+    const raw = String(refs.discountValue?.value || '').trim();
+    if (raw === '') return { type: '', value: 0, total: 0, valid: true, message: '' };
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value < 0) {
+      return { type: state.discountMode, value: 0, total: 0, valid: false, message: 'Enter a valid non-negative discount value.' };
+    }
+    if (state.discountMode === 'percentage') {
+      if (value > 100) return { type: state.discountMode, value, total: 0, valid: false, message: 'Discount percentage cannot be more than 100%.' };
+      return { type: state.discountMode, value, total: Math.round(eligibleTotal * value) / 100, valid: true, message: '' };
+    }
+    if (value > eligibleTotal) {
+      return { type: state.discountMode, value, total: 0, valid: false, message: 'Sale price cannot be more than the current merchandise total.' };
+    }
+    return { type: state.discountMode, value, total: Math.max(0, eligibleTotal - value), valid: true, message: '' };
+  };
+
   const formatRupiah = (value) => new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
@@ -129,14 +148,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const setScannerStatus = (ready, label = '', detail = '') => {
     state.scannerReady = Boolean(ready);
     state.scannerLabel = state.scannerReady ? (label || state.scannerLabel || '') : '';
-    if (refs.scannerAction) {
-      refs.scannerAction.classList.toggle('is-ready', state.scannerReady);
-      refs.scannerAction.setAttribute('aria-label', state.scannerReady ? 'Scanner ready' : 'Connect scanner');
-    }
-    if (refs.scannerTitle) refs.scannerTitle.textContent = state.scannerReady ? 'Scanner ready' : 'Connect scanner';
-    if (refs.scannerDetail) {
-      refs.scannerDetail.textContent = detail || (state.scannerReady ? (state.scannerLabel || 'Ready for scans') : 'No scanner selected');
-    }
   };
 
   const readJsonResponse = async (response, fallbackMessage) => {
@@ -242,11 +253,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const totals = () => {
     const subtotal = state.cart.reduce((sum, item) => sum + lineGross(item), 0);
-    const discount = state.cart.reduce((sum, item) => sum + lineDiscount(item), 0);
+    const catalogDiscount = state.cart.reduce((sum, item) => sum + lineDiscount(item), 0);
+    const manualDiscount = orderDiscount(Math.max(0, subtotal - catalogDiscount));
+    const discount = catalogDiscount + (manualDiscount.valid ? manualDiscount.total : 0);
     const tax = 0;
     const itemCount = state.cart.reduce((sum, item) => sum + Number(item.qty || 0), 0);
     const shippingCost = isWhatsappInvoice ? shippingCostValue() : 0;
-    return { subtotal, discount, tax, shippingCost, total: subtotal - discount + tax + shippingCost, itemCount };
+    return { subtotal, discount, catalogDiscount, manualDiscount, tax, shippingCost, total: subtotal - discount + tax + shippingCost, itemCount };
   };
 
   const renderInvoiceNumber = () => {
@@ -275,15 +288,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (refs.complete instanceof HTMLButtonElement) {
       const needsPrintedInvoice = state.cart.length > 0 && !state.invoicePrinted;
       const shippingMissing = shippingCostMissing();
-      refs.complete.disabled = state.busy || state.cart.length === 0 || needsPrintedInvoice || shippingMissing;
+      refs.complete.disabled = state.busy || state.cart.length === 0 || needsPrintedInvoice || shippingMissing || !summary.manualDiscount.valid;
       refs.complete.classList.toggle('is-locked', needsPrintedInvoice);
       refs.complete.title = shippingMissing
         ? 'Enter a shipping cost before completing this invoice.'
         : (needsPrintedInvoice ? 'Print this invoice before completing the sale.' : '');
     }
     if (refs.print instanceof HTMLButtonElement) {
-      refs.print.disabled = state.cart.length === 0 || shippingCostMissing();
-      refs.print.title = shippingCostMissing() ? 'Enter a shipping cost before printing this invoice.' : '';
+      refs.print.disabled = state.cart.length === 0 || shippingCostMissing() || !summary.manualDiscount.valid;
+      refs.print.title = !summary.manualDiscount.valid ? summary.manualDiscount.message : (shippingCostMissing() ? 'Enter a shipping cost before printing this invoice.' : '');
     }
   };
 
@@ -561,14 +574,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return false;
   };
 
-  const openScannerSettings = () => {
-    if (window.JGStoreOpsScanner && typeof window.JGStoreOpsScanner.openSettings === 'function') {
-      window.JGStoreOpsScanner.openSettings();
-      return;
-    }
-    window.location.href = '../dashboard/?settings=scanner';
-  };
-
   const changeQuantity = (sku, delta) => {
     invalidatePrintedInvoice();
     state.cart = state.cart
@@ -590,10 +595,17 @@ document.addEventListener('DOMContentLoaded', () => {
     state.cart = [];
     state.paymentMethod = 'Cash';
     state.invoicePrinted = false;
+    state.discountMode = 'percentage';
     if (refs.customerName instanceof HTMLInputElement) refs.customerName.value = '';
     if (refs.customerPhone instanceof HTMLInputElement) refs.customerPhone.value = '';
     if (refs.customerEmail instanceof HTMLInputElement) refs.customerEmail.value = '';
     if (refs.shippingCost instanceof HTMLInputElement) refs.shippingCost.value = '';
+    if (refs.discountValue instanceof HTMLInputElement) refs.discountValue.value = '';
+    if (refs.discountPrefix) refs.discountPrefix.textContent = '%';
+    if (refs.discountHelp) refs.discountHelp.textContent = 'Percentage off the merchandise total.';
+    document.querySelectorAll('[data-walkins-discount-mode]').forEach((button) => {
+      button.classList.toggle('is-active', button.dataset.walkinsDiscountMode === 'percentage');
+    });
     document.querySelectorAll('[data-walkins-payment]').forEach((button) => {
       button.classList.toggle('is-active', button.dataset.walkinsPayment === 'Cash');
     });
@@ -630,6 +642,10 @@ document.addEventListener('DOMContentLoaded', () => {
         customer_email: contactKind === 'email' ? customer.contact : '-',
         customer_address: contactKind === 'address' ? customer.contact : '-',
         created_at: new Date().toISOString(),
+        subtotal: summary.subtotal,
+        discount_total: summary.discount,
+        discount_type: summary.manualDiscount.type,
+        discount_value: summary.manualDiscount.value,
         shipping_cost: summary.shippingCost,
         total: summary.total
       },
@@ -655,6 +671,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (shippingCostMissing()) {
       setError('Enter a shipping cost before printing this invoice. Use 0 when shipping is free.');
+      return false;
+    }
+    const summary = totals();
+    if (!summary.manualDiscount.valid) {
+      setError(summary.manualDiscount.message);
       return false;
     }
     if (!invoiceLayout) {
@@ -697,6 +718,12 @@ document.addEventListener('DOMContentLoaded', () => {
       renderTotals();
       return;
     }
+    const summary = totals();
+    if (!summary.manualDiscount.valid) {
+      setError(summary.manualDiscount.message);
+      renderTotals();
+      return;
+    }
     state.busy = true;
     renderTotals();
     setError('');
@@ -717,6 +744,10 @@ document.addEventListener('DOMContentLoaded', () => {
             address: isWhatsappInvoice ? (refs.customerEmail?.value || '') : ''
           },
           payment_method: state.paymentMethod,
+          discount: summary.manualDiscount.type ? {
+            type: summary.manualDiscount.type,
+            value: summary.manualDiscount.value
+          } : null,
           items: state.cart.map((item) => ({
             sku: item.sku,
             qty: item.qty,
@@ -764,13 +795,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderAll();
   };
 
-  refs.scannerAction?.addEventListener('click', () => {
-    if (state.scannerReady) {
-      connectApprovedScanner().catch(() => {});
-      return;
-    }
-    openScannerSettings();
-  });
   refs.skipSearch?.addEventListener('input', renderSkipScan);
   refs.skipList?.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
@@ -792,6 +816,39 @@ document.addEventListener('DOMContentLoaded', () => {
     invalidatePrintedInvoice();
     state.cart = [];
     renderCart();
+  });
+  refs.clearCustomer?.addEventListener('click', () => {
+    [refs.customerName, refs.customerPhone, refs.customerEmail].forEach((input) => {
+      if (input instanceof HTMLInputElement) input.value = '';
+    });
+    invalidatePrintedInvoice();
+    renderCustomerSummary();
+    renderTotals();
+    refs.customerName?.focus();
+  });
+  document.querySelectorAll('[data-walkins-discount-mode]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const nextMode = button.dataset.walkinsDiscountMode === 'sale_price' ? 'sale_price' : 'percentage';
+      if (nextMode !== state.discountMode && refs.discountValue instanceof HTMLInputElement) refs.discountValue.value = '';
+      state.discountMode = nextMode;
+      document.querySelectorAll('[data-walkins-discount-mode]').forEach((item) => item.classList.toggle('is-active', item === button));
+      if (refs.discountPrefix) refs.discountPrefix.textContent = state.discountMode === 'sale_price' ? 'Rp' : '%';
+      if (refs.discountHelp) refs.discountHelp.textContent = state.discountMode === 'sale_price'
+        ? 'Final merchandise price after discount.'
+        : 'Percentage off the merchandise total.';
+      if (refs.discountValue instanceof HTMLInputElement) {
+        refs.discountValue.max = state.discountMode === 'percentage' ? '100' : '999999999999';
+        refs.discountValue.placeholder = '0';
+      }
+      invalidatePrintedInvoice();
+      setError('');
+      renderTotals();
+    });
+  });
+  refs.discountValue?.addEventListener('input', () => {
+    invalidatePrintedInvoice();
+    setError('');
+    renderTotals();
   });
   [refs.customerName, refs.customerPhone, refs.customerEmail].forEach((input) => {
     input?.addEventListener('input', () => {

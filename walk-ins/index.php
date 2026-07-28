@@ -56,17 +56,6 @@ $walkInsJsVersion = (string) @filemtime(dirname(__DIR__) . '/walk-ins.js');
                             </div>
                             <span class="admin-status-badge" data-walkins-catalog-status>Loading SKUs</span>
                         </div>
-                        <div class="admin-walkins-scan-row">
-                            <button type="button" class="admin-walkins-scanner-action" data-walkins-scanner-action>
-                                <span class="admin-walkins-scanner-icon" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24"><path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3M7 12h10M8 9h1M11 9h2M15 9h1M8 15h2M12 15h1M15 15h1"/></svg>
-                                </span>
-                                <span>
-                                    <strong data-walkins-scanner-title>Connect scanner</strong>
-                                    <small data-walkins-scanner-detail>No scanner selected</small>
-                                </span>
-                            </button>
-                        </div>
                         <p class="admin-form-error" data-walkins-error hidden></p>
                     </article>
 
@@ -76,7 +65,10 @@ $walkInsJsVersion = (string) @filemtime(dirname(__DIR__) . '/walk-ins.js');
                                 <span class="admin-panel-kicker">Customer</span>
                                 <h3>Invoice details</h3>
                             </div>
-                            <span class="admin-panel-meta">Optional for walk-in customers</span>
+                            <div class="admin-walkins-panel-actions">
+                                <span class="admin-panel-meta">Optional for walk-in customers</span>
+                                <button type="button" class="admin-ghost-btn" data-walkins-clear-customer>Clear</button>
+                            </div>
                         </div>
                         <div class="admin-walkins-customer-grid">
                             <label class="admin-walkins-input-shell">
@@ -146,6 +138,18 @@ $walkInsJsVersion = (string) @filemtime(dirname(__DIR__) . '/walk-ins.js');
                             <strong data-walkins-summary-customer>Walk-in customer</strong>
                             <small data-walkins-summary-contact>No phone / No email</small>
                         </div>
+                        <div class="admin-walkins-discount-box">
+                            <span>Order discount</span>
+                            <div class="admin-walkins-discount-modes" role="group" aria-label="Discount type">
+                                <button type="button" data-walkins-discount-mode="sale_price">Sale price</button>
+                                <button type="button" class="is-active" data-walkins-discount-mode="percentage">Percentage</button>
+                            </div>
+                            <label class="admin-walkins-discount-input">
+                                <span data-walkins-discount-prefix>%</span>
+                                <input type="number" min="0" max="100" step="0.01" inputmode="decimal" placeholder="0" data-walkins-discount-value>
+                            </label>
+                            <small data-walkins-discount-help>Percentage off the merchandise total.</small>
+                        </div>
                         <dl class="admin-walkins-total-list">
                             <div><dt>Subtotal</dt><dd data-walkins-subtotal>Rp0</dd></div>
                             <div><dt>Discount</dt><dd data-walkins-discount>Rp0</dd></div>
@@ -192,7 +196,7 @@ $walkInsJsVersion = (string) @filemtime(dirname(__DIR__) . '/walk-ins.js');
                         <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
                     </span>
                     <h3 id="walkins-complete-title">Walk-in sale complete</h3>
-                    <p>Invoice was created, stock was deducted, and the sale was added to Store Ops.</p>
+                    <p>Invoice was created, stock was deducted, and the record was saved to Invoice Records.</p>
                     <strong data-walkins-complete-invoice>Invoice</strong>
                 </section>
             </div>

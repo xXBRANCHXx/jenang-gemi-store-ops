@@ -121,6 +121,16 @@
           </div>
         </section>
         ${isLastPage ? `
+          ${moneyValue(invoice.discount_total) > 0 ? `
+            <section class="admin-walkins-invoice-shipping-cost">
+              <span>Subtotal</span>
+              <strong>${formatPrintTotal(invoice.subtotal)}</strong>
+            </section>
+            <section class="admin-walkins-invoice-shipping-cost">
+              <span>Discount</span>
+              <strong>-${formatPrintTotal(invoice.discount_total)}</strong>
+            </section>
+          ` : ''}
           ${invoice.invoice_type === 'whatsapp' ? `
             <section class="admin-walkins-invoice-shipping-cost">
               <span>Shipping Cost</span>
@@ -202,6 +212,8 @@
         customer_email: customer.email || '-',
         customer_address: customer.address || '-',
         created_at: timestamps.created_at || timestamps.ordered_at || '',
+        subtotal: revenue.subtotal || revenue.merchandise_subtotal || revenue.total || revenue.gross || 0,
+        discount_total: revenue.discount_total || 0,
         shipping_cost: revenue.shipping_cost || 0,
         total: revenue.total || revenue.gross || 0
       },
@@ -210,7 +222,7 @@
         sku: item.sku || '',
         qty: item.quantity || 0,
         sale_price: item.unit_price || 0,
-        discount_rate: item.discount_total && item.line_total ? (Number(item.discount_total) / Math.max(1, Number(item.line_total))) * 100 : 0,
+        discount_rate: item.discount_total ? (Number(item.discount_total) / Math.max(1, Number(item.line_total || 0) + Number(item.discount_total))) * 100 : 0,
         line_total: item.line_total || 0
       }))
     };

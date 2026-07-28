@@ -6948,6 +6948,17 @@ button.admin-store-sidebar-profile:hover {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.admin-walkins-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-walkins-panel-actions .admin-ghost-btn {
+  min-height: 34px;
+  padding: 6px 12px;
+}
+
 .admin-walkins-cart-card {
   display: grid;
   min-height: 0;
@@ -7278,6 +7289,79 @@ button.admin-store-sidebar-profile:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.admin-walkins-discount-box {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  background: var(--admin-surface-soft);
+}
+
+.admin-walkins-discount-box > span,
+.admin-walkins-discount-box > small {
+  color: var(--admin-muted);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.admin-walkins-discount-box > span {
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.admin-walkins-discount-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.admin-walkins-discount-modes button {
+  min-height: 34px;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  background: var(--admin-surface);
+  color: var(--admin-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.admin-walkins-discount-modes button.is-active {
+  border-color: var(--admin-text);
+  background: var(--admin-text);
+  color: var(--admin-bg);
+}
+
+.admin-walkins-discount-input {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-surface);
+}
+
+.admin-walkins-discount-input span {
+  color: var(--admin-muted);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.admin-walkins-discount-input input {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--admin-text);
+  font: inherit;
+  font-weight: 900;
+  outline: none;
+  text-align: right;
 }
 
 .admin-walkins-customer-summary strong {

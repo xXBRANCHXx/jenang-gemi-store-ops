@@ -29,10 +29,22 @@ walkins_expect('Whatsapp', jg_store_ops_walkins_normalize_sale_type('whatsapp', 
 walkins_expect('0.00', jg_store_ops_walkins_shipping_cost('whatsapp', ['shipping_cost' => 0]), 'Zero shipping must be accepted.');
 walkins_expect('25000.00', jg_store_ops_walkins_shipping_cost('whatsapp', ['shipping_cost' => 25000]), 'Shipping cost should normalize as money.');
 walkins_expect('0.00', jg_store_ops_walkins_shipping_cost('walk_in', []), 'Walk-in sales should not require shipping cost.');
+$percentageDiscount = jg_store_ops_walkins_order_discount(['discount' => ['type' => 'percentage', 'value' => 15]], 100000);
+walkins_expect(15000.0, $percentageDiscount['total'], 'Percentage discounts must apply to merchandise.');
+$salePriceDiscount = jg_store_ops_walkins_order_discount(['discount' => ['type' => 'sale_price', 'value' => 70000]], 100000);
+walkins_expect(30000.0, $salePriceDiscount['total'], 'Sale-price discounts must set the final merchandise price.');
 
 try {
     jg_store_ops_walkins_shipping_cost('whatsapp', []);
     fwrite(STDERR, 'Missing WhatsApp shipping cost should fail.' . PHP_EOL);
+    exit(1);
+} catch (InvalidArgumentException) {
+    // Expected.
+}
+
+try {
+    jg_store_ops_walkins_order_discount(['discount' => ['type' => 'percentage', 'value' => 101]], 100000);
+    fwrite(STDERR, 'Discounts above 100 percent should fail.' . PHP_EOL);
     exit(1);
 } catch (InvalidArgumentException) {
     // Expected.

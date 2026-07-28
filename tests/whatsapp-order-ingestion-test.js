@@ -23,5 +23,7 @@ assert.match(ordersApi, /source_platform'] === 'whatsapp'[\s\S]*?jg_store_ops_we
 assert.match(legacyOrdersApi, /source_platform'] === 'whatsapp'[\s\S]*?jg_store_ops_website_deduct_stock/);
 assert.doesNotMatch(shell, /'key' => 'whatsapp-orders'/, 'The shared Store Ops navigation must not show the legacy WhatsApp order-entry tab.');
 assert.doesNotMatch(dashboard, /href="\.\.\/whatsapp-orders\/"/, 'The Store Ops dashboard navigation must not show the legacy WhatsApp order-entry tab.');
+assert.doesNotMatch(ordersApi, /walk_?in|store_ops_walkin/i, 'Completed Walk In invoices must not be imported into the Store Ops order queue.');
+assert.doesNotMatch(legacyOrdersApi, /walk_?in|store_ops_walkin/i, 'The legacy Store Ops order queue must also exclude completed Walk Ins.');
 
 console.log('whatsapp-order-ingestion-test: ok');

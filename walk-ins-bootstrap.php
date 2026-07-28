@@ -54,6 +54,8 @@ function jg_store_ops_walkins_ensure_schema(PDO $pdo): void
     );
 
     jg_store_ops_sku_ensure_column($pdo, 'store_ops_walkin_invoices', 'discount_total', 'DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER subtotal');
+    jg_store_ops_sku_ensure_column($pdo, 'store_ops_walkin_invoices', 'discount_type', 'VARCHAR(24) NOT NULL DEFAULT "" AFTER discount_total');
+    jg_store_ops_sku_ensure_column($pdo, 'store_ops_walkin_invoices', 'discount_value', 'DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER discount_type');
     jg_store_ops_sku_ensure_column($pdo, 'store_ops_walkin_invoices', 'invoice_type', 'VARCHAR(24) NOT NULL DEFAULT "walk_in" AFTER invoice_number');
     jg_store_ops_sku_ensure_column($pdo, 'store_ops_walkin_invoices', 'sale_type', 'VARCHAR(24) NOT NULL DEFAULT "Walk In" AFTER invoice_type');
     jg_store_ops_sku_ensure_column($pdo, 'store_ops_walkin_invoices', 'customer_address', 'VARCHAR(255) NOT NULL DEFAULT "" AFTER customer_email');
@@ -167,6 +169,38 @@ function jg_store_ops_walkins_discount_rate(mixed $value): float
     return max(0.0, min(100.0, round((float) $value, 2)));
 }
 
+/**
+ * @return array{type:string,value:float,total:float}
+ */
+function jg_store_ops_walkins_order_discount(array $payload, float $eligibleTotal): array
+{
+    $discount = is_array($payload['discount'] ?? null) ? $payload['discount'] : [];
+    $type = strtolower(trim((string) ($discount['type'] ?? '')));
+    $rawValue = $discount['value'] ?? null;
+    if ($type === '' || $rawValue === '' || $rawValue === null) {
+        return ['type' => '', 'value' => 0.0, 'total' => 0.0];
+    }
+    if (!in_array($type, ['sale_price', 'percentage'], true) || !is_numeric($rawValue)) {
+        throw new InvalidArgumentException('Choose a valid sale price or percentage discount.');
+    }
+
+    $value = round((float) $rawValue, 2);
+    if ($value < 0) {
+        throw new InvalidArgumentException('Discount value cannot be negative.');
+    }
+    $eligibleTotal = round(max(0, $eligibleTotal), 2);
+    if ($type === 'percentage') {
+        if ($value > 100) {
+            throw new InvalidArgumentException('Discount percentage cannot be more than 100%.');
+        }
+        return ['type' => $type, 'value' => $value, 'total' => round($eligibleTotal * $value / 100, 2)];
+    }
+    if ($value > $eligibleTotal) {
+        throw new InvalidArgumentException('Sale price cannot be more than the current merchandise total.');
+    }
+    return ['type' => $type, 'value' => $value, 'total' => round($eligibleTotal - $value, 2)];
+}
+
 function jg_store_ops_walkins_display_name(array $row): string
 {
     $pieces = array_filter([
@@ -255,6 +289,8 @@ function jg_store_ops_walkins_invoice_row(array $row): array
         'payment_method' => (string) ($row['payment_method'] ?? ''),
         'subtotal' => number_format((float) ($row['subtotal'] ?? 0), 2, '.', ''),
         'discount_total' => number_format((float) ($row['discount_total'] ?? 0), 2, '.', ''),
+        'discount_type' => (string) ($row['discount_type'] ?? ''),
+        'discount_value' => number_format((float) ($row['discount_value'] ?? 0), 2, '.', ''),
         'tax' => number_format((float) ($row['tax'] ?? 0), 2, '.', ''),
         'shipping_cost' => number_format((float) ($row['shipping_cost'] ?? 0), 2, '.', ''),
         'total' => number_format((float) ($row['total'] ?? 0), 2, '.', ''),
@@ -280,7 +316,7 @@ function jg_store_ops_walkins_recent(PDO $pdo, int $limit = 12, string $invoiceT
     $stmt = $pdo->prepare(
         sprintf(
             'SELECT invoice_number, invoice_type, sale_type, customer_name, customer_phone, customer_email,
-                customer_address, payment_method, subtotal, discount_total, tax, shipping_cost, total, item_count,
+                customer_address, payment_method, subtotal, discount_total, discount_type, discount_value, tax, shipping_cost, total, item_count,
                 analytics_visible, created_by, created_at
              FROM store_ops_walkin_invoices
              %s
@@ -309,7 +345,7 @@ function jg_store_ops_walkins_records(PDO $pdo, int $limit = 500): array
     $limit = max(1, min(1000, $limit));
     $stmt = $pdo->query(
         'SELECT invoice_number, invoice_type, sale_type, customer_name, customer_phone, customer_email,
-            customer_address, payment_method, subtotal, discount_total, tax, shipping_cost, total, item_count,
+            customer_address, payment_method, subtotal, discount_total, discount_type, discount_value, tax, shipping_cost, total, item_count,
             analytics_visible, created_by, created_at
          FROM store_ops_walkin_invoices
          ORDER BY created_at DESC, invoice_number DESC
@@ -332,7 +368,7 @@ function jg_store_ops_walkins_find_invoice(PDO $pdo, string $invoiceNumber): ?ar
 
     $invoiceStmt = $pdo->prepare(
         'SELECT invoice_number, invoice_type, sale_type, customer_name, customer_phone, customer_email,
-            customer_address, payment_method, subtotal, discount_total, tax, shipping_cost, total, item_count,
+            customer_address, payment_method, subtotal, discount_total, discount_type, discount_value, tax, shipping_cost, total, item_count,
             analytics_visible, created_by, created_at
          FROM store_ops_walkin_invoices
          WHERE invoice_number = :invoice_number
@@ -404,7 +440,7 @@ function jg_store_ops_walkins_sales_summary(PDO $pdo): array
     jg_store_ops_walkins_ensure_schema($pdo);
     $stmt = $pdo->query(
         'SELECT invoice_number, invoice_type, sale_type, customer_name, customer_phone, customer_email,
-            customer_address, payment_method, subtotal, discount_total, tax, shipping_cost, total, item_count,
+            customer_address, payment_method, subtotal, discount_total, discount_type, discount_value, tax, shipping_cost, total, item_count,
             analytics_visible, created_by, created_at
          FROM store_ops_walkin_invoices'
     );
@@ -575,16 +611,19 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
             ];
         }
 
+        $catalogDiscountTotal = $discountTotal;
+        $manualDiscount = jg_store_ops_walkins_order_discount($payload, $subtotal - $catalogDiscountTotal);
+        $discountTotal = round($catalogDiscountTotal + $manualDiscount['total'], 2);
         $tax = 0.0;
         $total = round($subtotal - $discountTotal + $tax + (float) $shippingCost, 2);
         $insertInvoice = $pdo->prepare(
             'INSERT INTO store_ops_walkin_invoices (
                 invoice_number, invoice_type, sale_type, customer_name, customer_phone, customer_email,
-                customer_address, payment_method, subtotal, discount_total, tax, shipping_cost, total, item_count,
+                customer_address, payment_method, subtotal, discount_total, discount_type, discount_value, tax, shipping_cost, total, item_count,
                 analytics_visible, created_by, created_at
              ) VALUES (
                 :invoice_number, :invoice_type, :sale_type, :customer_name, :customer_phone, :customer_email,
-                :customer_address, :payment_method, :subtotal, :discount_total, :tax, :shipping_cost, :total, :item_count,
+                :customer_address, :payment_method, :subtotal, :discount_total, :discount_type, :discount_value, :tax, :shipping_cost, :total, :item_count,
                 1, :created_by, :created_at
              )'
         );
@@ -599,6 +638,8 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
             ':payment_method' => $paymentMethod,
             ':subtotal' => number_format($subtotal, 2, '.', ''),
             ':discount_total' => number_format($discountTotal, 2, '.', ''),
+            ':discount_type' => $manualDiscount['type'],
+            ':discount_value' => number_format($manualDiscount['value'], 2, '.', ''),
             ':tax' => number_format($tax, 2, '.', ''),
             ':shipping_cost' => $shippingCost,
             ':total' => number_format($total, 2, '.', ''),
@@ -639,6 +680,8 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
                 'payment_method' => $paymentMethod,
                 'subtotal' => number_format($subtotal, 2, '.', ''),
                 'discount_total' => number_format($discountTotal, 2, '.', ''),
+                'discount_type' => $manualDiscount['type'],
+                'discount_value' => number_format($manualDiscount['value'], 2, '.', ''),
                 'tax' => number_format($tax, 2, '.', ''),
                 'shipping_cost' => $shippingCost,
                 'total' => number_format($total, 2, '.', ''),
