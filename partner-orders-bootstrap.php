@@ -667,6 +667,60 @@ function jg_store_ops_partner_orders_normalize(array $row, array $labels): array
     ];
 }
 
+/**
+ * Look up one Partner order directly from history, regardless of fulfillment
+ * status or whether its shipping label is still active.
+ */
+function jg_store_ops_partner_orders_find_any(string $displayId): ?array
+{
+    $originalId = jg_store_ops_partner_orders_original_id($displayId);
+    if ($originalId === '') {
+        return null;
+    }
+
+    $pdo = jg_store_ops_partner_orders_db();
+    if (!$pdo instanceof PDO) {
+        return null;
+    }
+
+    try {
+        $columns = jg_store_ops_partner_orders_table_columns($pdo);
+        $select = [
+            'id',
+            'partner_code',
+            'customer_name',
+            'brand_name',
+            'product_name',
+            'sku_code',
+            'sku_label',
+            'quantity',
+            'notes',
+            'status',
+            jg_store_ops_partner_orders_select_column($columns, 'order_timestamp', 'NULL'),
+            jg_store_ops_partner_orders_select_column($columns, 'marketplace_platform', "''"),
+            jg_store_ops_partner_orders_select_column($columns, 'deadline_hours', '24'),
+            jg_store_ops_partner_orders_select_column($columns, 'deadline_at', 'NULL'),
+            jg_store_ops_partner_orders_select_column($columns, 'revenue_total', '0'),
+            jg_store_ops_partner_orders_select_column($columns, 'items_json', 'NULL'),
+            'created_at',
+            'updated_at',
+        ];
+        $stmt = $pdo->prepare(
+            'SELECT ' . implode(', ', $select) . '\n'
+            . 'FROM partner_orders\n'
+            . 'WHERE UPPER(id) = :order_id\n'
+            . 'LIMIT 1'
+        );
+        $stmt->execute([':order_id' => strtoupper($originalId)]);
+        $row = $stmt->fetch();
+    } catch (Throwable $exception) {
+        jg_store_ops_partner_orders_last_error($exception->getMessage());
+        return null;
+    }
+
+    return is_array($row) ? jg_store_ops_partner_orders_normalize($row, []) : null;
+}
+
 function jg_store_ops_partner_sales_orders(string $partnerCode, ?string $from = null, ?string $to = null, int $limit = 2500): array
 {
     $partnerCode = strtoupper(trim($partnerCode));

@@ -453,6 +453,11 @@ function jg_store_ops_order_resolver_partner_orders(): array
 
 function jg_store_ops_order_resolver_find_partner(string $orderId): ?array
 {
+    $historicalOrder = jg_store_ops_partner_orders_find_any($orderId);
+    if (is_array($historicalOrder)) {
+        return jg_store_ops_order_resolver_order_from_feed_order($historicalOrder, 'partner');
+    }
+
     $target = jg_store_ops_order_resolver_id_key($orderId);
     foreach (jg_store_ops_order_resolver_partner_orders() as $order) {
         $id = jg_store_ops_order_resolver_id_key((string) ($order['id'] ?? ''));

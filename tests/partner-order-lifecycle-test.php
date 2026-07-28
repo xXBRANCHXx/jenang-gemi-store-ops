@@ -18,6 +18,23 @@ partner_order_lifecycle_expect(true, jg_store_ops_partner_orders_status_can_tran
 partner_order_lifecycle_expect(false, jg_store_ops_partner_orders_status_can_transition('CANCELLED', 'IS_BEING_FULFILLED'), 'A cancelled order must not be revived by a stale Store Ops client.');
 partner_order_lifecycle_expect(false, jg_store_ops_partner_orders_status_can_transition('IS_BEING_FULFILLED', 'IS_LISTED'), 'A started order must not return to the listed state.');
 partner_order_lifecycle_expect(true, jg_store_ops_partner_orders_status_can_transition('IS_BEING_FULFILLED', 'FULFILLED'), 'A started order should still be fulfillable.');
+$fulfilledOrder = jg_store_ops_partner_orders_normalize([
+    'id' => 'PO26072816040D97',
+    'partner_code' => 'BAGGOSMEDIA123',
+    'customer_name' => 'Historical order customer',
+    'status' => 'FULFILLED',
+    'items_json' => json_encode([
+        ['sku_code' => '010155002701', 'product' => 'ZERO Syrup Pistachio 550 ml', 'quantity' => 1],
+        ['sku_code' => '010155000601', 'product' => 'ZERO Syrup Salted Caramel 550 ml', 'quantity' => 2],
+    ], JSON_UNESCAPED_SLASHES),
+    'created_at' => '2026-07-28 08:42:00',
+    'updated_at' => '2026-07-28 09:42:00',
+], []);
+partner_order_lifecycle_expect(true, ($fulfilledOrder['status'] ?? '') === 'FULFILLED', 'Historical Partner normalization must retain fulfilled orders.');
+partner_order_lifecycle_expect(true, count((array) ($fulfilledOrder['items'] ?? [])) === 2, 'Historical Partner normalization must retain every processed product.');
+partner_order_lifecycle_expect(true, (($fulfilledOrder['items'][0]['productName'] ?? '') === 'ZERO Syrup Pistachio 550 ml'), 'Historical Partner products must retain their names.');
+$resolverSource = file_get_contents(dirname(__DIR__) . '/order-resolver.php');
+partner_order_lifecycle_expect(true, is_string($resolverSource) && str_contains($resolverSource, 'jg_store_ops_partner_orders_find_any($orderId)'), 'The order resolver must use the any-status Partner history lookup.');
 partner_order_lifecycle_expect(true, jg_store_ops_partner_orders_has_labels([
     'labels' => [[
         'name' => 'shipment-label.pdf',
