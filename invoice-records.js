@@ -108,14 +108,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const isIncluded = invoice.analytics_included;
       const customer = invoice.customer_name || (invoice.invoice_type === 'whatsapp' ? 'WhatsApp customer' : 'Walk-in customer');
       const contact = invoice.customer_phone || invoice.customer_address || invoice.customer_email || '';
+      const detailUrl = `../invoice-record/?${new URLSearchParams({ invoice: invoice.invoice_number }).toString()}`;
       return `
-        <tr class="${isHidden ? 'is-analytics-hidden' : ''} ${!isHidden && !isIncluded ? 'is-analytics-excluded' : ''}">
+        <tr class="admin-invoice-record-row ${isHidden ? 'is-analytics-hidden' : ''} ${!isHidden && !isIncluded ? 'is-analytics-excluded' : ''}" data-invoice-detail-url="${escapeHtml(detailUrl)}" tabindex="0" role="link" aria-label="View invoice ${escapeHtml(invoice.invoice_number)}">
           <td>
             <button type="button" class="admin-invoice-eye-btn ${isHidden ? 'is-hidden' : ''}" data-toggle-analytics="${escapeHtml(invoice.invoice_number)}" aria-label="${isHidden ? 'Show invoice in analytics' : 'Hide invoice from analytics'}" title="${isHidden ? 'Show in analytics' : 'Hide from analytics'}">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
           </td>
-          <td><strong>${escapeHtml(invoice.invoice_number)}</strong>${invoiceStatusBadge(invoice)}</td>
+          <td><a class="admin-invoice-record-link" href="${escapeHtml(detailUrl)}"><strong>${escapeHtml(invoice.invoice_number)}</strong></a>${invoiceStatusBadge(invoice)}</td>
           <td><span>${escapeHtml(customer)}</span><small>${escapeHtml(contact)}</small></td>
           <td>${escapeHtml(invoice.invoice_label || invoice.sale_type || '')}</td>
           <td>${escapeHtml(invoice.item_count || 0)}</td>
@@ -210,12 +211,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleButton = target?.closest('[data-toggle-analytics]');
     const printButton = target?.closest('[data-print-invoice]');
     if (toggleButton instanceof HTMLButtonElement) {
+      event.stopPropagation();
       toggleAnalytics(toggleButton.dataset.toggleAnalytics || '');
       return;
     }
     if (printButton instanceof HTMLButtonElement) {
+      event.stopPropagation();
       printInvoice(printButton.dataset.printInvoice || '');
+      return;
     }
+    if (target?.closest('a, button, input, select, textarea')) return;
+    const row = target?.closest('[data-invoice-detail-url]');
+    if (row instanceof HTMLElement && row.dataset.invoiceDetailUrl) window.location.assign(row.dataset.invoiceDetailUrl);
+  });
+
+  refs.body?.addEventListener('keydown', (event) => {
+    if (!['Enter', ' '].includes(event.key) || !(event.target instanceof HTMLTableRowElement)) return;
+    const row = event.target instanceof Element ? event.target.closest('[data-invoice-detail-url]') : null;
+    if (!(row instanceof HTMLElement) || !row.dataset.invoiceDetailUrl) return;
+    event.preventDefault();
+    window.location.assign(row.dataset.invoiceDetailUrl);
   });
 
   window.addEventListener('afterprint', finishInvoicePrint);

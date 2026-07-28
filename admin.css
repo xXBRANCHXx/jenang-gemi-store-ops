@@ -7968,6 +7968,27 @@ button.admin-store-sidebar-profile:hover {
   white-space: nowrap;
 }
 
+.admin-invoice-record-row {
+  cursor: pointer;
+  transition: background-color 160ms ease, opacity 160ms ease;
+}
+
+.admin-invoice-record-row:hover,
+.admin-invoice-record-row:focus-visible {
+  background: color-mix(in srgb, var(--admin-text) 5%, transparent);
+  outline: none;
+}
+
+.admin-invoice-record-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.admin-invoice-record-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
 .admin-invoice-records-table td:nth-child(3) {
   min-width: 220px;
 }
@@ -7993,6 +8014,178 @@ button.admin-store-sidebar-profile:hover {
 
 .admin-invoice-records-table tr.is-analytics-excluded {
   color: var(--admin-muted);
+}
+
+/* Invoice Record Detail */
+.admin-invoice-detail-layout {
+  display: grid;
+  gap: 16px;
+  padding: 0 10px 24px;
+}
+
+.admin-invoice-detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  color: var(--admin-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.admin-invoice-detail-back:hover {
+  color: var(--admin-text);
+}
+
+.admin-invoice-detail-card {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+  padding: clamp(20px, 3vw, 32px);
+  border: 1px solid var(--admin-border);
+  border-radius: 20px;
+  background: var(--admin-surface);
+}
+
+.admin-invoice-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.admin-invoice-detail-head span,
+.admin-invoice-detail-section > h3 {
+  color: var(--admin-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.admin-invoice-detail-head h2 {
+  margin: 6px 0 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(1.45rem, 3vw, 2.2rem);
+}
+
+.admin-invoice-detail-meta,
+.admin-invoice-detail-totals {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-invoice-detail-totals {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.admin-invoice-detail-meta article,
+.admin-invoice-detail-totals article {
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid var(--admin-border);
+  border-radius: 14px;
+  background: var(--admin-surface-soft);
+}
+
+.admin-invoice-detail-meta span,
+.admin-invoice-detail-totals span {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--admin-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.admin-invoice-detail-meta strong,
+.admin-invoice-detail-totals strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.admin-invoice-detail-section {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-invoice-detail-section > h3 {
+  margin: 0;
+}
+
+.admin-invoice-detail-items {
+  overflow-x: auto;
+  border: 1px solid var(--admin-border);
+  border-radius: 14px;
+}
+
+.admin-invoice-detail-items table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-invoice-detail-items th,
+.admin-invoice-detail-items td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--admin-border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.admin-invoice-detail-items tr:last-child td {
+  border-bottom: 0;
+}
+
+.admin-invoice-detail-items th {
+  color: var(--admin-muted);
+  font-size: 10px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.admin-invoice-detail-product {
+  min-width: 240px;
+}
+
+.admin-invoice-detail-product strong,
+.admin-invoice-detail-product small {
+  display: block;
+}
+
+.admin-invoice-detail-product small {
+  margin-top: 4px;
+  color: var(--admin-muted);
+  font-size: 10px;
+}
+
+.admin-invoice-detail-total {
+  color: var(--admin-text);
+}
+
+.admin-invoice-detail-total article:last-child {
+  border-color: color-mix(in srgb, var(--admin-text) 26%, var(--admin-border));
+}
+
+@media (max-width: 900px) {
+  .admin-invoice-detail-meta,
+  .admin-invoice-detail-totals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .admin-invoice-detail-head {
+    flex-direction: column;
+  }
+
+  .admin-invoice-detail-meta,
+  .admin-invoice-detail-totals {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* Universal Invoice Printer */
