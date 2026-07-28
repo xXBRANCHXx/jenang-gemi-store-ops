@@ -2595,6 +2595,21 @@ button, input {
   min-height: 46px;
 }
 
+.admin-label-print-confirmation .admin-print-success-btn {
+  border-color: #ef4444;
+  background: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(220, 38, 38, 0.24);
+}
+
+.admin-label-print-confirmation .admin-print-success-btn:hover,
+.admin-label-print-confirmation .admin-print-success-btn:focus-visible {
+  border-color: #f87171;
+  background: #b91c1c;
+  color: #ffffff;
+  box-shadow: 0 12px 28px rgba(220, 38, 38, 0.32);
+}
+
 .admin-label-sheet {
   display: grid;
   align-content: space-between;
@@ -6548,20 +6563,6 @@ button.admin-store-sidebar-profile:hover {
 :root[data-admin-theme='light'] .admin-store-nav-item.is-active {
   border-color: #17191c;
   background: #17191c;
-  color: #ffffff;
-}
-
-.admin-store-nav-item.admin-reprint-trigger,
-:root[data-admin-theme='light'] .admin-store-nav-item.admin-reprint-trigger {
-  border-color: #ef4444;
-  background: #dc2626;
-  color: #ffffff;
-}
-
-.admin-store-nav-item.admin-reprint-trigger:hover,
-:root[data-admin-theme='light'] .admin-store-nav-item.admin-reprint-trigger:hover {
-  border-color: #f87171;
-  background: #b91c1c;
   color: #ffffff;
 }
 

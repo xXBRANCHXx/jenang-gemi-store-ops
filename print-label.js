@@ -256,18 +256,21 @@ document.addEventListener('DOMContentLoaded', () => {
     printLifecycleCleanup = () => {};
   };
 
+  const revealPrintConfirmationAtBottom = () => {
+    if (!confirmationNode) return;
+    confirmationNode.hidden = false;
+    window.requestAnimationFrame(() => {
+      confirmationNode.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'center' });
+    });
+  };
+
   const showPrintConfirmationFallback = (status = 'Confirm print') => {
     if (!printInProgress || !confirmationNode) return;
     const wasHidden = confirmationNode.hidden;
     setConfirmationDisabled(false);
-    confirmationNode.hidden = false;
+    if (wasHidden) revealPrintConfirmationAtBottom();
     setPrintEnabled(true);
     if (statusNode) statusNode.textContent = status;
-    if (wasHidden) {
-      window.requestAnimationFrame(() => {
-        confirmationNode.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'center' });
-      });
-    }
   };
 
   const closeConfirmedPrintTab = () => {
@@ -401,6 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setError('');
     printInProgress = true;
     if (statusNode) statusNode.textContent = 'Printing';
+    revealPrintConfirmationAtBottom();
     try {
       const frameWindow = labelFrame instanceof HTMLIFrameElement ? labelFrame.contentWindow : null;
       armAutomaticPrintConfirmation(frameWindow);

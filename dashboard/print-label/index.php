@@ -72,7 +72,7 @@ $printLabelJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/print-label.j
                     </div>
                 </div>
                 <section class="admin-label-print-confirmation" data-print-confirmation aria-live="polite" hidden>
-                    <button type="button" class="admin-primary-btn" data-confirm-label-printed>Printed successfully</button>
+                    <button type="button" class="admin-primary-btn admin-print-success-btn" data-confirm-label-printed>Printed successfully</button>
                 </section>
             </section>
         </main>

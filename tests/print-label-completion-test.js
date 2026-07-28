@@ -11,10 +11,8 @@ const ordersApi = fs.readFileSync(path.join(root, 'api/orders-v2/index.php'), 'u
 const legacyOrdersApi = fs.readFileSync(path.join(root, 'api/orders/index.php'), 'utf8');
 const fulfillmentRuntime = fs.readFileSync(path.join(root, 'store-ops-fulfillment-runtime.php'), 'utf8');
 const fulfillmentSource = fs.readFileSync(path.join(root, 'store-ops-fulfillment.php'), 'utf8');
-const shellMarkup = fs.readFileSync(path.join(root, 'store-ops-shell.php'), 'utf8');
-const dashboardMarkup = fs.readFileSync(path.join(root, 'dashboard/index.php'), 'utf8');
 
-assert.match(markup, /data-label-preview[\s\S]*data-print-confirmation[\s\S]*data-confirm-label-printed>Printed successfully<\/button>/, 'the single print confirmation button should appear below the label preview');
+assert.match(markup, /data-label-preview[\s\S]*data-print-confirmation[\s\S]*admin-print-success-btn[^>]*data-confirm-label-printed>Printed successfully<\/button>/, 'the single red print confirmation button should appear below the label preview');
 assert.doesNotMatch(markup, /data-print-again|Printed successfully — close tab|Print confirmation/, 'the confirmation area should contain no duplicate print action or extra copy');
 assert.match(markup, /admin-label-frame-shell[\s\S]*data-label-frame[\s\S]*data-print-shopee-label/, 'the PDF viewer print icon should be covered by the Store Ops print action');
 assert.match(ordersApi, /function jg_store_ops_orders_partner_status_is_visible[\s\S]*?'IS_BEING_FULFILLED'/, 'accepted Partner orders should remain in the API queue');
@@ -37,12 +35,12 @@ assert.ok(openDialogFlow, 'the direct print-dialog flow should be present');
 assert.doesNotMatch(openDialogFlow[0], /requestAnimationFrame|\bawait\b/, 'the browser print call should remain in the original click call stack');
 assert.match(script, /const confirmAfterPrint = \(\) => \{[\s\S]*showPrintConfirmationFallback\([\s\S]*addEvent\(window, 'afterprint', confirmAfterPrint\);[\s\S]*addEvent\(frameWindow, 'afterprint', confirmAfterPrint\)/, 'print lifecycle signals should reveal an enabled confirmation instead of starting an unbounded automatic close');
 assert.match(script, /matchMedia\?\.\('print'\)[\s\S]*visibilitychange[\s\S]*showPrintConfirmationFallback/, 'automatic confirmation should use browser lifecycle signals with a manual fallback');
-assert.match(script, /const showPrintConfirmationFallback = \([\s\S]*if \(!printInProgress \|\| !confirmationNode\) return;[\s\S]*confirmationNode\.hidden = false;[\s\S]*scrollIntoView\(\{ behavior: 'smooth', block: 'end', inline: 'center' \}\)/, 'confirmation should be print-gated and automatically scroll the page to its bottom position');
+assert.match(script, /const revealPrintConfirmationAtBottom = \(\) => \{[\s\S]*confirmationNode\.hidden = false;[\s\S]*scrollIntoView\(\{ behavior: 'smooth', block: 'end', inline: 'center' \}\)/, 'confirmation should automatically scroll the page to its bottom position');
+assert.match(script, /const openPrintDialog = \(\) => \{[\s\S]*printInProgress = true;[\s\S]*revealPrintConfirmationAtBottom\(\);[\s\S]*frameWindow\.print\(\)/, 'pressing the preview Print button should reveal and queue the bottom scroll before opening the print dialog');
 assert.match(script, /const printLabel = \(\) => \{[\s\S]*if \(printInProgress\) \{[\s\S]*retryPrintDialog\(\)/, 'the existing Print control should remain the only way to print again');
 assert.match(styles, /\.admin-label-print-confirmation \{[\s\S]*place-items: center;[\s\S]*\.admin-label-print-confirmation button \{[\s\S]*min-width:/, 'the post-preview confirmation button should be centered');
-assert.match(shellMarkup, /admin-store-nav-item admin-reprint-trigger[\s\S]*>Reprint</, 'the shared Reprint navigation action should use the red trigger style');
-assert.match(dashboardMarkup, /admin-store-nav-item admin-reprint-trigger[^>]*data-open-reprint[\s\S]*>Reprint</, 'the dashboard Reprint action should use the red trigger style');
-assert.match(styles, /\.admin-store-nav-item\.admin-reprint-trigger[\s\S]*background: #dc2626;[\s\S]*color: #ffffff;/, 'the Reprint trigger should be visibly red in every theme');
+assert.match(styles, /\.admin-label-print-confirmation \.admin-print-success-btn \{[\s\S]*background: #dc2626;[\s\S]*color: #ffffff;/, 'Printed successfully should be visibly red in every theme');
+assert.doesNotMatch(styles, /\.admin-store-nav-item\.admin-reprint-trigger/, 'the sidebar Reprint action should keep its normal navigation styling');
 assert.match(script, /confirmPrintedButton\?\.addEventListener\('click', closeConfirmedPrintTab\)/, 'manual fallback confirmation should close the tab');
 const closeFlow = script.match(/const closeConfirmedPrintTab = \(\) => \{[\s\S]*?\n  \};\n\n  const armAutomaticPrintConfirmation/);
 assert.ok(closeFlow, 'the direct confirmation-close flow should be present');
