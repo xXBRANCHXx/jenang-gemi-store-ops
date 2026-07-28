@@ -12,9 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const errorNode = document.querySelector('[data-print-error]');
   const optionsNode = document.querySelector('[data-label-options]');
   const confirmationNode = document.querySelector('[data-print-confirmation]');
-  const confirmationDetailNode = document.querySelector('[data-print-confirmation-detail]');
   const confirmPrintedButton = document.querySelector('[data-confirm-label-printed]');
-  const printAgainButton = document.querySelector('[data-print-again]');
   const previewNode = document.querySelector('[data-label-preview]');
   const labelFrame = document.querySelector('[data-label-frame]');
 
@@ -248,9 +246,8 @@ document.addEventListener('DOMContentLoaded', () => {
     return printFinalizationPromise;
   };
 
-  const setConfirmationActionsDisabled = (disabled) => {
+  const setConfirmationDisabled = (disabled) => {
     if (confirmPrintedButton instanceof HTMLButtonElement) confirmPrintedButton.disabled = disabled;
-    if (printAgainButton instanceof HTMLButtonElement) printAgainButton.disabled = disabled;
   };
 
   const resetPrintLifecycle = () => {
@@ -259,15 +256,18 @@ document.addEventListener('DOMContentLoaded', () => {
     printLifecycleCleanup = () => {};
   };
 
-  const showPrintConfirmationFallback = (
-    message = 'Automatic print confirmation did not arrive. Confirm only if the label printed successfully.',
-    status = 'Confirm print'
-  ) => {
-    if (!printInProgress && !labelLoaded) return;
-    setConfirmationActionsDisabled(false);
-    if (confirmationNode) confirmationNode.hidden = false;
-    if (confirmationDetailNode) confirmationDetailNode.textContent = message;
+  const showPrintConfirmationFallback = (status = 'Confirm print') => {
+    if (!printInProgress || !confirmationNode) return;
+    const wasHidden = confirmationNode.hidden;
+    setConfirmationDisabled(false);
+    confirmationNode.hidden = false;
+    setPrintEnabled(true);
     if (statusNode) statusNode.textContent = status;
+    if (wasHidden) {
+      window.requestAnimationFrame(() => {
+        confirmationNode.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      });
+    }
   };
 
   const closeConfirmedPrintTab = () => {
@@ -275,7 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
     printInProgress = true;
     printClosing = true;
     resetPrintLifecycle();
-    setConfirmationActionsDisabled(true);
+    setConfirmationDisabled(true);
     if (!isReprint) markPrinted();
     if (statusNode) statusNode.textContent = isReprint ? 'Finalizing reprint' : 'Removed from Listed · finalizing';
     setError('');
@@ -293,16 +293,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }).catch((error) => {
       printInProgress = true;
       printClosing = false;
-      setConfirmationActionsDisabled(false);
+      setConfirmationDisabled(false);
       if (confirmationNode) confirmationNode.hidden = false;
-      if (confirmationDetailNode) confirmationDetailNode.textContent = isReprint
-        ? 'The reprint was confirmed, but Store Ops could not record it. Confirm again to retry.'
-        : 'The order was removed from Listed, but Store Ops could not finish the server update. Confirm again to retry.';
       if (statusNode) statusNode.textContent = 'Update failed';
       setError(error instanceof Error ? error.message : 'Unable to finish updating the printed order.');
     });
     window.setTimeout(() => {
-      setConfirmationActionsDisabled(false);
+      setConfirmationDisabled(false);
       setError('Print confirmed. Your browser prevented automatic closing; you can close this tab.');
     }, 250);
   };
@@ -318,7 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!printInProgress) return;
       window.setTimeout(() => {
         if (printInProgress) {
-          showPrintConfirmationFallback('The print dialog closed. Confirm that the shipping label printed successfully.');
+          showPrintConfirmationFallback();
         }
       }, 120);
     };
@@ -400,7 +397,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!labelLoaded || printInProgress) return false;
     resetPrintLifecycle();
     if (confirmationNode) confirmationNode.hidden = true;
-    setConfirmationActionsDisabled(true);
+    setConfirmationDisabled(true);
     setError('');
     printInProgress = true;
     if (statusNode) statusNode.textContent = 'Printing';
@@ -415,15 +412,19 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       return true;
     } catch (_error) {
-      showPrintConfirmationFallback('The browser could not open the print dialog. Use Print again.');
+      showPrintConfirmationFallback('Print dialog failed');
       if (statusNode) statusNode.textContent = 'Print dialog failed';
-      setError('The browser could not open the print dialog. Use Print again.');
+      setError('The browser could not open the print dialog. Use the Print button again.');
       return false;
     }
   };
 
   const printLabel = () => {
-    if (!order || !labelLoaded || printInProgress) return;
+    if (!order || !labelLoaded || printClosing) return;
+    if (printInProgress) {
+      retryPrintDialog();
+      return;
+    }
     resetPrintLifecycle();
     setPrintEnabled(false);
     setError('');
@@ -432,9 +433,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     if (!isReprint) markPrinted();
-    showPrintConfirmationFallback('The print dialog closed. Confirm that the shipping label printed successfully.');
+    showPrintConfirmationFallback();
     beginPrintFinalization().catch((error) => {
-      showPrintConfirmationFallback('The print dialog opened, but Store Ops could not finish updating this order. Confirm again to retry.');
+      showPrintConfirmationFallback('Update failed');
       if (statusNode) statusNode.textContent = 'Update failed';
       setError(error instanceof Error ? error.message : 'Unable to finish updating the printed order.');
     });
@@ -445,9 +446,9 @@ document.addEventListener('DOMContentLoaded', () => {
     printInProgress = false;
     printClosing = false;
     if (!openPrintDialog()) return;
-    showPrintConfirmationFallback('The print dialog closed. Confirm that the shipping label printed successfully.');
+    showPrintConfirmationFallback();
     beginPrintFinalization().catch((error) => {
-      showPrintConfirmationFallback('The print dialog opened, but Store Ops could not finish updating this order. Confirm again to retry.');
+      showPrintConfirmationFallback('Update failed');
       if (statusNode) statusNode.textContent = 'Update failed';
       setError(error instanceof Error ? error.message : 'Unable to finish updating the printed order.');
     });
@@ -512,19 +513,13 @@ document.addEventListener('DOMContentLoaded', () => {
       labelFrame.addEventListener('load', () => {
         labelLoaded = true;
         setPrintEnabled(true);
-        showPrintConfirmationFallback(
-          'If this label already printed successfully, confirm it here to remove the order from Listed without printing again.',
-          'Ready'
-        );
+        if (statusNode) statusNode.textContent = 'Ready';
       }, { once: true });
       labelFrame.src = labelUrl;
     } else {
       labelLoaded = true;
       setPrintEnabled(true);
-      showPrintConfirmationFallback(
-        'If this label already printed successfully, confirm it here to remove the order from Listed without printing again.',
-        'Ready'
-      );
+      if (statusNode) statusNode.textContent = 'Ready';
     }
     if (previewNode) previewNode.hidden = false;
   };
@@ -559,6 +554,5 @@ document.addEventListener('DOMContentLoaded', () => {
     printLabel();
   });
 
-  printAgainButton?.addEventListener('click', retryPrintDialog);
   confirmPrintedButton?.addEventListener('click', closeConfirmedPrintTab);
 });
