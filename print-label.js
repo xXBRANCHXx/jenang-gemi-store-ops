@@ -265,7 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (statusNode) statusNode.textContent = status;
     if (wasHidden) {
       window.requestAnimationFrame(() => {
-        confirmationNode.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        confirmationNode.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'center' });
       });
     }
   };

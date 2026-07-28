@@ -129,7 +129,7 @@ function jg_store_ops_shell_open(array $options = []): void
             </nav>
 
             <div class="admin-store-sidebar-tools">
-                <a class="admin-store-nav-item" href="<?php echo htmlspecialchars($rootPrefix . 'dashboard/print-label/', ENT_QUOTES, 'UTF-8'); ?>" title="Reprint label">
+                <a class="admin-store-nav-item admin-reprint-trigger" href="<?php echo htmlspecialchars($rootPrefix . 'dashboard/print-label/', ENT_QUOTES, 'UTF-8'); ?>" title="Reprint label">
                     <?php echo jg_store_ops_shell_svg('reprint'); ?>
                     <span>Reprint</span>
                 </a>

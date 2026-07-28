@@ -6551,6 +6551,20 @@ button.admin-store-sidebar-profile:hover {
   color: #ffffff;
 }
 
+.admin-store-nav-item.admin-reprint-trigger,
+:root[data-admin-theme='light'] .admin-store-nav-item.admin-reprint-trigger {
+  border-color: #ef4444;
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.admin-store-nav-item.admin-reprint-trigger:hover,
+:root[data-admin-theme='light'] .admin-store-nav-item.admin-reprint-trigger:hover {
+  border-color: #f87171;
+  background: #b91c1c;
+  color: #ffffff;
+}
+
 :root[data-admin-theme='light'] .admin-store-sidebar-tools {
   border-color: rgba(17, 24, 39, 0.09);
 }
