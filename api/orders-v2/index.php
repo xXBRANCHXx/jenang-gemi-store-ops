@@ -1068,9 +1068,55 @@ function jg_store_ops_orders_request_has_etag(string $etag): bool
     return false;
 }
 
-jg_admin_require_auth_json();
-
 $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+function jg_store_ops_orders_bearer_token(): string
+{
+    $authorization = trim((string) ($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? ''));
+    if (preg_match('/^Bearer\s+(.+)$/i', $authorization, $matches) === 1) {
+        return trim((string) ($matches[1] ?? ''));
+    }
+    return trim((string) ($_SERVER['HTTP_X_JG_WEBSITE_TOKEN'] ?? ''));
+}
+
+function jg_store_ops_orders_is_partner_sales_service_request(string $method): bool
+{
+    if ($method !== 'GET' || strtolower(trim((string) ($_GET['source'] ?? ''))) !== 'partner-sales') {
+        return false;
+    }
+    $expected = jg_store_ops_website_token();
+    $supplied = jg_store_ops_orders_bearer_token();
+    return $expected !== '' && $supplied !== '' && hash_equals($expected, $supplied);
+}
+
+$partnerSalesServiceRequest = jg_store_ops_orders_is_partner_sales_service_request($method);
+if (!$partnerSalesServiceRequest) {
+    jg_admin_require_auth_json();
+} else {
+    $partnerCode = strtoupper(trim((string) ($_GET['partner_code'] ?? '')));
+    $from = trim((string) ($_GET['from'] ?? ''));
+    $to = trim((string) ($_GET['to'] ?? ''));
+    try {
+        $orders = jg_store_ops_partner_sales_orders($partnerCode, $from !== '' ? $from : null, $to !== '' ? $to : null);
+        echo json_encode([
+            'ok' => true,
+            'orders' => $orders,
+            'meta' => [
+                'source' => 'partner-sales',
+                'partner_code' => $partnerCode,
+                'count' => count($orders),
+                'limited' => count($orders) >= 2500,
+                'fetched_at' => gmdate(DATE_ATOM),
+            ],
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    } catch (InvalidArgumentException $error) {
+        jg_store_ops_orders_fail($error->getMessage(), 422);
+    } catch (Throwable $error) {
+        error_log('Partner sales service read failed: ' . $error->getMessage());
+        jg_store_ops_orders_fail('Partner sales source is unavailable.', 503);
+    }
+    exit;
+}
+
 if ($method === 'POST') {
     $raw = file_get_contents('php://input');
     $payload = json_decode(is_string($raw) ? $raw : '', true);

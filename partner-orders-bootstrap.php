@@ -655,6 +655,9 @@ function jg_store_ops_partner_orders_normalize(array $row, array $labels): array
         'instant' => false,
         'deadlineAt' => jg_store_ops_partner_orders_deadline_at($row),
         'createdAt' => $createdAt !== '' ? gmdate(DATE_ATOM, strtotime($createdAt . ' UTC') ?: time()) : null,
+        'orderTimestamp' => trim((string) ($row['order_timestamp'] ?? '')) !== ''
+            ? gmdate(DATE_ATOM, strtotime((string) $row['order_timestamp'] . ' UTC') ?: time())
+            : ($createdAt !== '' ? gmdate(DATE_ATOM, strtotime($createdAt . ' UTC') ?: time()) : null),
         'updatedAt' => $updatedAt !== '' ? gmdate(DATE_ATOM, strtotime($updatedAt . ' UTC') ?: time()) : null,
         'customerName' => (string) ($row['customer_name'] ?? ''),
         'notes' => (string) ($row['notes'] ?? ''),
@@ -662,6 +665,67 @@ function jg_store_ops_partner_orders_normalize(array $row, array $labels): array
         'items' => jg_store_ops_partner_orders_items($row),
         'labels' => $labels,
     ];
+}
+
+function jg_store_ops_partner_sales_orders(string $partnerCode, ?string $from = null, ?string $to = null, int $limit = 2500): array
+{
+    $partnerCode = strtoupper(trim($partnerCode));
+    if ($partnerCode === '') {
+        throw new InvalidArgumentException('Partner code is required.');
+    }
+
+    $pdo = jg_store_ops_partner_orders_db();
+    if (!$pdo instanceof PDO) {
+        throw new RuntimeException(jg_store_ops_partner_orders_last_error() ?: 'Partner order source is unavailable.');
+    }
+
+    $columns = jg_store_ops_partner_orders_table_columns($pdo);
+    $select = [
+        'id',
+        'partner_code',
+        'customer_name',
+        'brand_name',
+        'product_name',
+        'sku_code',
+        'sku_label',
+        'quantity',
+        'notes',
+        'status',
+        jg_store_ops_partner_orders_select_column($columns, 'order_timestamp', 'NULL'),
+        jg_store_ops_partner_orders_select_column($columns, 'marketplace_platform', "''"),
+        jg_store_ops_partner_orders_select_column($columns, 'deadline_hours', '24'),
+        jg_store_ops_partner_orders_select_column($columns, 'deadline_at', 'NULL'),
+        jg_store_ops_partner_orders_select_column($columns, 'revenue_total', '0'),
+        jg_store_ops_partner_orders_select_column($columns, 'items_json', 'NULL'),
+        'created_at',
+        'updated_at',
+    ];
+    $dateColumn = isset($columns['order_timestamp']) ? 'COALESCE(order_timestamp, created_at)' : 'created_at';
+    $where = ['partner_code = :partner_code'];
+    $params = [':partner_code' => $partnerCode];
+    if ($from !== null && $from !== '') {
+        $where[] = $dateColumn . ' >= :from_date';
+        $params[':from_date'] = $from . ' 00:00:00';
+    }
+    if ($to !== null && $to !== '') {
+        $where[] = $dateColumn . ' < DATE_ADD(:to_date, INTERVAL 1 DAY)';
+        $params[':to_date'] = $to . ' 00:00:00';
+    }
+
+    $limit = max(1, min(2500, $limit));
+    $stmt = $pdo->prepare(
+        'SELECT ' . implode(', ', $select) . '
+         FROM partner_orders
+         WHERE ' . implode(' AND ', $where) . '
+         ORDER BY ' . $dateColumn . ' DESC, id DESC
+         LIMIT ' . $limit
+    );
+    $stmt->execute($params);
+
+    return array_map(
+        static fn (array $row): array => jg_store_ops_partner_orders_normalize($row, []),
+        array_values(array_filter($stmt->fetchAll(), 'is_array'))
+    );
 }
 
 function jg_store_ops_partner_orders_list(): array
