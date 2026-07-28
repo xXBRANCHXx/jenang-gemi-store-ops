@@ -114,6 +114,36 @@ function jg_admin_password_matches(string $password, string $storedHash): bool
     return hash_equals($stored, $candidate);
 }
 
+function jg_admin_employee_can_remove_orders(string $employeeId): bool
+{
+    return strtolower(trim($employeeId)) === 'branch-vincent';
+}
+
+function jg_admin_verify_employee_passcode(string $employeeId, string $passcode): bool
+{
+    $employeeId = trim($employeeId);
+    if ($employeeId === '' || trim($passcode) === '') {
+        return false;
+    }
+
+    try {
+        $pdo = jg_store_ops_fulfillment_db();
+        $stmt = $pdo->prepare(
+            'SELECT pin_hash
+             FROM store_ops_employees_v2
+             WHERE id = :id
+               AND active = 1
+             LIMIT 1'
+        );
+        $stmt->execute([':id' => $employeeId]);
+        $storedHash = $stmt->fetchColumn();
+    } catch (Throwable) {
+        return false;
+    }
+
+    return is_string($storedHash) && jg_admin_password_matches($passcode, $storedHash);
+}
+
 function jg_admin_set_authenticated_employee(string $employeeId, string $employeeName): void
 {
     $_SESSION['jg_admin_authenticated'] = true;

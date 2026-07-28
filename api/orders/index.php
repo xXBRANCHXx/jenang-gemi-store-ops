@@ -138,6 +138,7 @@ function jg_store_ops_orders_marketplace_status_callback(array $key, string $sta
         'platform' => (string) $key['source_platform'],
         'account_key' => (string) $key['source_account'],
         'order_id' => (string) $key['order_id'],
+        'package_id' => (string) ($key['package_id'] ?? ''),
         'status' => $status,
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     $context = stream_context_create(['http' => [
@@ -985,7 +986,7 @@ if ($method === 'POST') {
         exit;
     }
 
-    $validActions = ['claim_order', 'begin_fulfillment', 'release_order', 'record_scan', 'complete_scan', 'label_printed', 'fulfill_order', 'reprint_label', 'arrange_instant_shipment'];
+    $validActions = ['claim_order', 'begin_fulfillment', 'release_order', 'remove_order', 'record_scan', 'complete_scan', 'label_printed', 'fulfill_order', 'reprint_label', 'arrange_instant_shipment'];
     if (!in_array($action, $validActions, true)) {
         jg_store_ops_orders_fail('Unknown action.', 400);
     }
@@ -994,6 +995,32 @@ if ($method === 'POST') {
         $pdo = jg_store_ops_fulfillment_db();
         $key = jg_store_ops_fulfillment_key_from_payload($payload);
         jg_store_ops_fulfillment_validate_key($key);
+        $employeeId = jg_store_ops_orders_current_employee_id();
+        $employeeName = jg_store_ops_orders_current_employee_name();
+
+        if ($action === 'remove_order') {
+            if (!jg_admin_employee_can_remove_orders($employeeId)) {
+                jg_store_ops_orders_fail('Only branch-vincent can remove listed orders.', 403);
+            }
+            if (!jg_admin_verify_employee_passcode($employeeId, (string) ($payload['passcode'] ?? ''))) {
+                jg_store_ops_orders_fail('Branch Login passcode is incorrect.', 403);
+            }
+
+            if ($key['source_platform'] === 'partner'
+                && !jg_store_ops_orders_partner_update_status($key['order_id'], 'FULFILLED')) {
+                throw new RuntimeException('Unable to remove this Partner order from the source queue.');
+            }
+            if (in_array($key['source_platform'], JG_STORE_OPS_WEBSITE_PLATFORMS, true)) {
+                jg_store_ops_website_callback($pdo, $key['source_platform'], $key['order_id'], 'FULFILLED');
+            }
+            if (in_array($key['source_platform'], ['shopee', 'tiktok'], true)) {
+                jg_store_ops_orders_marketplace_status_callback($key, 'IS_PROCESSED');
+            }
+
+            $row = jg_store_ops_fulfillment_remove_from_listed($pdo, $key, $employeeId, $employeeName);
+            jg_store_ops_orders_fulfillment_response($pdo, $row);
+        }
+
         if (!jg_store_ops_marketplace_action_enabled(
             array_merge($payload, $key),
             jg_store_ops_orders_marketplace_big_set_enabled($pdo),
@@ -1009,9 +1036,6 @@ if ($method === 'POST') {
                             : 'This marketplace order cannot be processed until its shipment is arranged and its label is ready.'))
             );
         }
-        $employeeId = jg_store_ops_orders_current_employee_id();
-        $employeeName = jg_store_ops_orders_current_employee_name();
-
         if ($action === 'arrange_instant_shipment') {
             $arrangement = jg_store_ops_orders_arrange_instant($key, $payload, $employeeId, $employeeName);
             echo json_encode(['ok' => true, 'arrangement' => $arrangement], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);

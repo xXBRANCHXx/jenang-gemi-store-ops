@@ -177,7 +177,7 @@ function jg_store_ops_fulfillment_key_from_order(array $order): array
 }
 
 /**
- * @return array{source_platform:string,source_account:string,order_id:string}
+ * @return array{source_platform:string,source_account:string,order_id:string,package_id:string}
  */
 function jg_store_ops_fulfillment_key_from_payload(array $payload): array
 {
@@ -196,6 +196,7 @@ function jg_store_ops_fulfillment_key_from_payload(array $payload): array
         'source_platform' => $platform,
         'source_account' => $sourceAccount,
         'order_id' => $orderId,
+        'package_id' => trim((string) ($payload['package_id'] ?? $payload['package'] ?? '')),
     ];
 }
 
@@ -732,6 +733,56 @@ function jg_store_ops_fulfillment_mark_fulfilled(PDO $pdo, array $key, string $e
             ':id' => (int) $row['id'],
         ]);
         jg_store_ops_fulfillment_log_event($pdo, $key, 'fulfill', $employeeId, $employeeName);
+        $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
+        $pdo->commit();
+        return is_array($row) ? $row : [];
+    } catch (Throwable $throwable) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $throwable;
+    }
+}
+
+function jg_store_ops_fulfillment_remove_from_listed(PDO $pdo, array $key, string $employeeId, string $employeeName): array
+{
+    $pdo->beginTransaction();
+    try {
+        jg_store_ops_fulfillment_insert_order_if_missing($pdo, $key);
+        $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, true);
+        if (!is_array($row)) {
+            throw new RuntimeException('Unable to remove order from listed orders.');
+        }
+        if (strtoupper((string) ($row['status'] ?? '')) === 'FULFILLED') {
+            $pdo->commit();
+            return $row;
+        }
+
+        $now = jg_store_ops_fulfillment_now();
+        $stmt = $pdo->prepare(
+            'UPDATE store_ops_order_fulfillment_v2
+             SET status = "FULFILLED",
+                 claimed_by = NULL,
+                 claimed_at = NULL,
+                 fulfilled_at = COALESCE(fulfilled_at, :fulfilled_at),
+                 last_activity_at = :last_activity_at,
+                 updated_at = :updated_at
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            ':fulfilled_at' => $now,
+            ':last_activity_at' => $now,
+            ':updated_at' => $now,
+            ':id' => (int) $row['id'],
+        ]);
+        jg_store_ops_fulfillment_log_event(
+            $pdo,
+            $key,
+            'remove_from_listed',
+            $employeeId,
+            $employeeName,
+            ['message' => 'Removed from listed orders after Branch Login confirmation.']
+        );
         $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
         $pdo->commit();
         return is_array($row) ? $row : [];

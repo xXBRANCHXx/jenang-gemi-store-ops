@@ -1332,6 +1332,15 @@ button, input {
   background: color-mix(in srgb, var(--admin-accent-primary) 12%, var(--admin-surface-soft));
 }
 
+.admin-order-context-action.is-danger {
+  color: #ff5b65;
+}
+
+.admin-order-context-action.is-danger:hover,
+.admin-order-context-action.is-danger:focus-visible {
+  background: rgba(239, 68, 68, 0.12);
+}
+
 .admin-order-context-action:disabled {
   cursor: wait;
   opacity: 0.55;
@@ -1360,6 +1369,24 @@ button, input {
 .admin-order-context-action small {
   color: var(--admin-muted);
   font-size: 9px;
+}
+
+.admin-remove-order-card {
+  display: grid;
+  gap: 16px;
+  width: min(440px, 100%);
+}
+
+.admin-remove-order-submit {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+
+.admin-remove-order-submit:hover,
+.admin-remove-order-submit:focus-visible {
+  background: #b91c1c;
+  border-color: #b91c1c;
 }
 
 .admin-order-card.is-locked {

@@ -18,6 +18,7 @@ $storeHomeJsVersion = $assetVersionPrefix . '-' . (string) @filemtime(dirname(__
 $currentEmployeeId = jg_admin_current_employee_id();
 $currentEmployeeName = jg_admin_current_employee_name();
 $currentEmployeeCanManageProfiles = jg_admin_can_manage_employee_profiles();
+$currentEmployeeCanRemoveOrders = jg_admin_employee_can_remove_orders($currentEmployeeId);
 $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?: 'O';
 ?>
 <!DOCTYPE html>
@@ -202,7 +203,38 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7 4 12l5 5M4 12h10a6 6 0 0 0 6-6"/></svg>
                 <span><strong>Unclaim</strong><small>Release for another profile</small></span>
             </button>
+            <?php if ($currentEmployeeCanRemoveOrders): ?>
+                <button type="button" class="admin-order-context-action is-danger" data-remove-order role="menuitem">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg>
+                    <span><strong>Remove</strong><small>Remove from listed orders</small></span>
+                </button>
+            <?php endif; ?>
         </div>
+
+        <?php if ($currentEmployeeCanRemoveOrders): ?>
+            <div class="admin-modal-shell admin-remove-order-modal" data-remove-order-modal hidden>
+                <div class="admin-modal-backdrop" data-close-remove-order></div>
+                <form class="admin-modal-card admin-remove-order-card" data-remove-order-form role="dialog" aria-modal="true" aria-labelledby="remove-order-title">
+                    <div class="admin-modal-head">
+                        <div>
+                            <span class="admin-panel-kicker">Branch authorization</span>
+                            <h3 id="remove-order-title">Remove listed order</h3>
+                        </div>
+                        <button type="button" class="admin-ghost-btn" data-close-remove-order>Close</button>
+                    </div>
+                    <p class="admin-reprint-intro">Remove <strong data-remove-order-id></strong> from listed orders without processing its inventory.</p>
+                    <label class="admin-reprint-field">
+                        <span>Branch Login passcode</span>
+                        <input class="admin-settings-input" name="passcode" type="password" autocomplete="current-password" maxlength="128" required>
+                    </label>
+                    <p class="admin-form-error" data-remove-order-error hidden></p>
+                    <div class="admin-modal-actions">
+                        <button type="button" class="admin-ghost-btn" data-close-remove-order>Cancel</button>
+                        <button type="submit" class="admin-primary-btn admin-remove-order-submit" data-remove-order-submit>Remove</button>
+                    </div>
+                </form>
+            </div>
+        <?php endif; ?>
 
         <div class="admin-modal-shell admin-fulfillment-modal" data-fulfillment-modal hidden>
             <div class="admin-modal-backdrop" data-close-fulfillment-modal></div>

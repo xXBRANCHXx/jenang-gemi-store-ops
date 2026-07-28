@@ -78,6 +78,21 @@ const ranked = presentation.sortOrdersByUrgency([
 ]);
 assert(ranked.map((order) => order.id).join(',') === 'INSTANT,WEEKEND,REGULAR-EARLY,REGULAR-LATE', 'Instant orders must rank first, followed by the existing urgency classes and deadline order.');
 
+assert(presentation.canCurrentEmployeeRemove('branch-vincent') === true, 'The branch-vincent profile must receive the protected Remove action.');
+assert(presentation.canCurrentEmployeeRemove('employee-1') === false, 'Other employee profiles must not receive the Remove action.');
+assert(
+  presentation.canOpenOrderContextMenu({ fulfillmentStatus: 'UNCLAIMED' }, 'branch-vincent') === true,
+  'branch-vincent must be able to open Remove for an unclaimed listed order.'
+);
+assert(
+  presentation.canCurrentEmployeeUnclaim({ claimedBy: 'employee-1', fulfillmentStatus: 'CLAIMED' }, 'employee-1') === true,
+  'The claimant must retain the existing Unclaim action.'
+);
+assert(
+  presentation.canCurrentEmployeeUnclaim({ claimedBy: 'employee-1', fulfillmentStatus: 'CLAIMED' }, 'branch-vincent') === false,
+  'The Remove permission must not let branch-vincent unclaim another profile\'s order.'
+);
+
 assert(
   presentation.shouldSoundSiren({ instant: true, deadlineAt: now + 2 * 60 * 60000 }, now) === false,
   'Instant orders must stay silent at the two-hour boundary.'

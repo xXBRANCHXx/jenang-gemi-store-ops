@@ -119,6 +119,9 @@
     const status = String(order?.fulfillmentStatus || order?.fulfillment_status || order?.status || '').trim().toUpperCase();
     return claimant !== '' && employeeId !== '' && claimant === employeeId && status !== 'FULFILLED';
   };
+  const canCurrentEmployeeRemove = (currentEmployeeId) => String(currentEmployeeId || '').trim().toLowerCase() === 'branch-vincent';
+  const canOpenOrderContextMenu = (order, currentEmployeeId) => canCurrentEmployeeUnclaim(order, currentEmployeeId)
+    || canCurrentEmployeeRemove(currentEmployeeId);
   const previewActionState = (order, context = {}) => {
     const platform = String(order?.platform || '').trim().toLowerCase();
     const pausedUnarranged = Boolean(context.automaticArrangementPaused)
@@ -183,6 +186,8 @@
     columnFirstBoardFlow,
     sortOrdersByUrgency,
     canCurrentEmployeeUnclaim,
+    canCurrentEmployeeRemove,
+    canOpenOrderContextMenu,
     previewActionState
   });
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -222,6 +227,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const automationPauseCopy = document.querySelector('[data-automation-pause-copy]');
   const orderContextMenu = document.querySelector('[data-order-context-menu]');
   const unclaimOrderButton = document.querySelector('[data-unclaim-order]');
+  const removeOrderButton = document.querySelector('[data-remove-order]');
+  const removeOrderModal = document.querySelector('[data-remove-order-modal]');
+  const removeOrderForm = document.querySelector('[data-remove-order-form]');
+  const removeOrderId = document.querySelector('[data-remove-order-id]');
+  const removeOrderError = document.querySelector('[data-remove-order-error]');
+  const removeOrderSubmit = document.querySelector('[data-remove-order-submit]');
   const reprintModal = document.querySelector('[data-reprint-modal]');
   const reprintForm = document.querySelector('[data-reprint-form]');
   const reprintError = document.querySelector('[data-reprint-error]');
@@ -2494,21 +2505,91 @@ document.addEventListener('DOMContentLoaded', () => {
     orderContextMenu.hidden = true;
     orderContextMenu.removeAttribute('data-order-id');
     if (unclaimOrderButton instanceof HTMLButtonElement) unclaimOrderButton.disabled = false;
+    if (removeOrderButton instanceof HTMLButtonElement) removeOrderButton.disabled = false;
   };
 
   const openOrderContextMenu = (order, clientX, clientY) => {
-    if (!orderContextMenu || !orderPresentation.canCurrentEmployeeUnclaim(order, currentEmployee.id)) return;
+    if (!orderContextMenu || !orderPresentation.canOpenOrderContextMenu(order, currentEmployee.id)) return;
+    const canUnclaim = orderPresentation.canCurrentEmployeeUnclaim(order, currentEmployee.id);
+    const canRemove = orderPresentation.canCurrentEmployeeRemove(currentEmployee.id);
     orderContextMenu.dataset.orderId = order.id;
     orderContextMenu.hidden = false;
+    if (unclaimOrderButton instanceof HTMLButtonElement) {
+      unclaimOrderButton.disabled = !canUnclaim;
+      unclaimOrderButton.title = canUnclaim ? '' : 'Only the profile that claimed this order can unclaim it.';
+    }
+    if (removeOrderButton instanceof HTMLButtonElement) removeOrderButton.disabled = !canRemove;
     const bounds = orderContextMenu.getBoundingClientRect();
     const margin = 8;
     const left = Math.max(margin, Math.min(clientX, window.innerWidth - bounds.width - margin));
     const top = Math.max(margin, Math.min(clientY, window.innerHeight - bounds.height - margin));
     orderContextMenu.style.left = `${left}px`;
     orderContextMenu.style.top = `${top}px`;
-    if (unclaimOrderButton instanceof HTMLButtonElement) {
-      unclaimOrderButton.disabled = false;
+    if (canUnclaim && unclaimOrderButton instanceof HTMLButtonElement) {
       unclaimOrderButton.focus({ preventScroll: true });
+    } else if (canRemove && removeOrderButton instanceof HTMLButtonElement) {
+      removeOrderButton.focus({ preventScroll: true });
+    }
+  };
+
+  const closeRemoveOrderModal = () => {
+    if (!removeOrderModal) return;
+    removeOrderModal.hidden = true;
+    removeOrderModal.removeAttribute('data-order-id');
+    if (removeOrderForm instanceof HTMLFormElement) removeOrderForm.reset();
+    if (removeOrderError) {
+      removeOrderError.hidden = true;
+      removeOrderError.textContent = '';
+    }
+    if (removeOrderSubmit instanceof HTMLButtonElement) removeOrderSubmit.disabled = false;
+  };
+
+  const openRemoveOrderModal = (orderId) => {
+    if (!removeOrderModal || !orderPresentation.canCurrentEmployeeRemove(currentEmployee.id)) return;
+    const order = state.orders.find((item) => item.id === orderId && item.fulfillmentStatus !== 'FULFILLED');
+    if (!order) return;
+    removeOrderModal.dataset.orderId = order.id;
+    if (removeOrderId) removeOrderId.textContent = order.id;
+    if (removeOrderError) {
+      removeOrderError.hidden = true;
+      removeOrderError.textContent = '';
+    }
+    removeOrderModal.hidden = false;
+    const passcodeField = removeOrderForm?.elements.namedItem('passcode');
+    if (passcodeField instanceof HTMLInputElement) {
+      passcodeField.value = '';
+      window.setTimeout(() => passcodeField.focus(), 30);
+    }
+  };
+
+  const removeOrderFromListed = async () => {
+    const orderId = String(removeOrderModal?.dataset.orderId || '');
+    const order = state.orders.find((item) => item.id === orderId);
+    const passcodeField = removeOrderForm?.elements.namedItem('passcode');
+    const passcode = passcodeField instanceof HTMLInputElement ? passcodeField.value : '';
+    if (!order || !passcode || !orderPresentation.canCurrentEmployeeRemove(currentEmployee.id)) return;
+    if (removeOrderSubmit instanceof HTMLButtonElement) removeOrderSubmit.disabled = true;
+    if (removeOrderError) {
+      removeOrderError.hidden = true;
+      removeOrderError.textContent = '';
+    }
+    try {
+      const payload = await postOrderAction('remove_order', order, { passcode });
+      if (passcodeField instanceof HTMLInputElement) passcodeField.value = '';
+      applyFulfillmentState(order, payload.fulfillment || payload.order);
+      if (state.activeOrderId === order.id || state.previewOrderId === order.id) closeFulfillment(false);
+      saveOrders();
+      closeRemoveOrderModal();
+      renderBoard();
+      await refreshOrders(false, { force: true });
+    } catch (error) {
+      if (passcodeField instanceof HTMLInputElement) passcodeField.value = '';
+      if (removeOrderError) {
+        removeOrderError.textContent = error instanceof Error ? error.message : 'Unable to remove this order.';
+        removeOrderError.hidden = false;
+      }
+      if (removeOrderSubmit instanceof HTMLButtonElement) removeOrderSubmit.disabled = false;
+      if (passcodeField instanceof HTMLInputElement) passcodeField.focus();
     }
   };
 
@@ -2587,7 +2668,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const card = target?.closest('.admin-order-card[data-order-id]');
     if (!(card instanceof HTMLElement)) return;
     const order = state.orders.find((item) => item.id === card.dataset.orderId);
-    if (!orderPresentation.canCurrentEmployeeUnclaim(order, currentEmployee.id)) {
+    if (!orderPresentation.canOpenOrderContextMenu(order, currentEmployee.id)) {
       closeOrderContextMenu();
       return;
     }
@@ -2606,12 +2687,29 @@ document.addEventListener('DOMContentLoaded', () => {
     unclaimOrder(orderId);
   });
 
+  removeOrderButton?.addEventListener('click', () => {
+    const orderId = String(orderContextMenu?.dataset.orderId || '');
+    closeOrderContextMenu();
+    openRemoveOrderModal(orderId);
+  });
+
+  removeOrderForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    removeOrderFromListed();
+  });
+  document.querySelectorAll('[data-close-remove-order]').forEach((button) => {
+    button.addEventListener('click', closeRemoveOrderModal);
+  });
+
   document.addEventListener('pointerdown', (event) => {
     if (orderContextMenu?.hidden || orderContextMenu?.contains(event.target)) return;
     closeOrderContextMenu();
   });
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closeOrderContextMenu();
+    if (event.key === 'Escape') {
+      closeOrderContextMenu();
+      closeRemoveOrderModal();
+    }
   });
   window.addEventListener('blur', closeOrderContextMenu);
   window.addEventListener('resize', closeOrderContextMenu);
