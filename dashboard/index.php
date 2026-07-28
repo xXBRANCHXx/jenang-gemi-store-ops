@@ -35,7 +35,7 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
     <link rel="stylesheet" href="../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
 <body class="admin-body is-dashboard is-store-home">
-    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.28</div>
+    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.30</div>
     <div
         class="admin-app admin-store-home"
         data-store-home
@@ -61,6 +61,10 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
                 <a class="admin-store-nav-item is-active" href="./" aria-current="page" title="Orders">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h6"/></svg>
                     <span>Orders</span>
+                </a>
+                <a class="admin-store-nav-item" href="../order-records/" title="Processed Order Records">
+                    <span class="admin-store-nav-internet-icon" style="--admin-store-nav-icon: url(https://api.iconify.design/material-symbols:history.svg);" aria-hidden="true"></span>
+                    <span>Order Records</span>
                 </a>
                 <a class="admin-store-nav-item" href="../inventory/" title="Inventory">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM4.4 7.7 12 12l7.6-4.3M12 12v9"/></svg>

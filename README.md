@@ -19,6 +19,7 @@ Operational backend for `store.jenanggemi.com`.
 - SKU database and master catalog
 - Inventory and stock thresholds
 - Fulfillment, walk-in, WhatsApp, and invoice-record workflows
+- Read-only processed order records with source, operator, scan totals, completion time, and event timelines
 - Universal invoice printing by Order ID
 - COGS history and operational pricing inputs
 - Webhook and API integrations to external systems
@@ -31,6 +32,7 @@ Operational backend for `store.jenanggemi.com`.
 - `/inventory/`
 - `/walk-ins/`
 - `/whatsapp-orders/`
+- `/order-records/`
 - `/invoice-printer/`
 - `/invoice-records/`
 - `/orders/` redirects to `/invoice-records/`

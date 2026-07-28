@@ -27,6 +27,7 @@ function jg_store_ops_shell_attr(array $attributes): string
 function jg_store_ops_shell_svg(string $name): string
 {
     $remoteIcons = [
+        'order-records' => 'https://api.iconify.design/material-symbols:history.svg',
         'invoice-records' => 'https://api.iconify.design/material-symbols:receipt-long-outline.svg',
         'invoice-printer' => 'https://api.iconify.design/material-symbols:print-outline.svg',
     ];
@@ -56,6 +57,7 @@ function jg_store_ops_shell_nav_items(string $rootPrefix): array
 {
     return [
         ['key' => 'orders', 'label' => 'Orders', 'href' => $rootPrefix . 'dashboard/', 'title' => 'Orders'],
+        ['key' => 'order-records', 'label' => 'Order Records', 'href' => $rootPrefix . 'order-records/', 'title' => 'Processed Order Records'],
         ['key' => 'inventory', 'label' => 'Inventory', 'href' => $rootPrefix . 'inventory/', 'title' => 'Inventory'],
         ['key' => 'stock-adjust', 'label' => 'Stock Adjust', 'href' => $rootPrefix . 'stock-adjust/', 'title' => 'Stock Adjust'],
         ['key' => 'walk-ins', 'label' => 'Walk Ins', 'href' => $rootPrefix . 'walk-ins/', 'title' => 'Walk Ins'],
@@ -101,7 +103,7 @@ function jg_store_ops_shell_open(array $options = []): void
         'data-scan-serial-endpoint' => $rootPrefix . 'api/scan-serial/',
     ], $appAttributes);
     ?>
-    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.29</div>
+    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.30</div>
     <div<?php echo jg_store_ops_shell_attr($attributes); ?>>
         <div class="admin-backdrop admin-backdrop-a"></div>
         <div class="admin-backdrop admin-backdrop-b"></div>
