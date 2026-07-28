@@ -49,6 +49,14 @@ assert(
   'Instant orders must expose their manual arrangement action.'
 );
 assert(
+  presentation.requiresManualInstantArrangement({ instant: true, shipmentArranged: false, labelBacked: false }),
+  'Instant orders must retain the manual arrangement action when lifecycle flags are absent.'
+);
+assert(
+  !presentation.requiresManualInstantArrangement({ instant: true, shipmentArranged: true, labelBacked: true }),
+  'Instant orders that already have an arranged label must proceed to Store Ops processing.'
+);
+assert(
   presentation.isInstantManualLifecycle({ instant: true, instantArrangementState: 'label_pending' }),
   'An Instant card must stay visible while its label is prepared.'
 );

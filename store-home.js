@@ -1,21 +1,43 @@
 (function exposeStoreOrderPresentation(global) {
+  const normalizedMarketplaceStatus = (order) => String(
+    order?.marketplaceStatus || order?.marketplace_status || order?.orderStatus || order?.order_status || ''
+  ).trim().toUpperCase();
+  const isMarketplaceShipmentArranged = (order) => {
+    if (order?.shipmentArranged || order?.shipment_arranged || order?.labelBacked || order?.label_backed) return true;
+    return ['PROCESSED', 'AWAITING_COLLECTION', 'IN_TRANSIT', 'SHIPPED', 'DELIVERED', 'COMPLETED']
+      .includes(normalizedMarketplaceStatus(order));
+  };
   const normalizeDeadline = (order, now = Date.now()) => {
     const deadlineAt = Number(order?.deadlineAt || order?.deadline_at || 0);
+    const deadlineType = String(order?.deadlineType || order?.deadline_type || 'deadline');
+    const deadlineLabel = String(order?.deadlineLabel || order?.deadline_label || 'Deadline');
+    const deadlineSource = String(order?.deadlineSource || order?.deadline_source || '');
+    const platform = String(order?.platform || '').trim().toLowerCase();
+    const preArrangementDeadline = ['ship_by', 'ship_by_date', 'shipping_due', 'arrange_by', 'arrange_due', 'handover_fallback']
+      .includes(deadlineType.trim().toLowerCase())
+      || ['ship_by_date', 'shipping_due_time', 'rts_sla_time'].includes(deadlineSource.trim().toLowerCase());
+    const deadlineSatisfied = ['shopee', 'tiktok'].includes(platform)
+      && isMarketplaceShipmentArranged(order)
+      && preArrangementDeadline;
     return {
       deadlineAt: Number.isFinite(deadlineAt) && deadlineAt > 0 ? deadlineAt : now + 86400000,
-      deadlineType: String(order?.deadlineType || order?.deadline_type || 'deadline'),
-      deadlineLabel: String(order?.deadlineLabel || order?.deadline_label || 'Deadline')
+      deadlineType,
+      deadlineLabel: deadlineSatisfied ? 'Shipment arranged' : deadlineLabel,
+      deadlineSatisfied
     };
   };
 
   const minutesRemaining = (order, now = Date.now()) => Math.ceil((Number(order?.deadlineAt || 0) - now) / 60000);
-  const isCriticalOrder = (order, now = Date.now()) => Number(order?.deadlineAt || 0) - now < 60 * 60000;
+  const isCriticalOrder = (order, now = Date.now()) => !order?.deadlineSatisfied
+    && Number(order?.deadlineAt || 0) - now < 60 * 60000;
   const shouldSoundSiren = (order, now = Date.now()) => {
+    if (order?.deadlineSatisfied) return false;
     const thresholdMs = order?.instant ? 2 * 60 * 60000 : 60 * 60000;
     const remainingMs = Number(order?.deadlineAt || 0) - now;
     return remainingMs > 0 && remainingMs < thresholdMs;
   };
   const formatDeadline = (order, now = Date.now()) => {
+    if (order?.deadlineSatisfied) return 'Ready to process';
     const minutes = minutesRemaining(order, now);
     if (minutes <= 0) return 'Overdue';
     if (minutes < 60) return `${minutes}m`;
@@ -41,9 +63,11 @@
       .toUpperCase();
     return ['IN_CANCEL', 'CANCEL_REQUESTED', 'CANCELLATION_REQUESTED', 'CANCEL_PENDING', 'CANCELLATION_PENDING'].includes(status);
   };
-  const requiresManualInstantArrangement = (order) => Boolean(
-    order?.instant && (order?.manualArrangementRequired || order?.manual_arrangement_required)
-  );
+  const requiresManualInstantArrangement = (order) => {
+    if (!order?.instant) return false;
+    if (order?.manualArrangementRequired || order?.manual_arrangement_required) return true;
+    return !isMarketplaceShipmentArranged(order);
+  };
   const isInstantManualLifecycle = (order) => {
     if (!order?.instant) return false;
     if (requiresManualInstantArrangement(order)) return true;
@@ -117,6 +141,7 @@
 
   global.JGStoreOrderPresentation = Object.freeze({
     normalizeDeadline,
+    isMarketplaceShipmentArranged,
     minutesRemaining,
     isCriticalOrder,
     shouldSoundSiren,
@@ -1283,6 +1308,7 @@ document.addEventListener('DOMContentLoaded', () => {
       deadlineAt: deadline.deadlineAt,
       deadlineType: deadline.deadlineType,
       deadlineLabel: deadline.deadlineLabel,
+      deadlineSatisfied: deadline.deadlineSatisfied,
       fulfillmentStatus: String(order.fulfillmentStatus || 'UNCLAIMED'),
       claimedBy: order.claimedBy || null,
       claimedByName: String(order.claimedByName || ''),
@@ -1451,6 +1477,7 @@ document.addEventListener('DOMContentLoaded', () => {
       && order.fulfillmentStatus !== 'FULFILLED'
     ))
     .sort((a, b) => Number(Boolean(b.weekendDependent)) - Number(Boolean(a.weekendDependent))
+      || Number(Boolean(a.deadlineSatisfied)) - Number(Boolean(b.deadlineSatisfied))
       || a.deadlineAt - b.deadlineAt);
 
   const visibleListedOrders = (orders = listedOrders()) => orderPresentation.filterOrdersByHandover(orders, dropOffOnly);
@@ -2126,7 +2153,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const claimedBySelf = order.claimedBy && order.claimedBy === currentEmployee.id;
       const claimLabel = cancellationRequested
         ? 'Cancellation requested'
-        : (order.claimedByName ? `${order.claimStale ? 'Stale' : 'Claimed'} by ${order.claimedByName}` : order.marketplaceStatus);
+        : (order.claimedByName
+          ? `${order.claimStale ? 'Stale' : 'Claimed'} by ${order.claimedByName}`
+          : (order.instant && orderPresentation.isMarketplaceShipmentArranged(order) ? 'Shipment arranged' : order.marketplaceStatus));
       const buttonLabel = order.claimStale ? 'Reclaim' : (claimedBySelf ? 'Resume' : (index === 0 ? 'Start Next' : 'Start'));
       const cardStyles = customSourceColor
         ? `--order-source-accent: ${escapeHtml(customSourceColor)}; --order-source-border: ${escapeHtml(customSourceColor)}; --order-source-border-hover: ${escapeHtml(customSourceColor)}`

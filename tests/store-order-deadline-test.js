@@ -37,6 +37,32 @@ assert(fallback.deadlineAt === now + 86400000, 'A missing deadline must receive 
 assert(fallback.deadlineLabel === 'Deadline', 'A non-marketplace fallback must retain the generic label.');
 assert(presentation.formatDeadline({ deadlineAt: now - 1 }, now) === 'Overdue', 'Expired deadlines must render as overdue.');
 
+const arrangedShopee = presentation.normalizeDeadline({
+  platform: 'Shopee',
+  marketplaceStatus: 'PROCESSED',
+  shipmentArranged: true,
+  deadlineAt: now - 60 * 60000,
+  deadlineType: 'ship_by',
+  deadlineLabel: 'Ship by',
+  deadlineSource: 'ship_by_date'
+}, now);
+assert(arrangedShopee.deadlineSatisfied === true, 'Arrangement must satisfy Shopee\'s pre-arrangement ship-by deadline.');
+assert(arrangedShopee.deadlineLabel === 'Shipment arranged', 'An arranged Shopee order must not retain a misleading ship-by label.');
+assert(presentation.formatDeadline(arrangedShopee, now) === 'Ready to process', 'An arranged Shopee order must not render as overdue.');
+assert(presentation.isCriticalOrder(arrangedShopee, now) === false, 'A satisfied arrangement deadline must not count as critical.');
+assert(presentation.shouldSoundSiren(arrangedShopee, now) === false, 'A satisfied arrangement deadline must not sound the siren.');
+
+const arrangedTikTokCollection = presentation.normalizeDeadline({
+  platform: 'TikTok',
+  marketplaceStatus: 'AWAITING_COLLECTION',
+  shipmentArranged: true,
+  deadlineAt: now + 90 * 60000,
+  deadlineType: 'collection_due',
+  deadlineLabel: 'Collection due'
+}, now);
+assert(arrangedTikTokCollection.deadlineSatisfied === false, 'A real post-arrangement collection deadline must remain active.');
+assert(presentation.formatDeadline(arrangedTikTokCollection, now) === '1h 30m', 'A collection deadline must retain its countdown.');
+
 assert(
   presentation.shouldSoundSiren({ instant: true, deadlineAt: now + 2 * 60 * 60000 }, now) === false,
   'Instant orders must stay silent at the two-hour boundary.'
@@ -88,5 +114,25 @@ const manualInstantPreview = presentation.previewActionState({
   instantArrangementState: 'required'
 });
 assert(manualInstantPreview.disabled === true && manualInstantPreview.label === 'Shipment arrangement required', 'An unarranged Instant order must not start from preview.');
+
+assert(
+  presentation.requiresManualInstantArrangement({
+    platform: 'Shopee',
+    instant: true,
+    shipmentArranged: false,
+    labelBacked: false
+  }),
+  'An unarranged Instant order must expose manual arrangement even when the API lifecycle flag is missing.'
+);
+assert(
+  !presentation.requiresManualInstantArrangement({
+    platform: 'Shopee',
+    instant: true,
+    marketplaceStatus: 'PROCESSED',
+    shipmentArranged: true,
+    labelBacked: true
+  }),
+  'An already arranged Instant order must not offer a duplicate arrangement API call.'
+);
 
 console.log('store-order-deadline-test: ok');
