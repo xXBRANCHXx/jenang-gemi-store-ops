@@ -22,7 +22,7 @@
     return {
       deadlineAt: Number.isFinite(deadlineAt) && deadlineAt > 0 ? deadlineAt : now + 86400000,
       deadlineType,
-      deadlineLabel: deadlineSatisfied ? 'Shipment arranged' : deadlineLabel,
+      deadlineLabel: deadlineSatisfied ? 'Shipment deadline' : deadlineLabel,
       deadlineSatisfied
     };
   };
@@ -36,8 +36,22 @@
     const remainingMs = Number(order?.deadlineAt || 0) - now;
     return remainingMs > 0 && remainingMs < thresholdMs;
   };
+  const formatAbsoluteDeadline = (order) => {
+    const deadlineAt = Number(order?.deadlineAt || order?.deadline_at || 0);
+    if (!Number.isFinite(deadlineAt) || deadlineAt <= 0) return 'Unavailable';
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+      timeZone: 'Asia/Jakarta'
+    }).formatToParts(new Date(deadlineAt));
+    const value = (type) => String(parts.find((part) => part.type === type)?.value || '');
+    return `${value('day')} ${value('month')} · ${value('hour')}:${value('minute')} WIB`;
+  };
   const formatDeadline = (order, now = Date.now()) => {
-    if (order?.deadlineSatisfied) return 'Ready to process';
+    if (order?.deadlineSatisfied) return formatAbsoluteDeadline(order);
     const minutes = minutesRemaining(order, now);
     if (minutes <= 0) return 'Overdue';
     if (minutes < 60) return `${minutes}m`;
@@ -93,6 +107,18 @@
     return dropOffOnly ? rows.filter((order) => isDropOff(order)) : rows.slice();
   };
   const shouldShowOrderLoading = (snapshotReady) => !snapshotReady;
+  const columnFirstBoardFlow = (orderCount, boardWidth, options = {}) => {
+    const count = Math.max(0, Number(orderCount) || 0);
+    const width = Math.max(0, Number(boardWidth) || 0);
+    const minimumCardWidth = Math.max(1, Number(options.minimumCardWidth) || 190);
+    const gap = Math.max(0, Number(options.gap) || 8);
+    const minimumRows = Math.max(1, Number(options.minimumRows) || 6);
+    const columns = Math.max(1, Math.floor((width + gap) / (minimumCardWidth + gap)));
+    return {
+      columns,
+      rows: Math.max(minimumRows, Math.ceil(count / columns) || 1)
+    };
+  };
   const canCurrentEmployeeUnclaim = (order, currentEmployeeId) => {
     const claimant = String(order?.claimedBy || order?.claimed_by || '').trim();
     const employeeId = String(currentEmployeeId || '').trim();
@@ -160,6 +186,7 @@
     formatHandoverSlot,
     filterOrdersByHandover,
     shouldShowOrderLoading,
+    columnFirstBoardFlow,
     canCurrentEmployeeUnclaim,
     previewActionState
   });
@@ -2125,6 +2152,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const allListedOrders = listedOrders();
     const orders = visibleListedOrders(allListedOrders);
+    const boardFlow = orderPresentation.columnFirstBoardFlow(
+      orders.length,
+      board.clientWidth || board.parentElement?.clientWidth || window.innerWidth
+    );
+    board.style.setProperty('--order-columns', String(boardFlow.columns));
+    board.style.setProperty('--order-rows', String(boardFlow.rows));
     if (boardDensity) boardDensity.textContent = `${orders.length} visible orders`;
     if (boardOverflow) boardOverflow.hidden = true;
 

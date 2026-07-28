@@ -142,11 +142,13 @@ assert(
   'Compact cards must leave product details in the order preview and use a short arrangement action.'
 );
 assert(
-  adminCss.includes('repeat(auto-fill, minmax(min(190px, 100%), 1fr))')
+  adminCss.includes('repeat(var(--order-columns, 1), minmax(0, 1fr))')
     && adminCss.includes('grid-template-rows: repeat(var(--order-rows, 6), minmax(88px, auto))')
     && adminCss.includes('grid-auto-flow: column')
+    && adminCss.includes('overflow-x: hidden')
+    && storeHome.includes("board.style.setProperty('--order-rows'")
     && adminCss.includes('.is-store-home .admin-store-home .admin-order-board'),
-  'The operational queue must fill the most urgent orders down the first readable column.'
+  'The operational queue must fill urgency down columns and add rows instead of horizontal overflow.'
 );
 assert(
   storeHome.includes("!order.instant ? 'is-deadline-urgent' : ''")

@@ -47,8 +47,9 @@ const arrangedShopee = presentation.normalizeDeadline({
   deadlineSource: 'ship_by_date'
 }, now);
 assert(arrangedShopee.deadlineSatisfied === true, 'Arrangement must satisfy Shopee\'s pre-arrangement ship-by deadline.');
-assert(arrangedShopee.deadlineLabel === 'Shipment arranged', 'An arranged Shopee order must not retain a misleading ship-by label.');
-assert(presentation.formatDeadline(arrangedShopee, now) === 'Ready to process', 'An arranged Shopee order must not render as overdue.');
+assert(arrangedShopee.deadlineLabel === 'Shipment deadline', 'An arranged Shopee order must identify the stored shipment deadline.');
+assert(presentation.formatDeadline(arrangedShopee, now).endsWith('WIB'), 'An arranged Shopee order must show its absolute Jakarta shipment deadline.');
+assert(!['Ready to process', 'Overdue'].includes(presentation.formatDeadline(arrangedShopee, now)), 'A satisfied shipment deadline must be shown without a false operational status.');
 assert(presentation.isCriticalOrder(arrangedShopee, now) === false, 'A satisfied arrangement deadline must not count as critical.');
 assert(presentation.shouldSoundSiren(arrangedShopee, now) === false, 'A satisfied arrangement deadline must not sound the siren.');
 
@@ -62,6 +63,13 @@ const arrangedTikTokCollection = presentation.normalizeDeadline({
 }, now);
 assert(arrangedTikTokCollection.deadlineSatisfied === false, 'A real post-arrangement collection deadline must remain active.');
 assert(presentation.formatDeadline(arrangedTikTokCollection, now) === '1h 30m', 'A collection deadline must retain its countdown.');
+
+const desktopFlow = presentation.columnFirstBoardFlow(58, 1200);
+assert(desktopFlow.columns === 6 && desktopFlow.rows === 10, 'A large desktop queue must grow downward within its six visible columns.');
+const shortFlow = presentation.columnFirstBoardFlow(10, 1200);
+assert(shortFlow.columns === 6 && shortFlow.rows === 6, 'A short queue must retain the six-row urgency-first column.');
+const mobileFlow = presentation.columnFirstBoardFlow(20, 360);
+assert(mobileFlow.columns === 1 && mobileFlow.rows === 20, 'A narrow queue must remain one column and expand only downward.');
 
 assert(
   presentation.shouldSoundSiren({ instant: true, deadlineAt: now + 2 * 60 * 60000 }, now) === false,
