@@ -1,7 +1,33 @@
 (function exposeStoreOrderPresentation(global) {
+  const normalizedSourceKey = (value) => String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^[._-]+|[._-]+$/g, '');
   const normalizedMarketplaceStatus = (order) => String(
     order?.marketplaceStatus || order?.marketplace_status || order?.orderStatus || order?.order_status || ''
   ).trim().toUpperCase();
+  const sourceLabelFromOrder = (order) => {
+    const platform = normalizedSourceKey(order?.platform || '');
+    const account = String(order?.account || '').trim();
+    const accountKey = String(order?.sourceAccountKey || order?.account_key || '').trim();
+    if (platform === 'whatsapp') return 'Whatsapp';
+    if (platform === 'partner') {
+      const partnerName = String(order?.partnerName || order?.partner_name || '').trim();
+      const partnerCode = String(order?.partnerCode || order?.partner_code || '').trim();
+      if (partnerName) return partnerName;
+      if (account && account.toLowerCase() !== 'partner') return account;
+      if (partnerCode) return partnerCode;
+    }
+    if (accountKey === 'jenang-gemi-shopee') return 'JG Shopee';
+    if (accountKey === 'zero-shopee') return 'ZERO Shopee';
+    if (accountKey === 'zfit-shopee') return 'ZFIT Shopee';
+    if (accountKey === 'jenang-gemi-tiktok') return 'JG TikTok';
+    if (accountKey === 'zero-tiktok') return 'ZERO TikTok';
+    if (accountKey === 'zfit-tiktok') return 'ZFIT TikTok';
+    if (account) return account;
+    return accountKey || String(order?.platform || 'Source');
+  };
   const isMarketplaceShipmentArranged = (order) => {
     if (order?.shipmentArranged || order?.shipment_arranged || order?.labelBacked || order?.label_backed) return true;
     return ['PROCESSED', 'AWAITING_COLLECTION', 'IN_TRANSIT', 'SHIPPED', 'DELIVERED', 'COMPLETED']
@@ -188,7 +214,8 @@
     canCurrentEmployeeUnclaim,
     canCurrentEmployeeRemove,
     canOpenOrderContextMenu,
-    previewActionState
+    previewActionState,
+    sourceLabelFromOrder
   });
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -527,26 +554,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return account || platform || 'unknown';
   };
 
-  const sourceLabelFromOrder = (order) => {
-    const platform = normalizeSourceKey(order?.platform || '');
-    const account = String(order?.account || '').trim();
-    const accountKey = String(order?.sourceAccountKey || order?.account_key || '').trim();
-    if (platform === 'partner') {
-      const partnerName = String(order?.partnerName || order?.partner_name || '').trim();
-      const partnerCode = String(order?.partnerCode || order?.partner_code || '').trim();
-      if (partnerName) return partnerName;
-      if (account && account.toLowerCase() !== 'partner') return account;
-      if (partnerCode) return partnerCode;
-    }
-    if (accountKey === 'jenang-gemi-shopee') return 'JG Shopee';
-    if (accountKey === 'zero-shopee') return 'ZERO Shopee';
-    if (accountKey === 'zfit-shopee') return 'ZFIT Shopee';
-    if (accountKey === 'jenang-gemi-tiktok') return 'JG TikTok';
-    if (accountKey === 'zero-tiktok') return 'ZERO TikTok';
-    if (accountKey === 'zfit-tiktok') return 'ZFIT TikTok';
-    if (account) return account;
-    return accountKey || String(order?.platform || 'Source');
-  };
+  const sourceLabelFromOrder = orderPresentation.sourceLabelFromOrder;
 
   const colorSettingForSource = (sourceKey) => {
     const configured = String(sourceColorMap[sourceKey] || '').trim();

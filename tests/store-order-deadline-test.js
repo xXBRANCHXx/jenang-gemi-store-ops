@@ -12,6 +12,18 @@ const assert = (condition, message) => {
 
 const presentation = global.JGStoreOrderPresentation;
 assert(presentation && typeof presentation.normalizeDeadline === 'function', 'Store Ops must expose its production deadline normalizer.');
+assert(
+  presentation.sourceLabelFromOrder({ platform: 'whatsapp', account: 'Jenang Gemi' }) === 'Whatsapp',
+  'WhatsApp orders must use their channel label instead of the generic Jenang Gemi account fallback.'
+);
+assert(
+  presentation.sourceLabelFromOrder({ platform: 'WhatsApp' }) === 'Whatsapp',
+  'WhatsApp orders must keep their channel label when no account is supplied.'
+);
+assert(
+  presentation.sourceLabelFromOrder({ platform: 'shopee', account: 'Jenang Gemi', sourceAccountKey: 'jenang-gemi-shopee' }) === 'JG Shopee',
+  'Marketplace account labels must remain unchanged.'
+);
 
 const now = 1800000000000;
 const arrange = presentation.normalizeDeadline({
