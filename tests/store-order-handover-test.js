@@ -124,9 +124,10 @@ assert(
 );
 assert(
   adminCss.includes('repeat(auto-fill, minmax(min(190px, 100%), 1fr))')
-    && adminCss.includes('grid-auto-flow: row')
+    && adminCss.includes('grid-template-rows: repeat(var(--order-rows, 6), minmax(88px, auto))')
+    && adminCss.includes('grid-auto-flow: column')
     && adminCss.includes('.is-store-home .admin-store-home .admin-order-board'),
-  'The operational queue must use readable row-major cards instead of narrow fixed columns.'
+  'The operational queue must fill the most urgent orders down the first readable column.'
 );
 assert(
   storeHome.includes("!order.instant ? 'is-deadline-urgent' : ''")
