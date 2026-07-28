@@ -47,6 +47,8 @@ assert.match(fulfillmentRuntime, /function jg_store_ops_fulfillment_mark_label_p
 assert.equal(fulfillmentSource, fulfillmentRuntime, 'the source and deployed fulfillment runtimes should stay synchronized');
 assert.match(ordersApi, /\$alreadyFulfilled[\s\S]*!\$alreadyFulfilled && \$key\['source_platform'\] === 'partner'[\s\S]*!\$alreadyFulfilled && in_array\(\$key\['source_platform'\], \['shopee', 'tiktok'\]/, 'idempotent confirmation must not regress an already fulfilled upstream order');
 assert.match(legacyOrdersApi, /\$alreadyFulfilled[\s\S]*!\$alreadyFulfilled && \$key\['source_platform'\] === 'partner'[\s\S]*!\$alreadyFulfilled && in_array\(\$key\['source_platform'\], \['shopee', 'tiktok'\]/, 'the compatible endpoint must preserve fulfilled upstream status on confirmation retry');
+assert.match(ordersApi, /'reprint' => in_array\([\s\S]*?\$_GET\['reprint'\]/, 'the current orders endpoint must forward explicit marketplace reprints');
+assert.match(legacyOrdersApi, /'reprint' => in_array\([\s\S]*?\$_GET\['reprint'\]/, 'the compatible orders endpoint must forward explicit marketplace reprints');
 assert.doesNotMatch(script, /location\.replace\(/, 'print confirmation should not redirect the tab');
 
 console.log('print-label-completion-test: ok');
