@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const scanProgress = document.querySelector('[data-scan-progress]');
   const scanStatus = document.querySelector('[data-scan-status]');
   const syncStatus = document.querySelector('[data-sync-status]');
-  const scannerConnect = document.querySelector('[data-scanner-connect]');
 
   const escapeHtml = (value) => String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -565,7 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (value) pushSerialChunk(value);
       }
     } catch (_error) {
-      setScanStatus('Scanner disconnected', 'Reconnect the USB-COM scanner or use keyboard-wedge input.');
+      setScanStatus('Barcode input unavailable', 'Scanner setup and testing are available in Store Ops Settings.');
     } finally {
       serialReader?.releaseLock();
       serialReader = null;
@@ -580,8 +579,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!serialPort.readable && !serialPort.writable) {
       await serialPort.open({ baudRate: Number(scannerSettings.baud_rate || 9600) });
     }
-    if (scannerConnect) scannerConnect.textContent = 'USB-COM Connected';
-    setScanStatus('USB-COM scanner ready', 'Scan each product barcode.');
+    setScanStatus('Ready to scan', 'Scan each product barcode.');
     readSerialLoop().catch(() => {});
   };
 
@@ -593,20 +591,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return true;
   };
 
-  const connectSerialScanner = async () => {
-    if (!navigator.serial) {
-      setError('This browser does not support USB-COM scanner access. Use Chrome or Edge, or keep the scanner in keyboard input mode.');
-      return;
-    }
-
-    try {
-      const port = await navigator.serial.requestPort();
-      await openSerialPort(port);
-    } catch (_error) {
-      setScanStatus('Scanner not connected', 'Use the Connect USB-COM Scanner button when the scanner is plugged in.');
-    }
-  };
-
   const pollServerSerialScanner = async () => {
     if (serialPort?.readable || serialPort?.writable) return;
     if (!serverCanSeeLocalUsb()) {
@@ -614,7 +598,7 @@ document.addEventListener('DOMContentLoaded', () => {
       serverSerialTimer = 0;
       if (!serverSerialErrorShown) {
         serverSerialErrorShown = true;
-        setScanStatus('USB-COM scanner needs browser access', 'Hostinger cannot see USB devices plugged into this laptop. Click Connect USB-COM Scanner in Chrome or Edge.');
+        setScanStatus('Ready for barcode input', 'Scanner setup and testing are available in Store Ops Settings.');
       }
       return;
     }
@@ -632,8 +616,7 @@ document.addEventListener('DOMContentLoaded', () => {
       serverSerialErrorShown = false;
       const codes = Array.isArray(payload.codes) ? payload.codes : [];
       codes.forEach((code) => handleScan(code));
-      if (codes.length && scannerConnect) scannerConnect.textContent = 'USB-COM Active';
-      if (codes.length) setScanStatus('USB-COM scanner ready', `Reading ${payload.device || 'serial device'}.`);
+      if (codes.length) setScanStatus('Ready to scan', `Reading ${payload.device || 'serial device'}.`);
     } catch (error) {
       if (serverSerialErrorShown) return;
       serverSerialErrorShown = true;
@@ -652,14 +635,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!navigator.serial || typeof navigator.serial.addEventListener !== 'function') return;
     navigator.serial.addEventListener('connect', () => {
       openApprovedSerialScanner().catch(() => {
-        setScanStatus('Scanner waiting', 'Click Connect USB-COM Scanner and choose the barcode scanner.');
+        setScanStatus('Ready for barcode input', 'Scanner setup and testing are available in Store Ops Settings.');
       });
     });
     navigator.serial.addEventListener('disconnect', (event) => {
       if (event.target && event.target !== serialPort) return;
       if (serialReader) serialReader.cancel().catch(() => {});
       serialPort = null;
-      setScanStatus('Scanner disconnected', 'Reconnect the USB-COM scanner or use keyboard-wedge input.');
+      setScanStatus('Barcode input unavailable', 'Scanner setup and testing are available in Store Ops Settings.');
     });
   };
 
@@ -678,8 +661,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.clearTimeout(scanBufferTimer);
     scanBufferTimer = window.setTimeout(submitScanBuffer, 260);
   });
-
-  scannerConnect?.addEventListener('click', connectSerialScanner);
 
   const initialize = async () => {
     try {
@@ -708,11 +689,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       if (!(await openApprovedSerialScanner())) {
-        setScanStatus('USB-COM scanner waiting', 'Click Connect USB-COM Scanner and choose the IWARE scanner. Hostinger cannot read laptop USB devices directly.');
+        setScanStatus('Ready for barcode input', 'Scanner setup and testing are available in Store Ops Settings.');
         if (serverCanSeeLocalUsb()) startServerSerialPolling();
       }
     } catch (_error) {
-      setScanStatus('USB-COM scanner waiting', 'Click Connect USB-COM Scanner and choose the IWARE scanner. Hostinger cannot read laptop USB devices directly.');
+      setScanStatus('Ready for barcode input', 'Scanner setup and testing are available in Store Ops Settings.');
       if (serverCanSeeLocalUsb()) startServerSerialPolling();
     }
   };

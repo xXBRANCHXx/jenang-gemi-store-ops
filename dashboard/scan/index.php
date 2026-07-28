@@ -33,7 +33,7 @@ $storeScanJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/store-scan.js'
         'active' => 'orders',
         'title' => 'Scan Order',
         'eyebrow' => 'Store Ops',
-        'description' => 'USB-COM product check for the active fulfillment order.',
+        'description' => 'Product check for the active fulfillment order.',
         'indicator' => 'Order',
         'app_class' => 'admin-store-scan-page',
         'app_attributes' => [
@@ -47,17 +47,16 @@ $storeScanJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/store-scan.js'
                 <div class="admin-scan-head">
                     <div>
                         <span class="admin-panel-kicker">Barcode Check</span>
-                        <h3>USB-COM product scan</h3>
+                        <h3>Scan product barcodes</h3>
                         <span class="admin-panel-meta" data-scan-order-id>Order</span>
                     </div>
                     <span class="admin-status-badge" data-scan-progress>0/0</span>
                 </div>
                 <div class="admin-scanner-status-card">
                     <div data-scan-status>
-                        <strong>Scanner waiting</strong>
-                        <span>Connect the USB-COM scanner, then scan each product barcode.</span>
+                        <strong>Ready to scan</strong>
+                        <span>Scan each product barcode.</span>
                     </div>
-                    <button type="button" class="admin-ghost-btn" data-scanner-connect>Connect USB-COM Scanner</button>
                 </div>
                 <p class="admin-sync-status" data-sync-status hidden>Sync pending</p>
                 <p class="admin-form-error" data-scan-error hidden></p>
