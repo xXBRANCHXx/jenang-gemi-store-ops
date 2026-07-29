@@ -1006,13 +1006,17 @@ if ($method === 'POST') {
                 jg_store_ops_orders_fail('Branch Login passcode is incorrect.', 403);
             }
 
+            if ($key['source_platform'] === 'whatsapp') {
+                jg_store_ops_whatsapp_cancel_unclaimed($pdo, $key['order_id']);
+                $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
+                jg_store_ops_orders_fulfillment_response($pdo, is_array($row) ? $row : []);
+            }
+
             if ($key['source_platform'] === 'partner'
                 && !jg_store_ops_orders_partner_update_status($key['order_id'], 'FULFILLED')) {
                 throw new RuntimeException('Unable to remove this Partner order from the source queue.');
             }
-            if ($key['source_platform'] === 'whatsapp') {
-                jg_store_ops_whatsapp_remove_from_listed($pdo, $key['order_id']);
-            } elseif (in_array($key['source_platform'], JG_STORE_OPS_WEBSITE_PLATFORMS, true)) {
+            if (in_array($key['source_platform'], JG_STORE_OPS_WEBSITE_PLATFORMS, true)) {
                 jg_store_ops_website_callback($pdo, $key['source_platform'], $key['order_id'], 'FULFILLED');
             }
             if (in_array($key['source_platform'], ['shopee', 'tiktok'], true)) {

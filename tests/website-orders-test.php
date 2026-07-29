@@ -152,7 +152,9 @@ $websiteApi = (string) file_get_contents(dirname(__DIR__) . '/api/website-orders
 website_ops_expect(
     true,
     str_contains($websiteApi, "\$action === 'cancel'")
-        && str_contains($websiteApi, 'jg_store_ops_whatsapp_cancel_unclaimed'),
+        && str_contains($websiteApi, 'jg_store_ops_whatsapp_cancel_unclaimed')
+        && str_contains($websiteApi, "\$action === 'whatsapp_status'")
+        && str_contains($websiteApi, 'jg_store_ops_whatsapp_cancellation_state'),
     'The authenticated website-order API must expose atomic WhatsApp cancellation.'
 );
 $fulfillmentRuntime = (string) file_get_contents(dirname(__DIR__) . '/store-ops-fulfillment-runtime.php');
