@@ -857,6 +857,94 @@ function jg_store_ops_whatsapp_remove_from_listed(PDO $pdo, string $orderId): vo
     throw new RuntimeException('This WhatsApp order is no longer listed and cannot be removed.');
 }
 
+/** @return array{order_id:string,status:string} */
+function jg_store_ops_whatsapp_cancel_unclaimed(PDO $pdo, string $orderId): array
+{
+    $orderId = trim($orderId);
+    if ($orderId === '') {
+        throw new InvalidArgumentException('WhatsApp order ID is required for cancellation.');
+    }
+
+    $key = [
+        'source_platform' => 'whatsapp',
+        'source_account' => 'whatsapp',
+        'order_id' => $orderId,
+    ];
+    $pdo->beginTransaction();
+    try {
+        jg_store_ops_fulfillment_insert_order_if_missing($pdo, $key);
+        $fulfillment = jg_store_ops_fulfillment_fetch_order($pdo, $key, true);
+        if (!is_array($fulfillment)) {
+            throw new RuntimeException('Unable to check whether this WhatsApp order has been claimed.');
+        }
+
+        $fulfillmentStatus = strtoupper(trim((string) ($fulfillment['status'] ?? 'UNCLAIMED'))) ?: 'UNCLAIMED';
+        $claimedBy = trim((string) ($fulfillment['claimed_by'] ?? ''));
+        if ($fulfillmentStatus === 'CANCELLED') {
+            $pdo->commit();
+            return ['order_id' => $orderId, 'status' => 'CANCELLED'];
+        }
+        if ($claimedBy !== '' || $fulfillmentStatus !== 'UNCLAIMED') {
+            throw new RuntimeException('This WhatsApp order has already been claimed in Store Ops and cannot be cancelled.');
+        }
+
+        $sourceStmt = $pdo->prepare(
+            'SELECT status
+             FROM store_ops_website_orders
+             WHERE source_platform = "whatsapp" AND order_id = :order_id
+             LIMIT 1 FOR UPDATE'
+        );
+        $sourceStmt->execute([':order_id' => $orderId]);
+        $sourceStatus = strtoupper(trim((string) $sourceStmt->fetchColumn()));
+        if ($sourceStatus === 'CANCELLED') {
+            $pdo->prepare(
+                'UPDATE store_ops_order_fulfillment_v2
+                 SET status = "CANCELLED", claimed_by = NULL, claimed_at = NULL, updated_at = :updated_at
+                 WHERE id = :id'
+            )->execute([':updated_at' => jg_store_ops_website_now(), ':id' => (int) $fulfillment['id']]);
+            $pdo->commit();
+            return ['order_id' => $orderId, 'status' => 'CANCELLED'];
+        }
+        if ($sourceStatus !== 'IS_LISTED') {
+            throw new RuntimeException($sourceStatus === ''
+                ? 'WhatsApp order is missing from Store Ops.'
+                : 'Only an unclaimed listed WhatsApp order can be cancelled.');
+        }
+
+        $now = jg_store_ops_website_now();
+        $pdo->prepare(
+            'UPDATE store_ops_order_fulfillment_v2
+             SET status = "CANCELLED", claimed_by = NULL, claimed_at = NULL,
+                 last_activity_at = :last_activity_at, updated_at = :updated_at
+             WHERE id = :id'
+        )->execute([
+            ':last_activity_at' => $now,
+            ':updated_at' => $now,
+            ':id' => (int) $fulfillment['id'],
+        ]);
+        $pdo->prepare(
+            'UPDATE store_ops_website_orders
+             SET status = "CANCELLED", updated_at = :updated_at
+             WHERE source_platform = "whatsapp" AND order_id = :order_id'
+        )->execute([':updated_at' => $now, ':order_id' => $orderId]);
+        jg_store_ops_fulfillment_log_event(
+            $pdo,
+            $key,
+            'cancel',
+            'executive-dashboard',
+            'Executive Dashboard',
+            ['message' => 'Cancelled before the order was claimed.']
+        );
+        $pdo->commit();
+        return ['order_id' => $orderId, 'status' => 'CANCELLED'];
+    } catch (Throwable $error) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $error;
+    }
+}
+
 function jg_store_ops_website_proxy_label(array $order): never
 {
     $url = trim((string) ($order['label_url'] ?? ''));

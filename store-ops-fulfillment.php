@@ -235,6 +235,11 @@ function jg_store_ops_fulfillment_is_admin_employee(string $employeeId): bool
     return in_array(strtolower(trim($employeeId)), ['admin', 'shared-admin'], true);
 }
 
+function jg_store_ops_fulfillment_is_terminal_status(string $status): bool
+{
+    return in_array(strtoupper(trim($status)), ['FULFILLED', 'CANCELLED'], true);
+}
+
 function jg_store_ops_fulfillment_employee_name(PDO $pdo, string $employeeId): string
 {
     $employeeId = trim($employeeId);
@@ -425,10 +430,10 @@ function jg_store_ops_fulfillment_state_from_row(?array $row, string $currentEmp
     $claimedBy = trim((string) ($row['claimed_by'] ?? ''));
     $status = strtoupper(trim((string) ($row['status'] ?? 'UNCLAIMED'))) ?: 'UNCLAIMED';
     $isStale = jg_store_ops_fulfillment_is_stale($row);
-    $isFulfilled = $status === 'FULFILLED';
+    $isTerminal = jg_store_ops_fulfillment_is_terminal_status($status);
     $isCurrentClaim = $claimedBy !== '' && hash_equals($claimedBy, $currentEmployeeId);
     $isAdmin = jg_store_ops_fulfillment_is_admin_employee($currentEmployeeId);
-    $locked = !$isFulfilled && $claimedBy !== '' && !$isCurrentClaim && !$isStale && !$isAdmin;
+    $locked = !$isTerminal && $claimedBy !== '' && !$isCurrentClaim && !$isStale && !$isAdmin;
     $required = max(0, (int) ($row['scan_required'] ?? 0));
     $completed = max(0, (int) ($row['scan_completed'] ?? 0));
 
@@ -438,7 +443,7 @@ function jg_store_ops_fulfillment_state_from_row(?array $row, string $currentEmp
         'claimedByName' => $claimedBy !== '' ? ($employeeMap[$claimedBy] ?? $claimedBy) : '',
         'claimedAt' => $row['claimed_at'] ?? null,
         'locked' => $locked,
-        'currentEmployeeCanWork' => !$locked && !$isFulfilled,
+        'currentEmployeeCanWork' => !$locked && !$isTerminal,
         'claimStale' => $isStale,
         'lastActivityAt' => $row['last_activity_at'] ?? null,
         'scanCompletedAt' => $row['scan_completed_at'] ?? null,
@@ -459,8 +464,10 @@ function jg_store_ops_fulfillment_assert_can_work(?array $row, string $employeeI
     }
 
     $status = strtoupper((string) ($row['status'] ?? ''));
-    if ($status === 'FULFILLED') {
-        throw new RuntimeException('This order is already fulfilled.');
+    if (jg_store_ops_fulfillment_is_terminal_status($status)) {
+        throw new RuntimeException($status === 'CANCELLED'
+            ? 'This order was cancelled before fulfillment.'
+            : 'This order is already fulfilled.');
     }
 
     $claimedBy = trim((string) ($row['claimed_by'] ?? ''));
@@ -497,8 +504,10 @@ function jg_store_ops_fulfillment_claim(PDO $pdo, array $key, string $employeeId
             throw new RuntimeException('This order is already claimed.');
         }
 
-        if ($status === 'FULFILLED') {
-            throw new RuntimeException('This order is already fulfilled.');
+        if (jg_store_ops_fulfillment_is_terminal_status($status)) {
+            throw new RuntimeException($status === 'CANCELLED'
+                ? 'This order was cancelled before it could be claimed.'
+                : 'This order is already fulfilled.');
         }
 
         $now = jg_store_ops_fulfillment_now();
@@ -545,6 +554,12 @@ function jg_store_ops_fulfillment_release(PDO $pdo, array $key, string $employee
         }
 
         $claimedBy = trim((string) ($row['claimed_by'] ?? ''));
+        $status = strtoupper(trim((string) ($row['status'] ?? '')));
+        if (jg_store_ops_fulfillment_is_terminal_status($status)) {
+            throw new RuntimeException($status === 'CANCELLED'
+                ? 'This order was cancelled and cannot be released.'
+                : 'This order is already fulfilled.');
+        }
         if ($claimedBy !== '' && !hash_equals($claimedBy, $employeeId) && !jg_store_ops_fulfillment_is_admin_employee($employeeId)) {
             throw new RuntimeException('Only the claimant or admin can release this order.');
         }
@@ -558,7 +573,7 @@ function jg_store_ops_fulfillment_release(PDO $pdo, array $key, string $employee
                  last_activity_at = :last_activity_at,
                  updated_at = :updated_at
              WHERE id = :id
-               AND status <> "FULFILLED"'
+               AND status NOT IN ("FULFILLED", "CANCELLED")'
         );
         $stmt->execute([
             ':last_activity_at' => $now,

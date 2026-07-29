@@ -145,6 +145,23 @@ $_ENV['JG_TIKTOK_INGEST_SETUP_TOKEN'] = 'tiktok-test-token';
 website_ops_expect('shopee-test-token', jg_store_ops_marketplace_setup_token('shopee'), 'Shopee requests must use the Shopee setup credential.');
 website_ops_expect('tiktok-test-token', jg_store_ops_marketplace_setup_token('tiktok'), 'TikTok requests must use the TikTok setup credential when configured.');
 website_ops_expect(['zero_website', 'jenang_gemi_website', 'whatsapp'], JG_STORE_OPS_WEBSITE_PLATFORMS, 'Store Ops must accept both website sources and Executive WhatsApp orders.');
+website_ops_expect(true, jg_store_ops_fulfillment_is_terminal_status('CANCELLED'), 'A cancelled WhatsApp order must be terminal in Store Ops.');
+website_ops_expect(true, jg_store_ops_fulfillment_is_terminal_status('FULFILLED'), 'A fulfilled order must remain terminal in Store Ops.');
+website_ops_expect(false, jg_store_ops_fulfillment_is_terminal_status('UNCLAIMED'), 'An unclaimed order must remain available to work.');
+$websiteApi = (string) file_get_contents(dirname(__DIR__) . '/api/website-orders/index.php');
+website_ops_expect(
+    true,
+    str_contains($websiteApi, "\$action === 'cancel'")
+        && str_contains($websiteApi, 'jg_store_ops_whatsapp_cancel_unclaimed'),
+    'The authenticated website-order API must expose atomic WhatsApp cancellation.'
+);
+$fulfillmentRuntime = (string) file_get_contents(dirname(__DIR__) . '/store-ops-fulfillment-runtime.php');
+website_ops_expect(
+    true,
+    str_contains($fulfillmentRuntime, "['FULFILLED', 'CANCELLED']")
+        && str_contains($fulfillmentRuntime, 'was cancelled before it could be claimed'),
+    'A stale Store Ops client must not claim an order after Executive cancellation.'
+);
 website_ops_expect(
     hash_hmac('sha256', 'jenang-gemi-website-orders-v1', 'shared-seed'),
     jg_store_ops_website_derive_token('shared-seed'),
