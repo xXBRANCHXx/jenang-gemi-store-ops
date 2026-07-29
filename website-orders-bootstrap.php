@@ -818,6 +818,45 @@ function jg_store_ops_website_callback(PDO $pdo, string $platform, string $order
     )->execute([':status' => $status, ':updated_at' => jg_store_ops_website_now(), ':platform' => $platform, ':order_id' => $orderId]);
 }
 
+function jg_store_ops_whatsapp_remove_from_listed(PDO $pdo, string $orderId): void
+{
+    $orderId = trim($orderId);
+    if ($orderId === '') {
+        throw new InvalidArgumentException('WhatsApp order ID is required for removal.');
+    }
+
+    $stmt = $pdo->prepare(
+        'UPDATE store_ops_website_orders
+         SET status = "REMOVED", updated_at = :updated_at
+         WHERE source_platform = "whatsapp"
+           AND order_id = :order_id
+           AND status IN ("IS_LISTED", "IS_BEING_FULFILLED")'
+    );
+    $stmt->execute([
+        ':updated_at' => jg_store_ops_website_now(),
+        ':order_id' => $orderId,
+    ]);
+    if ($stmt->rowCount() > 0) {
+        return;
+    }
+
+    $statusStmt = $pdo->prepare(
+        'SELECT status
+         FROM store_ops_website_orders
+         WHERE source_platform = "whatsapp" AND order_id = :order_id
+         LIMIT 1'
+    );
+    $statusStmt->execute([':order_id' => $orderId]);
+    $status = strtoupper(trim((string) $statusStmt->fetchColumn()));
+    if ($status === 'REMOVED') {
+        return;
+    }
+    if ($status === '') {
+        throw new RuntimeException('WhatsApp order is missing from Store Ops.');
+    }
+    throw new RuntimeException('This WhatsApp order is no longer listed and cannot be removed.');
+}
+
 function jg_store_ops_website_proxy_label(array $order): never
 {
     $url = trim((string) ($order['label_url'] ?? ''));

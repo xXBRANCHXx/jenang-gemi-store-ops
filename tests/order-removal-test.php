@@ -35,11 +35,21 @@ foreach (['api/orders/index.php', 'api/orders-v2/index.php'] as $endpoint) {
     order_removal_expect(
         str_contains($source, "'remove_order'")
         && str_contains($source, 'jg_admin_verify_employee_passcode')
+        && str_contains($source, "if (\$key['source_platform'] === 'whatsapp')")
+        && str_contains($source, 'jg_store_ops_whatsapp_remove_from_listed')
         && str_contains($source, "jg_store_ops_orders_marketplace_status_callback(\$key, 'IS_PROCESSED')")
         && str_contains($source, 'jg_store_ops_fulfillment_remove_from_listed'),
         $endpoint . ' must verify Branch Login and remove the order from both marketplace and Store Ops queues.'
     );
 }
+
+$websiteOrders = (string) file_get_contents(dirname(__DIR__) . '/website-orders-bootstrap.php');
+order_removal_expect(
+    str_contains($websiteOrders, 'function jg_store_ops_whatsapp_remove_from_listed')
+    && str_contains($websiteOrders, 'SET status = "REMOVED"')
+    && str_contains($websiteOrders, 'status IN ("IS_LISTED", "IS_BEING_FULFILLED")'),
+    'WhatsApp removal must retire the local listed row without reporting a fulfillment or deducting stock.'
+);
 
 $dashboard = (string) file_get_contents(dirname(__DIR__) . '/dashboard/index.php');
 order_removal_expect(
