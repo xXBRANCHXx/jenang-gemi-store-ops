@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/astra-stock-bootstrap.php';
 
 function jg_store_ops_sku_config_value(string $envKey, string $configKey, string $default = ''): string
 {

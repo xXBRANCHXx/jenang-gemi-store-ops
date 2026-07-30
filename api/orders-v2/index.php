@@ -1266,10 +1266,12 @@ if ($method === 'POST') {
         }
 
         if ($action === 'fulfill_order') {
-            if ($key['source_platform'] === 'whatsapp') {
-                jg_store_ops_website_deduct_stock($pdo, $key['source_platform'], $key['order_id']);
-            }
             $items = is_array($payload['items'] ?? null) ? $payload['items'] : [];
+            if (in_array($key['source_platform'], JG_STORE_OPS_WEBSITE_PLATFORMS, true)) {
+                jg_store_ops_website_deduct_stock($pdo, $key['source_platform'], $key['order_id']);
+            } else {
+                jg_store_ops_order_stock_deduct($pdo, $key, $items);
+            }
             $row = jg_store_ops_fulfillment_mark_fulfilled($pdo, $key, $employeeId, $employeeName, $items);
             if ($key['source_platform'] === 'partner') {
                 jg_store_ops_orders_partner_update_status($key['order_id'], 'FULFILLED');
@@ -1290,7 +1292,7 @@ if ($method === 'POST') {
             }
             jg_store_ops_orders_fulfillment_response($pdo, $row);
         }
-    } catch (RuntimeException $exception) {
+    } catch (InvalidArgumentException | RuntimeException $exception) {
         $message = $exception->getMessage();
         $status = (str_contains(strtolower($message), 'claimed')
             || str_contains(strtolower($message), 'another employee')

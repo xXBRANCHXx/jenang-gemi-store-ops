@@ -560,7 +560,6 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
              LIMIT 1
              FOR UPDATE'
         );
-        $updateStock = $pdo->prepare('UPDATE sku_skus SET current_stock = :current_stock, updated_at = :updated_at WHERE sku = :sku');
         $insertItem = $pdo->prepare(
             'INSERT INTO store_ops_walkin_invoice_items (
                 invoice_number, sku, tag, product_name, unit_price, quantity, discount_rate, discount_total, line_total,
@@ -570,6 +569,8 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
                 :scanned, :skip_scan, :created_at
              )'
         );
+
+        jg_store_ops_astra_apply_deduction($pdo, array_values($requestedItems), $now);
 
         foreach ($requestedItems as $requestedItem) {
             $selectSku->execute([':sku' => $requestedItem['sku']]);
@@ -584,15 +585,8 @@ function jg_store_ops_walkins_complete_sale(PDO $pdo, array $payload, string $cr
             $grossLineTotal = round($unitPrice * $quantity, 2);
             $lineDiscount = round($grossLineTotal * ($discountRate / 100), 2);
             $lineTotal = round(max(0, $grossLineTotal - $lineDiscount), 2);
-            $currentStock = max(0, (int) ($row['current_stock'] ?? 0) - $quantity);
             $skipScan = (int) ($row['skip_scan'] ?? 0) === 1;
             $name = jg_store_ops_walkins_display_name($row);
-
-            $updateStock->execute([
-                ':current_stock' => $currentStock,
-                ':updated_at' => $now,
-                ':sku' => (string) $row['sku'],
-            ]);
 
             $subtotal += $grossLineTotal;
             $discountTotal += $lineDiscount;
