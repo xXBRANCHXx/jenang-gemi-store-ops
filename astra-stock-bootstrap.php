@@ -221,16 +221,25 @@ function jg_store_ops_astra_lock_suffix(PDO $pdo): string
 }
 
 /**
- * Apply an ASTRA plan inside the caller's transaction and synchronize every
- * linked selling SKU from the authoritative base-stock row.
+ * Apply an ASTRA stock movement inside the caller's transaction and synchronize
+ * every linked selling SKU from the authoritative base-stock row.
  *
  * @param array<int,array<string,mixed>> $items
  * @return array<int,array<string,mixed>>
  */
-function jg_store_ops_astra_apply_deduction(PDO $pdo, array $items, string $now): array
+function jg_store_ops_astra_apply_movement(
+    PDO $pdo,
+    array $items,
+    string $direction,
+    string $now
+): array
 {
     if (!$pdo->inTransaction()) {
-        throw new LogicException('ASTRA stock deduction requires an active transaction.');
+        throw new LogicException('ASTRA stock movement requires an active transaction.');
+    }
+    $direction = strtolower(trim($direction));
+    if (!in_array($direction, ['add', 'subtract'], true)) {
+        throw new InvalidArgumentException('ASTRA stock movement must add or subtract inventory.');
     }
 
     $rows = jg_store_ops_astra_rows($pdo);
@@ -253,9 +262,9 @@ function jg_store_ops_astra_apply_deduction(PDO $pdo, array $items, string $now)
             throw new RuntimeException(sprintf('%s is missing from the live stock catalog.', $stockSku));
         }
         $stockBefore = max(0, (int) ($row['current_stock'] ?? 0));
-        if ($required > $stockBefore) {
+        if ($direction === 'subtract' && $required > $stockBefore) {
             throw new RuntimeException(sprintf(
-                'Cannot fulfill this order: %s needs %d ASTRA base unit%s but only %d remain.',
+                'Cannot subtract stock: %s needs %d ASTRA base unit%s but only %d remain.',
                 $stockSku,
                 $required,
                 $required === 1 ? '' : 's',
@@ -264,7 +273,7 @@ function jg_store_ops_astra_apply_deduction(PDO $pdo, array $items, string $now)
         }
         $stockChanges[$stockSku] = [
             'stock_before' => $stockBefore,
-            'stock_after' => $stockBefore - $required,
+            'stock_after' => $direction === 'add' ? $stockBefore + $required : $stockBefore - $required,
             'base_quantity' => $required,
         ];
     }
@@ -303,11 +312,33 @@ function jg_store_ops_astra_apply_deduction(PDO $pdo, array $items, string $now)
 
     foreach ($plan as &$line) {
         $change = $stockChanges[$line['stock_sku']];
+        $ratio = max(1.0, (float) ($line['stock_ratio'] ?? 1.0));
+        $line['direction'] = $direction;
         $line['stock_before'] = $change['stock_before'];
         $line['stock_after'] = $change['stock_after'];
+        $line['selling_stock_before'] = jg_store_ops_astra_from_base_units($change['stock_before'], $ratio);
+        $line['selling_stock_after'] = jg_store_ops_astra_from_base_units($change['stock_after'], $ratio);
     }
     unset($line);
     return $plan;
+}
+
+/**
+ * @param array<int,array<string,mixed>> $items
+ * @return array<int,array<string,mixed>>
+ */
+function jg_store_ops_astra_apply_deduction(PDO $pdo, array $items, string $now): array
+{
+    return jg_store_ops_astra_apply_movement($pdo, $items, 'subtract', $now);
+}
+
+/**
+ * @param array<int,array<string,mixed>> $items
+ * @return array<int,array<string,mixed>>
+ */
+function jg_store_ops_astra_apply_addition(PDO $pdo, array $items, string $now): array
+{
+    return jg_store_ops_astra_apply_movement($pdo, $items, 'add', $now);
 }
 
 function jg_store_ops_order_stock_ensure_schema(PDO $pdo): void

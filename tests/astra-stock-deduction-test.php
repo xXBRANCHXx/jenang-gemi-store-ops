@@ -85,6 +85,15 @@ astra_deduction_expect(17, $stocks['BUBUR15'], 'Every requested sales channel mu
 astra_deduction_expect(8, $stocks['BUBUR30'], 'Derived Bubur 30 stock must remain half of base after all channels.');
 astra_deduction_expect(5, $stocks['BUBUR45'], 'Derived Bubur 45 stock must remain one third of base after all channels.');
 
+$pdo->beginTransaction();
+$addition = jg_store_ops_astra_apply_addition($pdo, [['sku' => 'BUBUR30', 'quantity' => 2]], '2026-07-30 02:00:00');
+$pdo->commit();
+astra_deduction_expect(4, $addition[0]['base_quantity'] ?? 0, 'Inventory receipts must convert selling quantities into ASTRA base units.');
+$stocks = astra_deduction_stocks($pdo);
+astra_deduction_expect(21, $stocks['BUBUR15'], 'Adding two Bubur 30 products must add four Bubur 15 base units.');
+astra_deduction_expect(10, $stocks['BUBUR30'], 'Derived stock must synchronize after an ASTRA inventory addition.');
+astra_deduction_expect(7, $stocks['BUBUR45'], 'Every linked size must synchronize after an ASTRA inventory addition.');
+
 $beforeFailure = astra_deduction_stocks($pdo);
 $shortageRejected = false;
 try {
@@ -92,7 +101,7 @@ try {
         'source_platform' => 'walk_in',
         'source_account' => 'pos',
         'order_id' => 'WI-SHORTAGE',
-    ], [['sku' => 'BUBUR30', 'quantity' => 9]]);
+    ], [['sku' => 'BUBUR30', 'quantity' => 11]]);
 } catch (RuntimeException $error) {
     $shortageRejected = str_contains($error->getMessage(), 'ASTRA base');
 }
@@ -128,6 +137,13 @@ astra_deduction_expect(
     true,
     str_contains($walkInSource, 'jg_store_ops_astra_apply_deduction($pdo, array_values($requestedItems), $now)'),
     'Walk-in completion must use the same ASTRA deduction engine.'
+);
+$transactionsSource = (string) file_get_contents(dirname(__DIR__) . '/transactions-bootstrap.php');
+astra_deduction_expect(
+    true,
+    str_contains($transactionsSource, 'jg_store_ops_astra_apply_addition($pdo, $inventoryItems, $now)')
+        && !str_contains($transactionsSource, 'SET current_stock = current_stock + :quantity'),
+    'Supplier invoice imports must add through ASTRA base stock instead of mutating a selling SKU directly.'
 );
 
 echo "astra-stock-deduction-test: ok\n";

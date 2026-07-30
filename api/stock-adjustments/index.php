@@ -74,7 +74,7 @@ try {
         'recent' => jg_store_ops_stock_adjustments_recent($pdo),
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     exit;
-} catch (InvalidArgumentException $exception) {
+} catch (InvalidArgumentException | RuntimeException $exception) {
     jg_store_ops_stock_adjustments_fail($exception->getMessage(), 422);
 } catch (Throwable $throwable) {
     error_log('Store Ops stock adjustment failed: ' . $throwable->getMessage());

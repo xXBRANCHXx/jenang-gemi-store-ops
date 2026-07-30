@@ -119,12 +119,17 @@
     history.innerHTML = rows.map((row) => {
       const isAdd = row.direction === 'add';
       const sign = isAdd ? '+' : '−';
+      const baseSku = String(row.base_sku || '');
+      const baseQuantity = Number(row.base_quantity || 0);
+      const baseNote = baseSku && (baseSku !== row.sku || baseQuantity !== Number(row.quantity || 0))
+        ? ` · ASTRA ${escapeHtml(baseSku)}: ${sign}${escapeHtml(baseQuantity)} (${escapeHtml(row.base_stock_before)} → ${escapeHtml(row.base_stock_after)})`
+        : '';
       return `
         <article class="admin-stock-history-row">
           <span class="admin-stock-history-mark ${isAdd ? 'is-add' : 'is-subtract'}">${sign}${escapeHtml(row.quantity)}</span>
           <div>
             <strong>${escapeHtml(row.name || row.sku)}</strong>
-            <span>${escapeHtml(row.sku)} · ${escapeHtml(row.created_by || 'Operator')} · ${escapeHtml(row.created_at || '')}</span>
+            <span>${escapeHtml(row.sku)} · ${escapeHtml(row.created_by || 'Operator')} · ${escapeHtml(row.created_at || '')}${baseNote}</span>
           </div>
           <em>${escapeHtml(row.stock_before)} → ${escapeHtml(row.stock_after)}</em>
         </article>
@@ -236,8 +241,14 @@
 
       const adjustment = payload.adjustment;
       const verb = direction === 'add' ? 'Added' : 'Subtracted';
+      const baseDetail = adjustment.base_sku && (
+        adjustment.base_sku !== product.sku
+        || Number(adjustment.base_quantity || 0) !== quantity
+      )
+        ? ` ASTRA base ${adjustment.base_sku} changed by ${adjustment.base_quantity} to ${adjustment.base_stock_after}.`
+        : '';
       clearPending({ keepMessage: true });
-      setSuccess(`${verb} ${unitCopy(quantity)} for ${product.name}. Stock is now ${adjustment.stock_after}.`);
+      setSuccess(`${verb} ${unitCopy(quantity)} for ${product.name}. Stock is now ${adjustment.stock_after}.${baseDetail}`);
       setStatus('Stock updated', 'Scan the next barcode when ready.');
       renderHistory(payload.recent);
     } catch (error) {

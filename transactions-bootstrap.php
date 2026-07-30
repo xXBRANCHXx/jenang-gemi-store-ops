@@ -503,7 +503,7 @@ function jg_store_ops_transactions_import_invoice(PDO $pdo, array $invoice, bool
             :raw_text_hash, :is_duplicate, :created_by, :created_at
         )'
     );
-    $updateSku = $pdo->prepare('UPDATE sku_skus SET current_stock = current_stock + :quantity, cogs = :cogs, updated_at = :updated_at WHERE sku = :sku');
+    $updateSkuCogs = $pdo->prepare('UPDATE sku_skus SET cogs = :cogs, updated_at = :updated_at WHERE sku = :sku');
     $history = $pdo->prepare(
         'INSERT INTO sku_cogs_history (sku, old_price, new_price, takes_place, recorded_at)
          VALUES (:sku, :old_price, :new_price, :takes_place, :recorded_at)'
@@ -512,6 +512,7 @@ function jg_store_ops_transactions_import_invoice(PDO $pdo, array $invoice, bool
 
     $inserted = 0;
     $inventoryUpdated = 0;
+    $inventoryItems = [];
     $pdo->beginTransaction();
     try {
         foreach ($invoice['items'] as $item) {
@@ -566,9 +567,15 @@ function jg_store_ops_transactions_import_invoice(PDO $pdo, array $invoice, bool
                 continue;
             }
 
-            $stockQuantityToAdd = (int) round($stockQuantity);
-            $updateSku->execute([
-                ':quantity' => $stockQuantityToAdd,
+            $sellingQuantity = (int) round((float) $quantity);
+            if ($sellingQuantity < 1) {
+                continue;
+            }
+            $inventoryItems[] = [
+                'sku' => $sku,
+                'quantity' => $sellingQuantity,
+            ];
+            $updateSkuCogs->execute([
                 ':cogs' => $cogs,
                 ':updated_at' => $now,
                 ':sku' => $sku,
@@ -584,6 +591,7 @@ function jg_store_ops_transactions_import_invoice(PDO $pdo, array $invoice, bool
         }
 
         if ($inventoryUpdated > 0) {
+            jg_store_ops_astra_apply_addition($pdo, $inventoryItems, $now);
             jg_store_ops_transactions_touch_sku_version($pdo, $now);
         }
 

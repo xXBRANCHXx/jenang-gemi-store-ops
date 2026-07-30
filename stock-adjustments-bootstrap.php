@@ -10,6 +10,29 @@ function jg_store_ops_stock_adjustments_now(): string
 
 function jg_store_ops_stock_adjustments_ensure_schema(PDO $pdo): void
 {
+    $driver = strtolower((string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME));
+    if ($driver === 'sqlite') {
+        $pdo->exec(
+            'CREATE TABLE IF NOT EXISTS store_ops_stock_adjustments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sku TEXT NOT NULL,
+                barcode TEXT NOT NULL DEFAULT "",
+                direction TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                stock_before INTEGER NOT NULL,
+                stock_after INTEGER NOT NULL,
+                base_sku TEXT NOT NULL DEFAULT "",
+                astra_ratio REAL NOT NULL DEFAULT 1,
+                base_quantity INTEGER NOT NULL DEFAULT 0,
+                base_stock_before INTEGER NOT NULL DEFAULT 0,
+                base_stock_after INTEGER NOT NULL DEFAULT 0,
+                created_by TEXT NOT NULL DEFAULT "",
+                created_at TEXT NOT NULL
+            )'
+        );
+        return;
+    }
+
     $pdo->exec(
         'CREATE TABLE IF NOT EXISTS store_ops_stock_adjustments (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -19,12 +42,22 @@ function jg_store_ops_stock_adjustments_ensure_schema(PDO $pdo): void
             quantity INT UNSIGNED NOT NULL,
             stock_before INT NOT NULL,
             stock_after INT NOT NULL,
+            base_sku VARCHAR(12) NOT NULL DEFAULT "",
+            astra_ratio DECIMAL(12,4) NOT NULL DEFAULT 1.0000,
+            base_quantity INT UNSIGNED NOT NULL DEFAULT 0,
+            base_stock_before INT NOT NULL DEFAULT 0,
+            base_stock_after INT NOT NULL DEFAULT 0,
             created_by VARCHAR(160) NOT NULL DEFAULT "",
             created_at DATETIME NOT NULL,
             KEY idx_stock_adjustments_sku_created (sku, created_at),
             KEY idx_stock_adjustments_created (created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
+    jg_store_ops_sku_ensure_column($pdo, 'store_ops_stock_adjustments', 'base_sku', 'VARCHAR(12) NOT NULL DEFAULT "" AFTER stock_after');
+    jg_store_ops_sku_ensure_column($pdo, 'store_ops_stock_adjustments', 'astra_ratio', 'DECIMAL(12,4) NOT NULL DEFAULT 1.0000 AFTER base_sku');
+    jg_store_ops_sku_ensure_column($pdo, 'store_ops_stock_adjustments', 'base_quantity', 'INT UNSIGNED NOT NULL DEFAULT 0 AFTER astra_ratio');
+    jg_store_ops_sku_ensure_column($pdo, 'store_ops_stock_adjustments', 'base_stock_before', 'INT NOT NULL DEFAULT 0 AFTER base_quantity');
+    jg_store_ops_sku_ensure_column($pdo, 'store_ops_stock_adjustments', 'base_stock_after', 'INT NOT NULL DEFAULT 0 AFTER base_stock_before');
 }
 
 function jg_store_ops_stock_adjustments_normalize_code(mixed $value): string
@@ -189,41 +222,32 @@ function jg_store_ops_stock_adjustments_apply(
 
     $pdo->beginTransaction();
     try {
-        $product = jg_store_ops_stock_adjustments_find_product($pdo, $barcode, true);
+        $product = jg_store_ops_stock_adjustments_find_product($pdo, $barcode);
         if ($product === null) {
             throw new InvalidArgumentException('This barcode is not in the SKU catalog.');
         }
 
-        $stockBefore = (int) $product['current_stock'];
-        if ($direction === 'subtract' && $quantity > $stockBefore) {
-            throw new InvalidArgumentException(sprintf(
-                'Cannot subtract %d. Only %d unit%s are currently in stock.',
-                $quantity,
-                $stockBefore,
-                $stockBefore === 1 ? '' : 's'
-            ));
-        }
-
-        $delta = $direction === 'add' ? $quantity : -$quantity;
-        $stockAfter = $stockBefore + $delta;
         $now = jg_store_ops_stock_adjustments_now();
-
-        $update = $pdo->prepare(
-            'UPDATE sku_skus
-             SET current_stock = :stock_after, updated_at = :updated_at
-             WHERE sku = :sku'
-        );
-        $update->execute([
-            ':stock_after' => $stockAfter,
-            ':updated_at' => $now,
-            ':sku' => $product['sku'],
-        ]);
+        $movement = jg_store_ops_astra_apply_movement($pdo, [[
+            'sku' => (string) $product['sku'],
+            'quantity' => $quantity,
+        ]], $direction, $now);
+        $line = $movement[0] ?? null;
+        if (!is_array($line)) {
+            throw new RuntimeException('The stock adjustment could not be resolved to ASTRA base stock.');
+        }
+        $stockBefore = (int) ($line['selling_stock_before'] ?? $product['current_stock']);
+        $stockAfter = (int) ($line['selling_stock_after'] ?? $stockBefore);
 
         $insert = $pdo->prepare(
             'INSERT INTO store_ops_stock_adjustments (
-                sku, barcode, direction, quantity, stock_before, stock_after, created_by, created_at
+                sku, barcode, direction, quantity, stock_before, stock_after,
+                base_sku, astra_ratio, base_quantity, base_stock_before, base_stock_after,
+                created_by, created_at
              ) VALUES (
-                :sku, :barcode, :direction, :quantity, :stock_before, :stock_after, :created_by, :created_at
+                :sku, :barcode, :direction, :quantity, :stock_before, :stock_after,
+                :base_sku, :astra_ratio, :base_quantity, :base_stock_before, :base_stock_after,
+                :created_by, :created_at
              )'
         );
         $insert->execute([
@@ -233,12 +257,15 @@ function jg_store_ops_stock_adjustments_apply(
             ':quantity' => $quantity,
             ':stock_before' => $stockBefore,
             ':stock_after' => $stockAfter,
+            ':base_sku' => (string) ($line['stock_sku'] ?? $product['sku']),
+            ':astra_ratio' => number_format((float) ($line['stock_ratio'] ?? 1), 4, '.', ''),
+            ':base_quantity' => (int) ($line['base_quantity'] ?? $quantity),
+            ':base_stock_before' => (int) ($line['stock_before'] ?? $stockBefore),
+            ':base_stock_after' => (int) ($line['stock_after'] ?? $stockAfter),
             ':created_by' => substr(trim($createdBy), 0, 160),
             ':created_at' => $now,
         ]);
 
-        $meta = $pdo->prepare('UPDATE sku_meta SET updated_at = :updated_at WHERE meta_key = "version"');
-        $meta->execute([':updated_at' => $now]);
         $pdo->commit();
 
         $product['current_stock'] = $stockAfter;
@@ -248,6 +275,11 @@ function jg_store_ops_stock_adjustments_apply(
             'quantity' => $quantity,
             'stock_before' => $stockBefore,
             'stock_after' => $stockAfter,
+            'base_sku' => (string) ($line['stock_sku'] ?? $product['sku']),
+            'astra_ratio' => (float) ($line['stock_ratio'] ?? 1),
+            'base_quantity' => (int) ($line['base_quantity'] ?? $quantity),
+            'base_stock_before' => (int) ($line['stock_before'] ?? $stockBefore),
+            'base_stock_after' => (int) ($line['stock_after'] ?? $stockAfter),
             'created_by' => substr(trim($createdBy), 0, 160),
             'created_at' => $now,
             'product' => $product,
@@ -276,6 +308,11 @@ function jg_store_ops_stock_adjustments_recent(PDO $pdo, int $limit = 12): array
             a.quantity,
             a.stock_before,
             a.stock_after,
+            a.base_sku,
+            a.astra_ratio,
+            a.base_quantity,
+            a.base_stock_before,
+            a.base_stock_after,
             a.created_by,
             a.created_at,
             s.tag,
@@ -305,6 +342,11 @@ function jg_store_ops_stock_adjustments_recent(PDO $pdo, int $limit = 12): array
             'quantity' => (int) ($row['quantity'] ?? 0),
             'stock_before' => (int) ($row['stock_before'] ?? 0),
             'stock_after' => (int) ($row['stock_after'] ?? 0),
+            'base_sku' => (string) ($row['base_sku'] ?? ''),
+            'astra_ratio' => (float) ($row['astra_ratio'] ?? 1),
+            'base_quantity' => (int) ($row['base_quantity'] ?? 0),
+            'base_stock_before' => (int) ($row['base_stock_before'] ?? 0),
+            'base_stock_after' => (int) ($row['base_stock_after'] ?? 0),
             'created_by' => (string) ($row['created_by'] ?? ''),
             'created_at' => (string) ($row['created_at'] ?? ''),
         ];
