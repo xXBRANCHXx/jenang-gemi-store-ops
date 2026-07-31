@@ -10043,3 +10043,157 @@ button.admin-store-sidebar-profile:hover {
     padding: 16px 18px;
   }
 }
+
+/* Flat receiving ledger */
+.admin-po-receiving {
+  gap: 0;
+}
+
+.admin-po-receiving-toolbar {
+  padding: 0 0 12px;
+  border: 0;
+  border-bottom: 1px solid var(--admin-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.admin-po-filter-tabs,
+.admin-po-toolbar-status {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.admin-po-receiving-toolbar button {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+}
+
+.admin-po-receiving-toolbar button:hover,
+.admin-po-receiving-toolbar button.is-active {
+  border-color: var(--admin-text);
+  background: transparent;
+  color: var(--admin-text);
+}
+
+.admin-po-receiving-toolbar > .admin-po-toolbar-status > button:last-child {
+  padding: 0 2px;
+  border: 0;
+  color: var(--admin-muted);
+}
+
+.admin-po-toolbar-status span {
+  color: var(--admin-muted);
+  font-size: 0.68rem;
+  font-weight: 680;
+  white-space: nowrap;
+}
+
+.admin-po-toolbar-status b {
+  color: var(--admin-text);
+  font: 800 0.78rem/1 "Space Grotesk", sans-serif;
+}
+
+.admin-po-instruction {
+  margin: 0;
+  padding: 12px 0 20px;
+  color: var(--admin-muted);
+  font-size: 0.68rem;
+  font-weight: 650;
+}
+
+.admin-po-feedback {
+  margin: 0 0 18px;
+  padding: 10px 0;
+  border-width: 1px 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.admin-po-order-list {
+  gap: 0;
+}
+
+.admin-po-empty {
+  display: block;
+  min-height: 0;
+  padding: 26px 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--admin-muted);
+  text-align: left;
+}
+
+.admin-po-receive-card,
+.admin-po-receive-card[open] {
+  overflow: visible;
+  border: 0;
+  border-bottom: 1px solid var(--admin-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.admin-po-receive-card + .admin-po-receive-card {
+  margin-top: 22px;
+}
+
+.admin-po-receive-card summary {
+  min-height: 94px;
+  padding: 18px 0;
+}
+
+.admin-po-summary-id > span {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--admin-muted);
+}
+
+.is-received .admin-po-summary-id > span {
+  background: transparent;
+}
+
+.admin-po-receive-card form {
+  border-top: 1px solid var(--admin-border);
+}
+
+.admin-po-order-note {
+  padding: 12px 0;
+  background: transparent;
+}
+
+.admin-po-receive-line {
+  padding: 14px 0;
+}
+
+.admin-po-receive-line:hover {
+  background: transparent;
+}
+
+.admin-po-receive-card footer {
+  padding: 17px 0;
+  background: transparent;
+}
+
+@media (max-width: 640px) {
+  .admin-po-receiving-toolbar {
+    gap: 8px;
+  }
+
+  .admin-po-toolbar-status {
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .admin-po-receive-card summary,
+  .admin-po-receive-line,
+  .admin-po-receive-card footer {
+    padding-right: 0;
+    padding-left: 0;
+  }
+}

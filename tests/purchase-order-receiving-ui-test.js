@@ -6,11 +6,13 @@ const root = path.resolve(__dirname, '..');
 const page = fs.readFileSync(path.join(root, 'inventory/index.php'), 'utf8');
 const script = fs.readFileSync(path.join(root, 'transactions.js'), 'utf8');
 const api = fs.readFileSync(path.join(root, 'api/transactions/index.php'), 'utf8');
+const styles = fs.readFileSync(path.join(root, 'admin.css'), 'utf8');
 
 assert.match(page, /Production Receiving/);
-assert.match(page, /Check what arrived\.[\s\S]*Stock updates when you confirm/);
-assert.match(page, /data-po-filter="open"[\s\S]*data-po-order-list/);
+assert.match(page, /data-po-filter="open"[\s\S]*data-po-open[\s\S]*data-po-incoming[\s\S]*data-po-order-list/);
 assert.doesNotMatch(page, /data-invoice-upload-form|Upload supplier invoices/);
+assert.doesNotMatch(page, /admin-po-receiving-hero|admin-po-metrics|admin-metric-card/);
+assert.match(styles, /\/\* Flat receiving ledger \*\/[\s\S]*\.admin-po-receive-card,[\s\S]*border-radius: 0;[\s\S]*box-shadow: none;/);
 
 assert.match(script, /data-po-item-check/);
 assert.match(script, /data-po-item-quantity/);

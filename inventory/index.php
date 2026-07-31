@@ -43,37 +43,19 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
     ?>
 
         <main class="admin-layout admin-po-receiving">
-            <section class="admin-po-receiving-hero">
-                <div>
-                    <span class="admin-chip admin-chip-accent">Production delivery</span>
-                    <h2>Check what arrived.<br>Stock updates when you confirm.</h2>
-                    <p>Every purchase order placed by Executive appears here. Check delivered lines, adjust a quantity only for a partial delivery, then confirm receipt.</p>
-                </div>
-                <div class="admin-po-receiving-guide">
-                    <span>Simple receiving flow</span>
-                    <ol>
-                        <li><b>1</b> Open the PO that arrived</li>
-                        <li><b>2</b> Check each delivered item</li>
-                        <li><b>3</b> Confirm to add stock</li>
-                    </ol>
-                </div>
-            </section>
-
-            <section class="admin-metric-grid admin-po-metrics">
-                <article class="admin-metric-card"><span>Open POs</span><strong data-po-open>0</strong><small>Waiting or partially received</small></article>
-                <article class="admin-metric-card"><span>Incoming Units</span><strong data-po-incoming>0</strong><small>Not yet added to stock</small></article>
-                <article class="admin-metric-card"><span>Units Received</span><strong data-po-received>0</strong><small>Added through this workflow</small></article>
-                <article class="admin-metric-card"><span>Completed POs</span><strong data-po-completed>0</strong><small>Received in full</small></article>
-            </section>
-
             <section class="admin-po-receiving-toolbar">
-                <div>
+                <div class="admin-po-filter-tabs">
                     <button type="button" class="is-active" data-po-filter="open">Ready to receive</button>
-                    <button type="button" data-po-filter="all">All purchase orders</button>
+                    <button type="button" data-po-filter="all">All orders</button>
                     <button type="button" data-po-filter="received">Completed</button>
                 </div>
-                <button type="button" data-po-refresh>Refresh orders</button>
+                <div class="admin-po-toolbar-status">
+                    <span><b data-po-open>0</b> open</span>
+                    <span><b data-po-incoming>0</b> units incoming</span>
+                    <button type="button" data-po-refresh>Refresh</button>
+                </div>
             </section>
+            <p class="admin-po-instruction">Check delivered lines below. Change “Receive now” only when the delivery is partial.</p>
 
             <p class="admin-form-error" data-po-error hidden></p>
             <p class="admin-po-feedback" data-po-feedback hidden></p>

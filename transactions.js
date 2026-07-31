@@ -117,9 +117,9 @@
     if (!orders.length) {
       orderList.innerHTML = `
         <div class="admin-po-empty">
-          <span aria-hidden="true">✓</span>
-          <strong>${state.filter === 'open' ? 'Nothing waiting to be received' : 'No purchase orders in this view'}</strong>
-          <small>${state.filter === 'open' ? 'New orders placed by Executive will appear here automatically.' : 'Choose another filter to see more orders.'}</small>
+          ${state.filter === 'open'
+            ? 'Nothing waiting to be received. New Executive orders will appear here automatically.'
+            : 'No purchase orders in this view.'}
         </div>
       `;
       return;
