@@ -31,10 +31,10 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
     jg_store_ops_shell_open([
         'root_prefix' => '../',
         'active' => 'inventory',
-        'title' => 'Inventory Tracking',
+        'title' => 'Production Receiving',
         'eyebrow' => 'Store Ops',
-        'description' => 'Stock and COGS move through supplier invoice rows mapped to SKUs and PO numbers.',
-        'indicator' => 'Inventory',
+        'description' => 'Confirm delivered purchase-order lines. Checked quantities enter inventory immediately.',
+        'indicator' => 'Live receiving',
         'app_attributes' => [
             'data-transactions' => true,
             'data-transactions-endpoint' => '../api/transactions/',
@@ -42,95 +42,44 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
     ]);
     ?>
 
-        <main class="admin-layout">
-            <section class="admin-hero-panel">
-                <div class="admin-hero-copy">
-                    <span class="admin-chip admin-chip-accent">PO Based COGS</span>
-                    <h2>Upload supplier invoices, preview the SKU map, then update inventory from invoice rows.</h2>
-                    <p>The system records invoice number, PO number, item tag, quantity, line total, SKU, and COGS per unit in <code>Transaction_Table</code>.</p>
+        <main class="admin-layout admin-po-receiving">
+            <section class="admin-po-receiving-hero">
+                <div>
+                    <span class="admin-chip admin-chip-accent">Production delivery</span>
+                    <h2>Check what arrived.<br>Stock updates when you confirm.</h2>
+                    <p>Every purchase order placed by Executive appears here. Check delivered lines, adjust a quantity only for a partial delivery, then confirm receipt.</p>
                 </div>
-                <form class="admin-invoice-upload" data-invoice-upload-form enctype="multipart/form-data">
-                    <label class="admin-invoice-dropzone" data-invoice-dropzone>
-                        <input class="admin-file-input" type="file" name="invoice_pdf" accept="application/pdf,.pdf" required>
-                        <span class="admin-invoice-dropzone-kicker">Upload Invoice</span>
-                        <strong>Drop invoice PDF here</strong>
-                        <small>or click this area to choose a PDF from your files.</small>
-                    </label>
-                    <p class="admin-table-note" data-invoice-file-name hidden></p>
-                    <p class="admin-table-note" data-invoice-upload-status hidden></p>
-                    <p class="admin-form-error" data-invoice-upload-error hidden></p>
-                </form>
-            </section>
-
-            <section class="admin-metric-grid">
-                <article class="admin-metric-card"><span>Invoice Rows</span><strong data-transaction-count>0</strong><small>Imported invoice item rows</small></article>
-                <article class="admin-metric-card"><span>Invoices</span><strong data-invoice-count>0</strong><small>Unique invoice numbers</small></article>
-                <article class="admin-metric-card"><span>POs</span><strong data-po-count>0</strong><small>Unique PO references</small></article>
-                <article class="admin-metric-card"><span>Low Stock</span><strong data-low-stock-count>0</strong><small>Rows at or below trigger</small></article>
-            </section>
-
-            <section class="admin-panel admin-panel-wide" data-invoice-preview hidden>
-                <div class="admin-panel-head">
-                    <div>
-                        <span class="admin-panel-kicker">Invoice Preview</span>
-                        <h3>Review extracted rows before import</h3>
-                    </div>
-                    <div class="admin-invoice-meta" data-invoice-preview-meta></div>
-                </div>
-                <p class="admin-form-error" data-duplicate-warning hidden></p>
-                <div class="admin-table-wrap admin-sheet-wrap">
-                    <table class="admin-table admin-sheet-table">
-                        <thead>
-                            <tr>
-                                <th>SKU</th>
-                                <th>Item Tag</th>
-                                <th>QTY</th>
-                                <th>Line Total</th>
-                                <th>COGS</th>
-                                <th>Match</th>
-                            </tr>
-                        </thead>
-                        <tbody data-invoice-preview-body></tbody>
-                    </table>
-                </div>
-                <div class="admin-bottom-actions">
-                    <label class="admin-checkbox-line" hidden>
-                        <input type="checkbox" data-allow-duplicate>
-                        <span>Allow duplicate test import for this invoice number</span>
-                    </label>
-                    <button type="button" class="admin-primary-btn" data-import-invoice disabled>Import Invoice Rows</button>
+                <div class="admin-po-receiving-guide">
+                    <span>Simple receiving flow</span>
+                    <ol>
+                        <li><b>1</b> Open the PO that arrived</li>
+                        <li><b>2</b> Check each delivered item</li>
+                        <li><b>3</b> Confirm to add stock</li>
+                    </ol>
                 </div>
             </section>
 
-            <section class="admin-panel admin-panel-wide">
-                <div class="admin-panel-head">
-                    <div>
-                        <span class="admin-panel-kicker">Inventory Sheet</span>
-                        <h3>Live SKU stock and current COGS</h3>
-                    </div>
-                    <span class="admin-panel-meta">Latest PO comes from the most recent transaction row for each SKU</span>
+            <section class="admin-metric-grid admin-po-metrics">
+                <article class="admin-metric-card"><span>Open POs</span><strong data-po-open>0</strong><small>Waiting or partially received</small></article>
+                <article class="admin-metric-card"><span>Incoming Units</span><strong data-po-incoming>0</strong><small>Not yet added to stock</small></article>
+                <article class="admin-metric-card"><span>Units Received</span><strong data-po-received>0</strong><small>Added through this workflow</small></article>
+                <article class="admin-metric-card"><span>Completed POs</span><strong data-po-completed>0</strong><small>Received in full</small></article>
+            </section>
+
+            <section class="admin-po-receiving-toolbar">
+                <div>
+                    <button type="button" class="is-active" data-po-filter="open">Ready to receive</button>
+                    <button type="button" data-po-filter="all">All purchase orders</button>
+                    <button type="button" data-po-filter="received">Completed</button>
                 </div>
-                <div class="admin-table-wrap admin-sheet-wrap">
-                    <table class="admin-table admin-sheet-table">
-                        <thead>
-                            <tr>
-                                <th>SKU</th>
-                                <th>TAG</th>
-                                <th>Product</th>
-                                <th>Flavor</th>
-                                <th>ASTRA</th>
-                                <th>Stock</th>
-                                <th>Trigger</th>
-                                <th>Status</th>
-                                <th>COGS</th>
-                                <th>Latest PO</th>
-                            </tr>
-                        </thead>
-                        <tbody data-inventory-table-body>
-                            <tr><td colspan="10" class="admin-empty">Loading inventory...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+                <button type="button" data-po-refresh>Refresh orders</button>
+            </section>
+
+            <p class="admin-form-error" data-po-error hidden></p>
+            <p class="admin-po-feedback" data-po-feedback hidden></p>
+
+            <section class="admin-po-order-list" data-po-order-list aria-live="polite">
+                <div class="admin-po-empty">Loading purchase orders from Executive.</div>
             </section>
         </main>
     <?php jg_store_ops_shell_close(); ?>

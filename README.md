@@ -30,6 +30,9 @@ Operational backend for `store.jenanggemi.com`.
 - `/sku-db/`
 - `/sku-db/new/`
 - `/inventory/`
+- `/inventory/` is the production-receiving queue for Executive purchase orders.
+  Checked full or partial line quantities are recorded as receipts and added
+  through the ASTRA-aware stock engine in one database transaction.
 - `/walk-ins/`
 - `/whatsapp-orders/`
 - `/order-records/`

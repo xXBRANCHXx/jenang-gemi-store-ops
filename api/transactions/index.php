@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/auth-runtime.php';
 require_once dirname(__DIR__, 2) . '/transactions-bootstrap.php';
+require_once dirname(__DIR__, 2) . '/purchase-orders-bootstrap.php';
 
 jg_admin_require_auth_json();
 header('Content-Type: application/json; charset=utf-8');
@@ -62,10 +63,13 @@ function jg_store_ops_transactions_get_preview(string $token): array
 
 function jg_store_ops_transactions_response(PDO $pdo): void
 {
+    $purchaseOrders = jg_store_ops_purchase_orders_fetch($pdo);
     echo json_encode([
         'metrics' => jg_store_ops_transactions_metrics($pdo),
         'inventory' => jg_store_ops_transactions_fetch_inventory($pdo),
         'transactions' => jg_store_ops_transactions_fetch_recent($pdo),
+        'purchase_orders' => $purchaseOrders,
+        'purchase_order_metrics' => jg_store_ops_purchase_orders_metrics($purchaseOrders),
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 }
 
@@ -100,6 +104,21 @@ if (!$isMultipart) {
 }
 
 try {
+    if ($action === 'receive_purchase_order') {
+        $orderId = (int) ($payload['order_id'] ?? 0);
+        $items = is_array($payload['items'] ?? null) ? $payload['items'] : [];
+        $receivedBy = function_exists('jg_admin_current_employee_name') ? jg_admin_current_employee_name() : 'Store Ops';
+        $receivedOrder = jg_store_ops_purchase_orders_receive($pdo, $orderId, $items, $receivedBy);
+        $purchaseOrders = jg_store_ops_purchase_orders_fetch($pdo);
+        echo json_encode([
+            'received_order' => $receivedOrder,
+            'message' => sprintf('%s stock was updated.', (string) ($receivedOrder['po_number'] ?? 'Purchase order')),
+            'purchase_orders' => $purchaseOrders,
+            'purchase_order_metrics' => jg_store_ops_purchase_orders_metrics($purchaseOrders),
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
     if ($action === 'preview_invoice') {
         $upload = $_FILES['invoice_pdf'] ?? null;
         if (!is_array($upload) || (int) ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
@@ -157,7 +176,7 @@ try {
     }
 
     jg_store_ops_transactions_fail('Unknown action.', 400);
-} catch (RuntimeException $exception) {
+} catch (InvalidArgumentException | RuntimeException $exception) {
     jg_store_ops_transactions_fail($exception->getMessage(), 422);
 } catch (Throwable $throwable) {
     jg_store_ops_transactions_fail('Transaction operation failed.', 500);

@@ -3,24 +3,17 @@
   if (!root) return;
 
   const endpoint = root.dataset.transactionsEndpoint || '../api/transactions/';
-  const uploadForm = document.querySelector('[data-invoice-upload-form]');
-  const invoiceFileInput = uploadForm?.querySelector('input[type="file"]');
-  const dropzone = document.querySelector('[data-invoice-dropzone]');
-  const fileNameNode = document.querySelector('[data-invoice-file-name]');
-  const uploadError = document.querySelector('[data-invoice-upload-error]');
-  const uploadStatus = document.querySelector('[data-invoice-upload-status]');
-  const previewPanel = document.querySelector('[data-invoice-preview]');
-  const previewMeta = document.querySelector('[data-invoice-preview-meta]');
-  const previewBody = document.querySelector('[data-invoice-preview-body]');
-  const duplicateWarning = document.querySelector('[data-duplicate-warning]');
-  const allowDuplicate = document.querySelector('[data-allow-duplicate]');
-  const importButton = document.querySelector('[data-import-invoice]');
-  const inventoryBody = document.querySelector('[data-inventory-table-body]');
-  const transactionsBody = document.querySelector('[data-transactions-table-body]');
-
+  const orderList = document.querySelector('[data-po-order-list]');
+  const errorNode = document.querySelector('[data-po-error]');
+  const feedbackNode = document.querySelector('[data-po-feedback]');
+  const refreshButton = document.querySelector('[data-po-refresh]');
+  const filterButtons = Array.from(document.querySelectorAll('[data-po-filter]'));
   const state = {
-    previewToken: '',
-    duplicateCount: 0
+    orders: [],
+    metrics: {},
+    filter: 'open',
+    loading: false,
+    receivingOrderId: 0
   };
 
   const escapeHtml = (value) => String(value ?? '')
@@ -30,10 +23,13 @@
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
 
-  const formatRp = (value) => {
-    const amount = Number(value || 0);
-    return `Rp ${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(amount)}`;
-  };
+  const formatInteger = (value) => new Intl.NumberFormat('id-ID', {
+    maximumFractionDigits: 0
+  }).format(Number(value || 0));
+
+  const formatRp = (value) => `Rp${new Intl.NumberFormat('id-ID', {
+    maximumFractionDigits: 0
+  }).format(Number(value || 0))}`;
 
   const setMessage = (node, message) => {
     if (!(node instanceof HTMLElement)) return;
@@ -44,233 +40,229 @@
   const requestJson = async (options = {}) => {
     const response = await fetch(endpoint, {
       credentials: 'same-origin',
+      cache: 'no-store',
       headers: {
         Accept: 'application/json',
-        ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {})
+        ...(options.body ? { 'Content-Type': 'application/json' } : {})
       },
       ...options
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    if (!response.ok) throw new Error(payload.error || payload.message || `HTTP ${response.status}`);
     return payload;
   };
 
-  const renderMetrics = (metrics = {}) => {
-    const bindings = {
-      transaction_count: document.querySelector('[data-transaction-count]'),
-      invoice_count: document.querySelector('[data-invoice-count]'),
-      po_count: document.querySelector('[data-po-count]'),
-      low_stock_count: document.querySelector('[data-low-stock-count]')
-    };
+  const statusLabel = (status) => ({
+    pending: 'Ready to receive',
+    partially_received: 'Partially received',
+    received: 'Received in full'
+  }[String(status || '')] || 'Ready to receive');
 
+  const renderMetrics = () => {
+    const bindings = {
+      open_orders: document.querySelector('[data-po-open]'),
+      incoming_units: document.querySelector('[data-po-incoming]'),
+      received_units: document.querySelector('[data-po-received]'),
+      completed_orders: document.querySelector('[data-po-completed]')
+    };
     Object.entries(bindings).forEach(([key, node]) => {
-      if (node) node.textContent = String(metrics[key] ?? 0);
+      if (node) node.textContent = formatInteger(state.metrics[key] || 0);
     });
   };
 
-  const renderInventory = (rows = []) => {
-    if (!inventoryBody) return;
-    if (!rows.length) {
-      inventoryBody.innerHTML = '<tr><td colspan="10" class="admin-empty">No live SKUs found.</td></tr>';
+  const filteredOrders = () => state.orders.filter((order) => {
+    const status = String(order.status || '');
+    if (state.filter === 'open') return status === 'pending' || status === 'partially_received';
+    if (state.filter === 'received') return status === 'received';
+    return true;
+  });
+
+  const renderOrderItem = (item, complete) => {
+    const remaining = Math.max(0, Number(item.remaining_qty || 0));
+    const received = Math.max(0, Number(item.received_qty || 0));
+    const ordered = Math.max(0, Number(item.ordered_qty || 0));
+    const lineComplete = remaining === 0;
+    return `
+      <label class="admin-po-receive-line ${lineComplete ? 'is-received' : ''}">
+        <span class="admin-po-line-check">
+          <input type="checkbox" data-po-item-check="${Number(item.id || 0)}" ${lineComplete || complete ? 'checked disabled' : ''}>
+          <i aria-hidden="true"></i>
+        </span>
+        <span class="admin-po-line-product">
+          <strong>${escapeHtml(item.product_name || item.sku)}</strong>
+          <small>${escapeHtml(item.sku)} · MOQ ${formatInteger(item.moq || 1)}${item.line_note ? ` · ${escapeHtml(item.line_note)}` : ''}</small>
+        </span>
+        <span class="admin-po-line-progress">
+          <b>${formatInteger(received)} / ${formatInteger(ordered)}</b>
+          <small>${lineComplete ? 'Added to stock' : `${formatInteger(remaining)} remaining`}</small>
+        </span>
+        ${lineComplete || complete ? `
+          <span class="admin-po-line-done">Stocked ✓</span>
+        ` : `
+          <span class="admin-po-line-quantity">
+            <small>Receive now</small>
+            <input type="number" min="1" max="${remaining}" step="1" value="${remaining}" data-po-item-quantity="${Number(item.id || 0)}" aria-label="Quantity received for ${escapeHtml(item.product_name || item.sku)}">
+          </span>
+        `}
+      </label>
+    `;
+  };
+
+  const renderOrders = () => {
+    if (!orderList) return;
+    filterButtons.forEach((button) => {
+      button.classList.toggle('is-active', button.dataset.poFilter === state.filter);
+    });
+    const orders = filteredOrders();
+    if (!orders.length) {
+      orderList.innerHTML = `
+        <div class="admin-po-empty">
+          <span aria-hidden="true">✓</span>
+          <strong>${state.filter === 'open' ? 'Nothing waiting to be received' : 'No purchase orders in this view'}</strong>
+          <small>${state.filter === 'open' ? 'New orders placed by Executive will appear here automatically.' : 'Choose another filter to see more orders.'}</small>
+        </div>
+      `;
       return;
     }
 
-    inventoryBody.innerHTML = rows.map((row) => {
-      const isLow = Number(row.current_stock || 0) <= Number(row.stock_trigger || 0);
+    orderList.innerHTML = orders.map((order) => {
+      const complete = String(order.status || '') === 'received';
+      const progress = Math.max(0, Math.min(100, Number(order.progress_percent || 0)));
+      const busy = state.receivingOrderId === Number(order.id);
+      const remainingLines = (order.items || []).filter((item) => Number(item.remaining_qty || 0) > 0).length;
       return `
-        <tr>
-          <td><strong>${escapeHtml(row.sku)}</strong></td>
-          <td>${escapeHtml(row.tag)}</td>
-          <td>${escapeHtml(row.product_name)}</td>
-          <td>${escapeHtml(row.flavor_name)}</td>
-          <td>${escapeHtml(row.astra || row.volume || '')}</td>
-          <td>${escapeHtml(row.current_stock)}</td>
-          <td>${escapeHtml(row.stock_trigger)}</td>
-          <td>${isLow ? '<span class="admin-status-badge admin-status-badge-danger">Low</span>' : '<span class="admin-status-badge">OK</span>'}</td>
-          <td>${formatRp(row.cogs)}</td>
-          <td>${escapeHtml(row.latest_po_number || 'No PO yet')}</td>
-        </tr>
+        <details class="admin-po-receive-card is-${escapeHtml(order.status || 'pending')}" ${complete ? '' : 'open'}>
+          <summary>
+            <div class="admin-po-summary-id">
+              <span>${escapeHtml(statusLabel(order.status))}</span>
+              <strong>${escapeHtml(order.po_number || 'Purchase order')}</strong>
+              <small>${escapeHtml(String(order.placed_at || '').slice(0, 16))} · ${formatInteger(order.line_count || 0)} product lines</small>
+            </div>
+            <div class="admin-po-summary-progress">
+              <span><b>${formatInteger(order.received_qty || 0)}</b> of ${formatInteger(order.ordered_qty || 0)} units stocked</span>
+              <div><i style="width:${progress}%"></i></div>
+            </div>
+            <strong class="admin-po-summary-percent">${formatInteger(progress)}%</strong>
+          </summary>
+          <form data-po-receive-form="${Number(order.id || 0)}">
+            ${order.note ? `<p class="admin-po-order-note"><b>Executive note</b>${escapeHtml(order.note)}</p>` : ''}
+            <div class="admin-po-receive-lines">
+              ${(order.items || []).map((item) => renderOrderItem(item, complete)).join('')}
+            </div>
+            <footer>
+              <div>
+                <span>${complete ? 'Delivery complete' : `${formatInteger(order.remaining_qty || 0)} units still expected`}</span>
+                <small>Estimated PO value ${formatRp(order.estimated_total || 0)}</small>
+              </div>
+              ${complete ? `
+                <span class="admin-po-complete-stamp">Completed ${escapeHtml(String(order.completed_at || '').slice(0, 16))}</span>
+              ` : `
+                <button type="submit" disabled ${busy ? 'aria-busy="true"' : ''}>
+                  ${busy ? 'Updating stock…' : `Confirm selected items (${remainingLines})`}
+                </button>
+              `}
+            </footer>
+          </form>
+        </details>
       `;
     }).join('');
   };
 
-  const renderTransactions = (rows = []) => {
-    if (!transactionsBody) return;
-    if (!rows.length) {
-      transactionsBody.innerHTML = '<tr><td colspan="9" class="admin-empty">No invoice transactions imported yet.</td></tr>';
-      return;
+  const applyPayload = (payload) => {
+    if (Array.isArray(payload.purchase_orders)) state.orders = payload.purchase_orders;
+    if (payload.purchase_order_metrics && typeof payload.purchase_order_metrics === 'object') {
+      state.metrics = payload.purchase_order_metrics;
     }
-
-    transactionsBody.innerHTML = rows.map((row) => `
-      <tr>
-        <td><strong>${escapeHtml(row.invoice_number)}</strong>${row.is_duplicate ? '<span class="admin-status-badge admin-status-badge-warn">Duplicate</span>' : ''}</td>
-        <td>${escapeHtml(row.po_number)}</td>
-        <td>${escapeHtml(row.sku || 'Unmatched')}</td>
-        <td>${escapeHtml(row.item_tag)}</td>
-        <td>${escapeHtml(row.quantity)}</td>
-        <td>${formatRp(row.line_total)}</td>
-        <td>${formatRp(row.cogs)}</td>
-        <td>${escapeHtml(row.po_context || row.source_reference || '')}</td>
-        <td>${escapeHtml(row.created_at)}</td>
-      </tr>
-    `).join('');
+    renderMetrics();
+    renderOrders();
   };
 
-  const renderData = (payload) => {
-    renderMetrics(payload.metrics || {});
-    renderInventory(payload.inventory || []);
-    renderTransactions(payload.transactions || []);
-  };
-
-  const renderPreview = (payload) => {
-    const invoice = payload.invoice || {};
-    state.previewToken = payload.preview_token || '';
-    state.duplicateCount = Number(payload.duplicate_count || 0);
-
-    if (previewPanel instanceof HTMLElement) previewPanel.hidden = false;
-    if (previewMeta instanceof HTMLElement) {
-      previewMeta.innerHTML = `
-        <span><strong>Invoice</strong> ${escapeHtml(invoice.invoice_number || '')}</span>
-        <span><strong>PO</strong> ${escapeHtml(invoice.po_number || '')}</span>
-        <span><strong>PDF PO Line</strong> ${escapeHtml(invoice.po_context || 'None')}</span>
-      `;
+  const load = async ({ quiet = false } = {}) => {
+    if (state.loading) return;
+    state.loading = true;
+    if (refreshButton instanceof HTMLButtonElement) {
+      refreshButton.disabled = true;
+      refreshButton.textContent = 'Refreshing…';
     }
-
-    if (duplicateWarning instanceof HTMLElement) {
-      duplicateWarning.hidden = state.duplicateCount < 1;
-      duplicateWarning.textContent = state.duplicateCount > 0
-        ? `Warning: invoice ${invoice.invoice_number} already exists ${state.duplicateCount} time(s). Duplicate import is enabled only for testing.`
-        : '';
+    if (!quiet && !state.orders.length && orderList) {
+      orderList.innerHTML = '<div class="admin-po-empty">Loading purchase orders from Executive.</div>';
     }
-
-    if (allowDuplicate instanceof HTMLInputElement) {
-      allowDuplicate.checked = false;
-      const duplicateLabel = allowDuplicate.closest('label');
-      if (duplicateLabel instanceof HTMLElement) duplicateLabel.hidden = state.duplicateCount < 1;
-    }
-
-    if (importButton instanceof HTMLButtonElement) {
-      importButton.disabled = false;
-    }
-
-    const items = Array.isArray(invoice.items) ? invoice.items : [];
-    if (previewBody) {
-      previewBody.innerHTML = items.map((item) => `
-        <tr>
-          <td>${escapeHtml(item.sku || 'Unmatched')}</td>
-          <td>${escapeHtml(item.item_tag)}</td>
-          <td>${escapeHtml(item.quantity)}</td>
-          <td>${formatRp(item.line_total)}</td>
-          <td>${formatRp(item.cogs)}</td>
-          <td>${item.match_status === 'matched' ? '<span class="admin-status-badge">Matched</span>' : '<span class="admin-status-badge admin-status-badge-warn">Needs SKU match</span>'}</td>
-        </tr>
-      `).join('');
-    }
-  };
-
-  const load = async () => {
     try {
-      const payload = await requestJson();
-      renderData(payload);
+      applyPayload(await requestJson());
+      setMessage(errorNode, '');
     } catch (error) {
-      setMessage(uploadError, error instanceof Error ? error.message : 'Unable to load transactions.');
+      if (!quiet || !state.orders.length) {
+        setMessage(errorNode, error instanceof Error ? error.message : 'Unable to load purchase orders.');
+      }
+    } finally {
+      state.loading = false;
+      if (refreshButton instanceof HTMLButtonElement) {
+        refreshButton.disabled = false;
+        refreshButton.textContent = 'Refresh orders';
+      }
     }
   };
 
-  const previewInvoiceFile = async (file) => {
-    if (!(uploadForm instanceof HTMLFormElement) || !(file instanceof File)) return;
-    setMessage(uploadError, '');
-    setMessage(fileNameNode, `Selected: ${file.name}`);
-    setMessage(uploadStatus, 'Reading invoice PDF...');
-    if (importButton instanceof HTMLButtonElement) importButton.disabled = true;
-
-    try {
-      const formData = new FormData();
-      formData.set('action', 'preview_invoice');
-      formData.set('invoice_pdf', file, file.name);
-      const payload = await requestJson({
-        method: 'POST',
-        body: formData
-      });
-      renderPreview(payload);
-      setMessage(uploadStatus, 'Invoice preview is ready. Review the rows before importing.');
-    } catch (error) {
-      state.previewToken = '';
-      setMessage(uploadStatus, '');
-      setMessage(uploadError, error instanceof Error ? error.message : 'Unable to read invoice.');
-    }
-  };
-
-  uploadForm?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (!(invoiceFileInput instanceof HTMLInputElement)) return;
-    const file = invoiceFileInput.files?.[0];
-    if (file) await previewInvoiceFile(file);
-  });
-
-  invoiceFileInput?.addEventListener('change', async () => {
-    if (!(invoiceFileInput instanceof HTMLInputElement)) return;
-    const file = invoiceFileInput.files?.[0];
-    if (file) await previewInvoiceFile(file);
-  });
-
-  dropzone?.addEventListener('dragenter', (event) => {
-    event.preventDefault();
-    dropzone.classList.add('is-dragging');
-  });
-
-  dropzone?.addEventListener('dragover', (event) => {
-    event.preventDefault();
-    dropzone.classList.add('is-dragging');
-  });
-
-  dropzone?.addEventListener('dragleave', (event) => {
-    if (!(event.relatedTarget instanceof Node) || !dropzone.contains(event.relatedTarget)) {
-      dropzone.classList.remove('is-dragging');
+  orderList?.addEventListener('change', (event) => {
+    const checkbox = event.target.closest('[data-po-item-check]');
+    if (!(checkbox instanceof HTMLInputElement)) return;
+    const form = checkbox.closest('[data-po-receive-form]');
+    const button = form?.querySelector('button[type="submit"]');
+    if (button instanceof HTMLButtonElement) {
+      button.disabled = !form.querySelector('[data-po-item-check]:checked:not(:disabled)');
+      const selected = form.querySelectorAll('[data-po-item-check]:checked:not(:disabled)').length;
+      button.textContent = `Confirm selected items (${selected})`;
     }
   });
 
-  dropzone?.addEventListener('drop', async (event) => {
+  orderList?.addEventListener('submit', async (event) => {
+    const form = event.target.closest('[data-po-receive-form]');
+    if (!(form instanceof HTMLFormElement)) return;
     event.preventDefault();
-    dropzone.classList.remove('is-dragging');
-    const file = event.dataTransfer?.files?.[0];
-    if (!file) return;
-    if (invoiceFileInput instanceof HTMLInputElement) {
-      const transfer = new DataTransfer();
-      transfer.items.add(file);
-      invoiceFileInput.files = transfer.files;
-    }
-    await previewInvoiceFile(file);
-  });
+    const orderId = Number(form.dataset.poReceiveForm || 0);
+    const items = Array.from(form.querySelectorAll('[data-po-item-check]:checked:not(:disabled)')).map((checkbox) => {
+      const itemId = Number(checkbox.getAttribute('data-po-item-check') || 0);
+      const quantityInput = form.querySelector(`[data-po-item-quantity="${itemId}"]`);
+      return {
+        item_id: itemId,
+        quantity: quantityInput instanceof HTMLInputElement ? Number(quantityInput.value || 0) : 0
+      };
+    }).filter((item) => item.item_id > 0 && item.quantity > 0);
+    if (!items.length || state.receivingOrderId) return;
 
-  importButton?.addEventListener('click', async () => {
-    if (!state.previewToken) return;
-    setMessage(uploadError, '');
-    setMessage(uploadStatus, 'Importing invoice rows...');
-    if (importButton instanceof HTMLButtonElement) importButton.disabled = true;
-
+    state.receivingOrderId = orderId;
+    setMessage(errorNode, '');
+    setMessage(feedbackNode, '');
+    renderOrders();
     try {
       const payload = await requestJson({
         method: 'POST',
         body: JSON.stringify({
-          action: 'import_invoice',
-          preview_token: state.previewToken,
-          allow_duplicate: allowDuplicate instanceof HTMLInputElement && allowDuplicate.checked
+          action: 'receive_purchase_order',
+          order_id: orderId,
+          items
         })
       });
-      state.previewToken = '';
-      if (previewPanel instanceof HTMLElement) previewPanel.hidden = true;
-      uploadForm?.reset();
-      setMessage(fileNameNode, '');
-      renderData(payload);
-      const result = payload.result || {};
-      setMessage(uploadStatus, `Imported ${result.inserted || 0} transaction row(s). Inventory updated for ${result.inventory_updated || 0} matched SKU row(s).`);
+      applyPayload(payload);
+      setMessage(feedbackNode, payload.message || 'Delivery confirmed and stock updated.');
+      window.setTimeout(() => setMessage(feedbackNode, ''), 5000);
     } catch (error) {
-      if (importButton instanceof HTMLButtonElement) importButton.disabled = false;
-      setMessage(uploadStatus, '');
-      setMessage(uploadError, error instanceof Error ? error.message : 'Unable to import invoice.');
+      setMessage(errorNode, error instanceof Error ? error.message : 'Unable to receive this delivery.');
+    } finally {
+      state.receivingOrderId = 0;
+      renderOrders();
     }
   });
 
+  filterButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      state.filter = button.dataset.poFilter || 'open';
+      renderOrders();
+    });
+  });
+  refreshButton?.addEventListener('click', () => load());
+  window.setInterval(() => {
+    if (!document.hidden) load({ quiet: true });
+  }, 45000);
   load();
 })();

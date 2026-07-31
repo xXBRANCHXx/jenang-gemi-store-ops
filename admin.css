@@ -9513,3 +9513,533 @@ button.admin-store-sidebar-profile:hover {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* Purchase-order receiving */
+.admin-po-receiving {
+  gap: 16px;
+}
+
+.admin-po-receiving-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  gap: 28px;
+  align-items: end;
+  padding: 30px;
+  border: 1px solid var(--admin-border);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 8% 12%, color-mix(in srgb, var(--admin-accent-primary) 16%, transparent), transparent 34%),
+    var(--admin-surface);
+  box-shadow: var(--admin-shadow);
+}
+
+.admin-po-receiving-hero h2 {
+  margin: 15px 0 12px;
+  color: var(--admin-text);
+  font: 800 clamp(2rem, 4.5vw, 4rem)/0.98 "Space Grotesk", sans-serif;
+  letter-spacing: -0.055em;
+}
+
+.admin-po-receiving-hero p {
+  max-width: 720px;
+  margin: 0;
+  color: var(--admin-muted);
+  font-size: 0.86rem;
+  font-weight: 650;
+  line-height: 1.65;
+}
+
+.admin-po-receiving-guide {
+  display: grid;
+  gap: 13px;
+  padding: 18px;
+  border: 1px solid var(--admin-border);
+  border-radius: 18px;
+  background: var(--admin-surface-soft);
+}
+
+.admin-po-receiving-guide > span {
+  color: var(--admin-muted);
+  font-size: 0.67rem;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.admin-po-receiving-guide ol {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-po-receiving-guide li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--admin-text);
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.admin-po-receiving-guide li b {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--admin-accent-primary) 18%, transparent);
+  color: var(--admin-accent-primary);
+}
+
+.admin-po-metrics .admin-metric-card {
+  min-height: 132px;
+}
+
+.admin-po-receiving-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: 18px;
+  background: var(--admin-surface);
+}
+
+.admin-po-receiving-toolbar > div {
+  display: flex;
+  gap: 6px;
+}
+
+.admin-po-receiving-toolbar button {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--admin-muted);
+  font: 800 0.7rem/1 "Plus Jakarta Sans", sans-serif;
+  cursor: pointer;
+}
+
+.admin-po-receiving-toolbar button:hover,
+.admin-po-receiving-toolbar button.is-active {
+  border-color: var(--admin-border);
+  background: var(--admin-surface-soft);
+  color: var(--admin-text);
+}
+
+.admin-po-receiving-toolbar > button:last-child {
+  border-color: var(--admin-border);
+}
+
+.admin-po-feedback {
+  margin: 0;
+  padding: 13px 15px;
+  border: 1px solid color-mix(in srgb, var(--admin-accent-primary) 38%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--admin-accent-primary) 10%, transparent);
+  color: var(--admin-text);
+  font-size: 0.76rem;
+  font-weight: 780;
+}
+
+.admin-po-order-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-po-empty {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+  padding: 30px;
+  border: 1px dashed var(--admin-border);
+  border-radius: 22px;
+  color: var(--admin-muted);
+  text-align: center;
+}
+
+.admin-po-empty > span {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 12px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--admin-accent-primary) 16%, transparent);
+  color: var(--admin-accent-primary);
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+
+.admin-po-empty strong {
+  color: var(--admin-text);
+  font: 800 1.1rem/1.2 "Space Grotesk", sans-serif;
+}
+
+.admin-po-empty small {
+  margin-top: 6px;
+  font-weight: 650;
+}
+
+.admin-po-receive-card {
+  overflow: hidden;
+  border: 1px solid var(--admin-border);
+  border-radius: 22px;
+  background: var(--admin-surface);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.08);
+}
+
+.admin-po-receive-card[open] {
+  border-color: color-mix(in srgb, var(--admin-accent-primary) 28%, var(--admin-border));
+}
+
+.admin-po-receive-card summary {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.8fr) minmax(280px, 1fr) 72px;
+  gap: 28px;
+  align-items: center;
+  min-height: 112px;
+  padding: 20px 24px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.admin-po-receive-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-po-summary-id,
+.admin-po-summary-progress {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.admin-po-summary-id > span {
+  width: max-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #3b82f6 14%, transparent);
+  color: #60a5fa;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.is-received .admin-po-summary-id > span {
+  background: color-mix(in srgb, var(--admin-accent-primary) 13%, transparent);
+  color: var(--admin-accent-primary);
+}
+
+.admin-po-summary-id > strong {
+  color: var(--admin-text);
+  font: 800 1.15rem/1.15 "Space Grotesk", sans-serif;
+}
+
+.admin-po-summary-id small,
+.admin-po-summary-progress > span {
+  color: var(--admin-muted);
+  font-size: 0.66rem;
+  font-weight: 680;
+}
+
+.admin-po-summary-progress > span b {
+  color: var(--admin-text);
+}
+
+.admin-po-summary-progress > div {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--admin-text) 10%, transparent);
+}
+
+.admin-po-summary-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #3b82f6;
+}
+
+.is-received .admin-po-summary-progress i {
+  background: var(--admin-accent-primary);
+}
+
+.admin-po-summary-percent {
+  color: var(--admin-text);
+  font: 800 1.45rem/1 "Space Grotesk", sans-serif;
+  text-align: right;
+}
+
+.admin-po-receive-card form {
+  border-top: 1px solid var(--admin-border);
+}
+
+.admin-po-order-note {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 13px 24px;
+  border-bottom: 1px solid var(--admin-border);
+  background: color-mix(in srgb, #f59e0b 8%, transparent);
+  color: var(--admin-muted);
+  font-size: 0.7rem;
+  font-weight: 660;
+}
+
+.admin-po-order-note b {
+  color: #f59e0b;
+  font-size: 0.59rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-po-receive-lines {
+  display: grid;
+}
+
+.admin-po-receive-line {
+  display: grid;
+  grid-template-columns: 34px minmax(240px, 1fr) minmax(120px, 0.35fr) minmax(128px, 0.3fr);
+  gap: 16px;
+  align-items: center;
+  min-height: 82px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--admin-border);
+  cursor: pointer;
+}
+
+.admin-po-receive-line:hover {
+  background: color-mix(in srgb, var(--admin-accent-primary) 4%, transparent);
+}
+
+.admin-po-receive-line.is-received {
+  opacity: 0.62;
+  cursor: default;
+}
+
+.admin-po-line-check {
+  position: relative;
+  display: block;
+  width: 26px;
+  height: 26px;
+}
+
+.admin-po-line-check input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.admin-po-line-check i {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--admin-border);
+  border-radius: 8px;
+  background: var(--admin-surface-soft);
+}
+
+.admin-po-line-check input:checked + i {
+  border-color: var(--admin-accent-primary);
+  background: var(--admin-accent-primary);
+}
+
+.admin-po-line-check input:checked + i::after {
+  color: #0b0d0f;
+  content: "✓";
+  font-size: 0.8rem;
+  font-style: normal;
+  font-weight: 950;
+}
+
+.admin-po-line-product,
+.admin-po-line-progress,
+.admin-po-line-quantity {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.admin-po-line-product strong {
+  overflow: hidden;
+  color: var(--admin-text);
+  font-size: 0.79rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-po-line-product small,
+.admin-po-line-progress small,
+.admin-po-line-quantity small {
+  overflow: hidden;
+  color: var(--admin-muted);
+  font-size: 0.61rem;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-po-line-progress b {
+  color: var(--admin-text);
+  font: 800 0.84rem/1 "Space Grotesk", sans-serif;
+}
+
+.admin-po-line-quantity {
+  grid-template-columns: 1fr 78px;
+  align-items: center;
+  justify-self: end;
+}
+
+.admin-po-line-quantity small {
+  grid-column: 1 / -1;
+}
+
+.admin-po-line-quantity input {
+  grid-column: 2;
+  width: 78px;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  outline: 0;
+  background: var(--admin-surface-soft);
+  color: var(--admin-text);
+  font: 850 0.77rem/1 "Plus Jakarta Sans", sans-serif;
+  text-align: right;
+}
+
+.admin-po-line-quantity input:focus {
+  border-color: var(--admin-accent-primary);
+}
+
+.admin-po-line-done {
+  justify-self: end;
+  color: var(--admin-accent-primary);
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+
+.admin-po-receive-card footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 17px 24px;
+  background: var(--admin-surface-soft);
+}
+
+.admin-po-receive-card footer > div {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-po-receive-card footer span {
+  color: var(--admin-text);
+  font-size: 0.72rem;
+  font-weight: 820;
+}
+
+.admin-po-receive-card footer small {
+  color: var(--admin-muted);
+  font-size: 0.61rem;
+  font-weight: 650;
+}
+
+.admin-po-receive-card footer button {
+  min-height: 44px;
+  padding: 0 17px;
+  border: 1px solid var(--admin-accent-primary);
+  border-radius: 12px;
+  background: var(--admin-accent-primary);
+  color: #0b0d0f;
+  font: 900 0.72rem/1 "Plus Jakarta Sans", sans-serif;
+  cursor: pointer;
+}
+
+.admin-po-receive-card footer button:disabled {
+  border-color: var(--admin-border);
+  background: color-mix(in srgb, var(--admin-text) 8%, transparent);
+  color: var(--admin-muted);
+  cursor: not-allowed;
+}
+
+.admin-po-complete-stamp {
+  color: var(--admin-accent-primary) !important;
+}
+
+@media (max-width: 900px) {
+  .admin-po-receiving-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-po-receive-card summary {
+    grid-template-columns: 1fr 90px;
+  }
+
+  .admin-po-summary-progress {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .admin-po-summary-percent {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .admin-po-receive-line {
+    grid-template-columns: 34px minmax(0, 1fr) minmax(110px, 0.35fr);
+  }
+
+  .admin-po-line-quantity,
+  .admin-po-line-done {
+    grid-column: 2 / -1;
+    justify-self: stretch;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-po-receiving-hero {
+    padding: 22px;
+  }
+
+  .admin-po-receiving-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-po-receiving-toolbar > div {
+    overflow-x: auto;
+  }
+
+  .admin-po-receive-card summary {
+    gap: 14px;
+    padding: 18px;
+  }
+
+  .admin-po-receive-line {
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 11px;
+    padding: 14px 18px;
+  }
+
+  .admin-po-line-progress,
+  .admin-po-line-quantity,
+  .admin-po-line-done {
+    grid-column: 2;
+  }
+
+  .admin-po-receive-card footer {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 16px 18px;
+  }
+}
