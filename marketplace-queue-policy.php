@@ -29,7 +29,7 @@ function jg_store_ops_marketplace_instant_manual_order(array $order): bool
         return true;
     }
     $state = strtolower(trim((string) ($order['instantArrangementState'] ?? $order['instant_arrangement_state'] ?? '')));
-    return in_array($state, ['required', 'requested', 'label_pending', 'failed', 'big_set_off'], true);
+    return in_array($state, ['display_only', 'required', 'requested', 'label_pending', 'failed', 'big_set_off'], true);
 }
 
 function jg_store_ops_marketplace_awaiting_collection(array $order, string $sourcePlatform): bool
@@ -126,11 +126,8 @@ function jg_store_ops_marketplace_action_enabled(array $key, bool $localHardSetE
     if (!$localHardSetEnabled || jg_store_ops_marketplace_cancellation_requested($key)) {
         return false;
     }
-    if (
-        !empty($key['instant'])
-        && strtolower(trim((string) ($key['action'] ?? ''))) === 'arrange_instant_shipment'
-    ) {
-        return true;
+    if (!empty($key['instant'])) {
+        return false;
     }
     // A regular marketplace card can be processed only after API Ingest has
     // safely stored its label. Paused unarranged rows stay visible/read-only.

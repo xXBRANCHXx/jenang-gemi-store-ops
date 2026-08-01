@@ -2226,15 +2226,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const marketplaceName = String(order.platform || 'marketplace').trim() || 'marketplace';
         actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-cancellation" title="Cancellation requested — do not process. Resolve it in ${escapeHtml(marketplaceName)}." disabled><span>Handle in ${escapeHtml(marketplaceName)}</span></button>`;
       } else if (instantManualLifecycle) {
-        const instantDisabled = !bigSetEnabled || isLocked || ['requested', 'label_pending'].includes(instantState);
-        const instantLabel = !bigSetEnabled
-          ? 'Big Set locked'
-          : (instantState === 'requested'
-            ? 'Arranging…'
-            : (instantState === 'label_pending'
-              ? 'Preparing label…'
-              : (instantState === 'failed' ? 'Retry arrange' : 'Accept + arrange')));
-        actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-instant-action" data-arrange-instant="${escapeHtml(order.id)}" ${instantDisabled ? 'disabled' : ''}><span>${escapeHtml(instantLabel)}</span></button>`;
+        actionButton = '<button type="button" class="admin-start-order-btn admin-manual-order-btn is-instant-action" disabled><span>Display only · arrange in marketplace</span></button>';
       } else if (pausedUnarranged) {
         actionButton = isWeekendDependent
           ? `<button type="button" class="admin-start-order-btn admin-paused-order-btn is-weekend-dependent-action" disabled><span>${order.weekendDependentAutoWindowOpen ? 'Weekend auto-arranging' : 'Arrange manually now'}</span></button>`
@@ -2484,30 +2476,6 @@ document.addEventListener('DOMContentLoaded', () => {
     syncClaimInBackground(order, order.clientClaimRequestId);
   };
 
-  const arrangeInstantShipment = async (orderId) => {
-    const order = state.orders.find((item) => item.id === orderId);
-    if (!order || !order.instant || orderPresentation.isCancellationRequested(order) || !bigSetEnabled) return;
-    order.instantArrangementState = 'requested';
-    order.instantArrangementError = '';
-    saveOrders();
-    renderBoard();
-    try {
-      const payload = await postOrderAction('arrange_instant_shipment', order);
-      const arrangement = payload.arrangement && typeof payload.arrangement === 'object' ? payload.arrangement : {};
-      order.instantArrangementState = String(arrangement.state || 'requested');
-      order.instantArrangementError = String(arrangement.error || '');
-      saveOrders();
-      renderBoard();
-      await refreshOrders(false, { force: true });
-    } catch (error) {
-      order.instantArrangementState = 'failed';
-      order.instantArrangementError = error instanceof Error ? error.message : 'Unable to arrange this Instant shipment.';
-      saveOrders();
-      renderBoard();
-      showBoardAlert(order.instantArrangementError);
-    }
-  };
-
   const closeOrderContextMenu = () => {
     if (!orderContextMenu) return;
     orderContextMenu.hidden = true;
@@ -2656,11 +2624,6 @@ document.addEventListener('DOMContentLoaded', () => {
   board?.addEventListener('click', (event) => {
     unlockAudio();
     const target = event.target instanceof Element ? event.target : null;
-    const instantButton = target?.closest('[data-arrange-instant]');
-    if (instantButton instanceof HTMLButtonElement) {
-      if (!instantButton.disabled) arrangeInstantShipment(instantButton.dataset.arrangeInstant || '');
-      return;
-    }
     const button = target?.closest('[data-start-order]');
     if (button instanceof HTMLButtonElement) {
       if (!button.disabled) openFulfillment(button.dataset.startOrder || '');

@@ -128,8 +128,8 @@ assert(
   'A profile must be able to right-click its claimed card and release it through the existing API.'
 );
 assert(
-  storeHome.includes('data-arrange-instant') && storeHome.includes('Accept + arrange'),
-  'The Instant card must provide one combined acceptance and arrangement button.'
+  !storeHome.includes('data-arrange-instant') && storeHome.includes('Display only · arrange in marketplace'),
+  'The Instant card must remain visible without a processing action.'
 );
 assert(
   !storeHome.includes('isCompletedMarketplaceOrder'),
