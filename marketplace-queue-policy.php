@@ -29,7 +29,10 @@ function jg_store_ops_marketplace_instant_manual_order(array $order): bool
         return true;
     }
     $state = strtolower(trim((string) ($order['instantArrangementState'] ?? $order['instant_arrangement_state'] ?? '')));
-    return in_array($state, ['required', 'requested', 'label_pending', 'failed', 'big_set_off'], true);
+    // `display_only` was emitted by the short-lived disabled Instant contract.
+    // Keep those existing rows visible and migrate them back to the manual
+    // accept-and-arrange action instead of dropping them from the queue.
+    return in_array($state, ['display_only', 'required', 'requested', 'label_pending', 'failed', 'big_set_off'], true);
 }
 
 function jg_store_ops_marketplace_awaiting_collection(array $order, string $sourcePlatform): bool

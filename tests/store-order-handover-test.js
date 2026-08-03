@@ -73,6 +73,10 @@ assert(
   'An Instant card must stay visible while its label is prepared.'
 );
 assert(
+  presentation.isInstantManualLifecycle({ instant: true, shipmentArranged: true, instantArrangementState: 'display_only' }),
+  'An Instant row from the temporary display-only contract must migrate back to its manual action.'
+);
+assert(
   presentation.formatHandoverSlot({ handoverSlotLabel: 'Sat, 1 Aug 2026 · 13:00-15:00' }) === 'Sat, 1 Aug 2026 · 13:00-15:00',
   'Store Ops must preserve the marketplace-selected pickup day.'
 );

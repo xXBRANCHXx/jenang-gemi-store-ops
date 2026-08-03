@@ -101,7 +101,7 @@
     if (!order?.instant) return false;
     if (requiresManualInstantArrangement(order)) return true;
     const state = String(order?.instantArrangementState || order?.instant_arrangement_state || '').trim().toLowerCase();
-    return ['required', 'requested', 'label_pending', 'failed', 'big_set_off'].includes(state);
+    return ['display_only', 'required', 'requested', 'label_pending', 'failed', 'big_set_off'].includes(state);
   };
   const formatHandoverSlot = (order) => {
     const supplied = String(order?.handoverSlotLabel || order?.handover_slot_label || '').trim();
