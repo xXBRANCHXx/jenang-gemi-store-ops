@@ -57,7 +57,7 @@
   const isCriticalOrder = (order, now = Date.now()) => !order?.deadlineSatisfied
     && Number(order?.deadlineAt || 0) - now < 60 * 60000;
   const shouldSoundSiren = (order, now = Date.now()) => {
-    if (order?.deadlineSatisfied) return false;
+    if (order?.deadlineSatisfied || isMarketplaceArrangementMissing(order)) return false;
     const thresholdMs = order?.instant ? 2 * 60 * 60000 : 60 * 60000;
     const remainingMs = Number(order?.deadlineAt || 0) - now;
     return remainingMs > 0 && remainingMs < thresholdMs;
@@ -2117,8 +2117,10 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const refreshSiren = () => {
-    const hasSirenEligibleOrder = orderSourceErrors.length > 0 || listedOrders().some((order) => !order.started
-      && (orderPresentation.isMarketplaceArrangementMissing(order) || orderPresentation.shouldSoundSiren(order)));
+    // Source and missing-arrangement failures remain red, visible, and
+    // blocking. They do not run the continuous packing-deadline siren.
+    const hasSirenEligibleOrder = listedOrders().some((order) => !order.started
+      && orderPresentation.shouldSoundSiren(order));
     if (!hasSirenEligibleOrder || !audioUnlocked) {
       window.clearInterval(sirenTimer);
       sirenTimer = 0;
