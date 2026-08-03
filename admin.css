@@ -3315,35 +3315,6 @@ button, input {
   font-weight: 700;
 }
 
-.admin-queue-notice a {
-  color: #f59e0b;
-  flex: 0 0 auto;
-  font-size: 11px;
-  font-weight: 900;
-  text-decoration: none;
-}
-
-.admin-queue-notice a:hover {
-  text-decoration: underline;
-}
-
-.is-store-home .admin-store-home .admin-queue-notice.is-integration-warning {
-  width: fit-content;
-  max-width: 100%;
-  min-height: 32px;
-  padding: 5px 10px;
-  border-color: color-mix(in srgb, #f59e0b 52%, var(--admin-border));
-  background: color-mix(in srgb, #f59e0b 8%, var(--admin-surface));
-  box-shadow: none;
-}
-
-.admin-queue-notice.is-integration-warning .admin-queue-notice-icon {
-  width: 20px;
-  height: 20px;
-  flex-basis: 20px;
-  font-size: 11px;
-}
-
 .is-store-home .admin-store-home .admin-queue-notice.is-critical {
   border-color: color-mix(in srgb, #ef4444 72%, var(--admin-border));
   background: color-mix(in srgb, #ef4444 14%, var(--admin-surface));

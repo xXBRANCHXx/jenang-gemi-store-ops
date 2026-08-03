@@ -187,7 +187,6 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
                             <div>
                                 <strong data-automation-pause-title>Automatic arrangement is paused</strong>
                                 <span data-automation-pause-copy>Unarranged marketplace orders stay visible for manual follow-up.</span>
-                                <a href="../integrations/" data-integration-notice-link hidden>Open Integrations</a>
                             </div>
                         </div>
                         <div class="admin-order-board" data-order-board aria-busy="true" style="--order-rows: 6; --order-columns: 1;">
