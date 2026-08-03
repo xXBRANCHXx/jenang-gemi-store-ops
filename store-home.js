@@ -264,6 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const automationPauseNotice = document.querySelector('[data-automation-pause-notice]');
   const automationPauseTitle = document.querySelector('[data-automation-pause-title]');
   const automationPauseCopy = document.querySelector('[data-automation-pause-copy]');
+  const integrationNoticeLink = document.querySelector('[data-integration-notice-link]');
   const orderContextMenu = document.querySelector('[data-order-context-menu]');
   const unclaimOrderButton = document.querySelector('[data-unclaim-order]');
   const removeOrderButton = document.querySelector('[data-remove-order]');
@@ -2150,24 +2151,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const waitingForArrangement = listed.filter((order) => orderPresentation.isMarketplaceArrangementMissing(order)).length;
     const sourceFailureCount = orderSourceErrors.length;
+    const sourceWarningOnly = sourceFailureCount > 0 && waitingForArrangement === 0;
     if (automationPauseNotice) {
       automationPauseNotice.hidden = waitingForArrangement === 0 && sourceFailureCount === 0 && !automaticArrangementPaused;
-      automationPauseNotice.classList.toggle('is-critical', waitingForArrangement > 0 || sourceFailureCount > 0);
+      automationPauseNotice.classList.toggle('is-critical', waitingForArrangement > 0);
+      automationPauseNotice.classList.toggle('is-integration-warning', sourceWarningOnly);
+      automationPauseNotice.setAttribute('role', sourceWarningOnly ? 'status' : 'alert');
+      automationPauseNotice.setAttribute('aria-live', sourceWarningOnly ? 'polite' : 'assertive');
     }
     if (automationPauseTitle) {
       automationPauseTitle.textContent = sourceFailureCount > 0
-        ? 'ORDER INGESTION FAILURE'
+        ? 'Integration attention'
         : (waitingForArrangement > 0 ? 'ORDER ACTION REQUIRED' : 'Automatic arrangement is paused');
     }
     if (automationPauseCopy) {
       automationPauseCopy.textContent = sourceFailureCount > 0
-        ? `Store Ops cannot prove every order is present. ${orderSourceErrors.slice(0, 2).join(' · ')}. Check Integrations immediately; the current board is being preserved.`
+        ? `${orderSourceErrors.slice(0, 1).join(' · ')}. Orders already on the board are preserved.`
         : (waitingForArrangement
           ? `${waitingForArrangement} marketplace order${waitingForArrangement === 1 ? '' : 's'} ${waitingForArrangement === 1 ? 'is' : 'are'} missing a stored label. Arrange ${waitingForArrangement === 1 ? 'it' : 'them'} in the marketplace now; Store Ops will keep ${waitingForArrangement === 1 ? 'it' : 'them'} visible until recovered.`
           : 'All visible marketplace orders are arranged and can be processed normally.');
     }
+    if (integrationNoticeLink) integrationNoticeLink.hidden = sourceFailureCount === 0;
     document.title = sourceFailureCount > 0
-      ? `(INGESTION FAILURE) ${baseDocumentTitle}`
+      ? `(Integration) ${baseDocumentTitle}`
       : (waitingForArrangement > 0 ? `(${waitingForArrangement} ACTION REQUIRED) ${baseDocumentTitle}` : baseDocumentTitle);
   };
 
