@@ -4,6 +4,16 @@
     .toLowerCase()
     .replace(/[^a-z0-9._-]+/g, '-')
     .replace(/^[._-]+|[._-]+$/g, '');
+  const requiredMarketplaceSources = new Set([
+    'shopee:jenang-gemi-shopee',
+    'shopee:zero-shopee',
+    'tiktok:jenang-gemi-tiktok',
+    'tiktok:zero-tiktok'
+  ]);
+  const isRequiredMarketplaceSourceError = (value) => {
+    const match = String(value || '').trim().toLowerCase().match(/^(shopee|tiktok):([^:]+):/);
+    return Boolean(match && requiredMarketplaceSources.has(`${match[1]}:${match[2]}`));
+  };
   const normalizedMarketplaceStatus = (order) => String(
     order?.marketplaceStatus || order?.marketplace_status || order?.orderStatus || order?.order_status || ''
   ).trim().toUpperCase();
@@ -215,7 +225,8 @@
     canCurrentEmployeeRemove,
     canOpenOrderContextMenu,
     previewActionState,
-    sourceLabelFromOrder
+    sourceLabelFromOrder,
+    isRequiredMarketplaceSourceError
   });
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -251,6 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const boardClock = document.querySelector('[data-board-clock]');
   const dropOffFilter = document.querySelector('[data-dropoff-filter]');
   const automationPauseNotice = document.querySelector('[data-automation-pause-notice]');
+  const automationPauseTitle = document.querySelector('[data-automation-pause-title]');
   const automationPauseCopy = document.querySelector('[data-automation-pause-copy]');
   const orderContextMenu = document.querySelector('[data-order-context-menu]');
   const unclaimOrderButton = document.querySelector('[data-unclaim-order]');
@@ -327,6 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let dropOffOnly = false;
   let bigSetEnabled = false;
   let automaticArrangementPaused = false;
+  let orderSourceErrors = [];
   const scannerBarcodeWaitSeconds = 6;
   const scannerBarcodeWaitMs = scannerBarcodeWaitSeconds * 1000;
   let state = {
@@ -1451,6 +1464,7 @@ document.addEventListener('DOMContentLoaded', () => {
     bigSetEnabled = Boolean(meta.big_set_enabled);
     automaticArrangementPaused = Boolean(meta.automation_paused);
     const refreshErrors = Array.isArray(meta.errors) ? meta.errors : [];
+    orderSourceErrors = refreshErrors.map(String).filter(orderPresentation.isRequiredMarketplaceSourceError);
     const configuredSources = Number(meta.configured_sources || 0);
     const successfulAccounts = Number(meta.successful_accounts || 0);
     const partnerOrdersMeta = meta.partner_orders && typeof meta.partner_orders === 'object' ? meta.partner_orders : {};
@@ -2117,11 +2131,19 @@ document.addEventListener('DOMContentLoaded', () => {
         && !orderPresentation.isInstantManualLifecycle(order)
         && !orderPresentation.isCancellationRequested(order);
     }).length;
-    if (automationPauseNotice) automationPauseNotice.hidden = !automaticArrangementPaused;
+    const sourceError = orderSourceErrors[0] || '';
+    if (automationPauseNotice) automationPauseNotice.hidden = !automaticArrangementPaused && sourceError === '';
+    if (automationPauseTitle) {
+      automationPauseTitle.textContent = sourceError === ''
+        ? 'Automatic arrangement is paused'
+        : 'Marketplace connection problem';
+    }
     if (automationPauseCopy) {
-      automationPauseCopy.textContent = waitingForArrangement
-        ? `${waitingForArrangement} order${waitingForArrangement === 1 ? '' : 's'} still need marketplace arrangement. Arranged orders can be processed normally.`
-        : 'All visible marketplace orders are arranged and can be processed normally.';
+      automationPauseCopy.textContent = sourceError !== ''
+        ? `${sourceError}. Existing orders remain on the board.`
+        : (waitingForArrangement
+          ? `${waitingForArrangement} order${waitingForArrangement === 1 ? '' : 's'} still need marketplace arrangement. Arranged orders can be processed normally.`
+          : 'All visible marketplace orders are arranged and can be processed normally.');
     }
   };
 

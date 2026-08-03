@@ -13,6 +13,18 @@ const assert = (condition, message) => {
 const presentation = global.JGStoreOrderPresentation;
 assert(presentation && typeof presentation.normalizeDeadline === 'function', 'Store Ops must expose its production deadline normalizer.');
 assert(
+  presentation.isRequiredMarketplaceSourceError('tiktok:zfit-tiktok: TikTok account is not authorized.') === false,
+  'ZFit must not produce the required marketplace connection banner.'
+);
+assert(
+  presentation.isRequiredMarketplaceSourceError('tiktok:zero-tiktok: TikTok account is not authorized.') === true,
+  'ZERO TikTok failures must produce the required marketplace connection banner.'
+);
+assert(
+  presentation.isRequiredMarketplaceSourceError('shopee:jenang-gemi-shopee: access token expired') === true,
+  'Jenang Gemi Shopee failures must produce the required marketplace connection banner.'
+);
+assert(
   presentation.sourceLabelFromOrder({ platform: 'whatsapp', account: 'Jenang Gemi' }) === 'Whatsapp',
   'WhatsApp orders must use their channel label instead of the generic Jenang Gemi account fallback.'
 );
