@@ -15,8 +15,6 @@ marketplace_queue_expect(false, jg_store_ops_marketplace_order_visible($awaiting
 marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible($awaitingCollection + ['labelBacked' => true], 'tiktok', false), 'A stored-label collection row must remain visible in Store Ops.');
 marketplace_queue_expect(false, jg_store_ops_marketplace_order_visible(['platform' => 'Shopee', 'marketplaceStatus' => 'READY_TO_SHIP'], 'shopee', true), 'Hard Set must reject cached live rows without stored labels.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible(['platform' => 'Shopee', 'marketplaceStatus' => 'READY_TO_SHIP', 'instant' => true, 'manualArrangementRequired' => true, 'instantArrangementState' => 'required'], 'shopee', true), 'An unarranged Instant order must remain visible for its manual action.');
-marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible(['platform' => 'Shopee', 'marketplaceStatus' => 'READY_TO_SHIP', 'instant' => true, 'manualArrangementRequired' => false, 'instantArrangementState' => 'display_only'], 'shopee', true), 'A display-only Instant order must remain visible without a stored label.');
-marketplace_queue_expect(false, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee', 'instant' => true, 'action' => 'arrange_instant_shipment'], true), 'Store Ops must reject Instant processing actions.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible(['platform' => 'Shopee', 'marketplaceStatus' => 'PROCESSED', 'instant' => true, 'instantArrangementState' => 'label_pending'], 'shopee', true), 'An arranged Instant order must remain visible while Store Ops processing is incomplete.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible(['platform' => 'Shopee', 'marketplaceStatus' => 'IN_CANCEL', 'cancellationRequested' => true], 'shopee', true), 'A cancellation request must remain visible without a stored label.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible(['platform' => 'Shopee', 'marketplaceStatus' => 'PROCESSED', 'labelBacked' => true], 'shopee', true), 'Marketplace PROCESSED means arranged and must remain Listed until Store Ops processes it.');
@@ -54,13 +52,22 @@ marketplace_queue_expect(
         && str_contains($ordersV2Api, '$localAutomationPaused || !$localHardSetEnabled'),
     'Hard Set PAUSED must use the same unarranged-only marketplace queue as Big Set OFF.'
 );
+marketplace_queue_expect(
+    true,
+    is_string($ordersApi)
+        && is_string($ordersV2Api)
+        && !str_contains($ordersApi, 'Instant orders are display-only')
+        && !str_contains($ordersV2Api, 'Instant orders are display-only'),
+    'Both order APIs must keep Instant arrangement available.'
+);
 marketplace_queue_expect(false, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee'], false), 'Big Set OFF must reject Shopee actions.');
 marketplace_queue_expect(false, jg_store_ops_marketplace_action_enabled(['source_platform' => 'tiktok'], false), 'Big Set OFF must reject TikTok actions.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_action_enabled(['source_platform' => 'partner'], false), 'Big Set OFF must not block unrelated partner work.');
 marketplace_queue_expect(false, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee', 'cancellation_requested' => true], true), 'Cancellation-requested marketplace orders must block Store Ops processing.');
 marketplace_queue_expect(false, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee'], true), 'An unarranged regular marketplace row must remain read-only.');
+marketplace_queue_expect(true, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee', 'instant' => true, 'action' => 'arrange_instant_shipment'], true), 'The explicit Instant arrangement action must be available when Big Set is active.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee', 'label_backed' => true], true, true), 'Pausing automatic arrangement must not block work on an already arranged label-backed order.');
-marketplace_queue_expect(false, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee', 'instant' => true, 'action' => 'arrange_instant_shipment'], true, true), 'Instant processing must remain blocked while automatic arrangement is paused.');
+marketplace_queue_expect(true, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee', 'instant' => true, 'action' => 'arrange_instant_shipment'], true, true), 'The explicit Instant arrangement button must remain available while automatic arrangement is paused.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee', 'action' => 'release_order'], false, true), 'A profile must be able to release its local claim even when marketplace automation is unavailable.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_action_enabled(['source_platform' => 'partner'], false, true), 'Pausing Big Set automation must not block unrelated Partner orders.');
 

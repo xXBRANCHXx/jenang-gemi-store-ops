@@ -158,8 +158,6 @@ function jg_store_ops_orders_marketplace_status_callback(array $key, string $sta
 /** @return array<string,mixed> */
 function jg_store_ops_orders_arrange_instant(array $key, array $payload, string $employeeId, string $employeeName): array
 {
-    throw new RuntimeException('Instant orders are display-only in Store Ops and must be arranged in the marketplace.');
-
     $platform = (string) ($key['source_platform'] ?? '');
     if (!in_array($platform, ['shopee', 'tiktok'], true)) {
         throw new RuntimeException('Instant shipment arrangement is available only for marketplace orders.');
