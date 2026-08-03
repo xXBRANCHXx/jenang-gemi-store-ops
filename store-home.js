@@ -103,16 +103,6 @@
     const state = String(order?.instantArrangementState || order?.instant_arrangement_state || '').trim().toLowerCase();
     return ['display_only', 'required', 'requested', 'label_pending', 'failed', 'big_set_off'].includes(state);
   };
-  const isMarketplaceArrangementMissing = (order) => {
-    const platform = normalizedSourceKey(order?.platform || order?.source_platform || '');
-    const marketplacePlatform = ['shopee', 'tiktok'].includes(platform)
-      || platform.includes('tiktok')
-      || platform.includes('tokopedia');
-    return marketplacePlatform
-      && !Boolean(order?.labelBacked || order?.label_backed)
-      && !isCancellationRequested(order)
-      && !isInstantManualLifecycle(order);
-  };
   const formatHandoverSlot = (order) => {
     const supplied = String(order?.handoverSlotLabel || order?.handover_slot_label || '').trim();
     if (supplied) return supplied;
@@ -147,7 +137,6 @@
   const sortOrdersByUrgency = (orders) => (Array.isArray(orders) ? orders : [])
     .slice()
     .sort((a, b) => Number(Boolean(b?.instant)) - Number(Boolean(a?.instant))
-      || Number(isMarketplaceArrangementMissing(b)) - Number(isMarketplaceArrangementMissing(a))
       || Number(Boolean(b?.weekendDependent)) - Number(Boolean(a?.weekendDependent))
       || Number(a?.deadlineAt || Number.MAX_SAFE_INTEGER) - Number(b?.deadlineAt || Number.MAX_SAFE_INTEGER));
   const canCurrentEmployeeUnclaim = (order, currentEmployeeId) => {
@@ -160,7 +149,10 @@
   const canOpenOrderContextMenu = (order, currentEmployeeId) => canCurrentEmployeeUnclaim(order, currentEmployeeId)
     || canCurrentEmployeeRemove(currentEmployeeId);
   const previewActionState = (order, context = {}) => {
-    const arrangementMissing = isMarketplaceArrangementMissing(order);
+    const platform = String(order?.platform || '').trim().toLowerCase();
+    const pausedUnarranged = Boolean(context.automaticArrangementPaused)
+      && ['shopee', 'tiktok'].includes(platform)
+      && !order?.labelBacked;
     const claimedBySelf = Boolean(order?.claimedBy && order.claimedBy === context.currentEmployeeId);
 
     if (isCancellationRequested(order)) {
@@ -177,13 +169,11 @@
         note: 'Accept and arrange the shipment from the order card before starting fulfillment.'
       };
     }
-    if (arrangementMissing) {
+    if (pausedUnarranged) {
       return {
         disabled: true,
-        label: 'Immediate marketplace action required',
-        note: context.automaticArrangementPaused
-          ? 'Automatic arrangement is paused. Arrange this order in the marketplace now.'
-          : 'Automatic arrangement did not produce a stored label. Resolve this order in the marketplace now.'
+        label: 'Shipment not arranged',
+        note: 'Automatic arrangement is paused. Arrange this order in the marketplace first.'
       };
     }
     if (order?.locked && order?.currentEmployeeCanWork === false) {
@@ -216,7 +206,6 @@
     isCancellationRequested,
     requiresManualInstantArrangement,
     isInstantManualLifecycle,
-    isMarketplaceArrangementMissing,
     formatHandoverSlot,
     filterOrdersByHandover,
     shouldShowOrderLoading,
@@ -262,7 +251,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const boardClock = document.querySelector('[data-board-clock]');
   const dropOffFilter = document.querySelector('[data-dropoff-filter]');
   const automationPauseNotice = document.querySelector('[data-automation-pause-notice]');
-  const automationPauseTitle = document.querySelector('[data-automation-pause-title]');
   const automationPauseCopy = document.querySelector('[data-automation-pause-copy]');
   const orderContextMenu = document.querySelector('[data-order-context-menu]');
   const unclaimOrderButton = document.querySelector('[data-unclaim-order]');
@@ -314,7 +302,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const ordersRefreshMinGapMs = 3500;
   const cachedStartupRefreshDelayMs = 0;
   const ordersStartupCacheMaxAgeMs = 60000;
-  const baseDocumentTitle = document.title;
   const clientCacheDbName = 'jg-store-ops-client-cache';
   const clientCacheStoreName = 'entries';
   const currentEmployee = {
@@ -340,7 +327,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let dropOffOnly = false;
   let bigSetEnabled = false;
   let automaticArrangementPaused = false;
-  let orderSourceErrors = [];
   const scannerBarcodeWaitSeconds = 6;
   const scannerBarcodeWaitMs = scannerBarcodeWaitSeconds * 1000;
   let state = {
@@ -1404,7 +1390,6 @@ document.addEventListener('DOMContentLoaded', () => {
           || automaticArrangementPaused
           || order.labelBacked
           || orderPresentation.isInstantManualLifecycle(order)
-          || orderPresentation.isMarketplaceArrangementMissing(order)
           || orderPresentation.isCancellationRequested(order);
       });
   };
@@ -1417,7 +1402,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     bigSetEnabled = Boolean(cachedMeta.bigSetEnabled);
     automaticArrangementPaused = Boolean(cachedMeta.automaticArrangementPaused);
-    orderSourceErrors = Array.isArray(cachedMeta.sourceErrors) ? cachedMeta.sourceErrors.map(String) : [];
     const cachedOrders = normalizeCachedOrders();
     if (!cachedOrders.length) return false;
     ordersEtag = String(cachedMeta.etag || '');
@@ -1437,7 +1421,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const rows = Array.isArray(cached) ? cached : (Array.isArray(cached?.orders) ? cached.orders : []);
     bigSetEnabled = Boolean(cached?.bigSetEnabled);
     automaticArrangementPaused = Boolean(cached?.automaticArrangementPaused);
-    orderSourceErrors = Array.isArray(cached?.sourceErrors) ? cached.sourceErrors.map(String) : [];
     const cachedOrders = normalizeCachedOrders(rows);
     if (!cachedOrders.length) return false;
     ordersEtag = String(cached?.etag || ordersEtag || '');
@@ -1475,18 +1458,6 @@ document.addEventListener('DOMContentLoaded', () => {
       || Number(meta.stale_account_count || 0) > 0
       || Boolean(partnerOrdersMeta.stale)
       || (configuredSources > 0 && successfulAccounts === 0);
-    orderSourceErrors = refreshErrors.map(String);
-    if (Number(meta.stale_account_count || 0) > 0) {
-      const staleCount = Number(meta.stale_account_count);
-      orderSourceErrors.push(`${staleCount} marketplace source${staleCount === 1 ? '' : 's'} returned stale data`);
-    }
-    if (partnerOrdersMeta.stale) {
-      orderSourceErrors.push(String(partnerOrdersMeta.stale_reason || 'Partner order source returned stale data'));
-    }
-    if (configuredSources > 0 && successfulAccounts === 0) {
-      orderSourceErrors.push('No configured marketplace source returned a confirmed live response');
-    }
-    orderSourceErrors = Array.from(new Set(orderSourceErrors.filter(Boolean)));
 
     partnerOrderSources = (Array.isArray(payload.meta?.partner_orders?.sources) ? payload.meta.partner_orders.sources : [])
       .map((source) => ({
@@ -1519,13 +1490,7 @@ document.addEventListener('DOMContentLoaded', () => {
       delete cached.clientClaimReleaseRequested;
       return cached;
     });
-    const meta = {
-      savedAt: Date.now(),
-      etag: ordersEtag,
-      bigSetEnabled,
-      automaticArrangementPaused,
-      sourceErrors: orderSourceErrors
-    };
+    const meta = { savedAt: Date.now(), etag: ordersEtag, bigSetEnabled, automaticArrangementPaused };
     try {
       window.localStorage.setItem(ordersStorageKey, JSON.stringify(cacheOrders));
       window.localStorage.setItem(ordersStorageMetaKey, JSON.stringify(meta));
@@ -2117,8 +2082,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const refreshSiren = () => {
-    const hasSirenEligibleOrder = orderSourceErrors.length > 0 || listedOrders().some((order) => !order.started
-      && (orderPresentation.isMarketplaceArrangementMissing(order) || orderPresentation.shouldSoundSiren(order)));
+    const hasSirenEligibleOrder = listedOrders().some((order) => !order.started && orderPresentation.shouldSoundSiren(order));
     if (!hasSirenEligibleOrder || !audioUnlocked) {
       window.clearInterval(sirenTimer);
       sirenTimer = 0;
@@ -2146,27 +2110,19 @@ document.addEventListener('DOMContentLoaded', () => {
         ? `Showing ${dropOffCount} drop-off order${dropOffCount === 1 ? '' : 's'}. Click to show all ${listed.length} listed orders.`
         : `Show only ${dropOffCount} drop-off order${dropOffCount === 1 ? '' : 's'}. This does not change any order status.`;
     }
-    const waitingForArrangement = listed.filter((order) => orderPresentation.isMarketplaceArrangementMissing(order)).length;
-    const sourceFailureCount = orderSourceErrors.length;
-    if (automationPauseNotice) {
-      automationPauseNotice.hidden = waitingForArrangement === 0 && sourceFailureCount === 0 && !automaticArrangementPaused;
-      automationPauseNotice.classList.toggle('is-critical', waitingForArrangement > 0 || sourceFailureCount > 0);
-    }
-    if (automationPauseTitle) {
-      automationPauseTitle.textContent = sourceFailureCount > 0
-        ? 'ORDER INGESTION FAILURE'
-        : (waitingForArrangement > 0 ? 'ORDER ACTION REQUIRED' : 'Automatic arrangement is paused');
-    }
+    const waitingForArrangement = listed.filter((order) => {
+      const platform = normalizeSourceKey(order.platform);
+      return ['shopee', 'tiktok'].includes(platform)
+        && !order.labelBacked
+        && !orderPresentation.isInstantManualLifecycle(order)
+        && !orderPresentation.isCancellationRequested(order);
+    }).length;
+    if (automationPauseNotice) automationPauseNotice.hidden = !automaticArrangementPaused;
     if (automationPauseCopy) {
-      automationPauseCopy.textContent = sourceFailureCount > 0
-        ? `Store Ops cannot prove every order is present. ${orderSourceErrors.slice(0, 2).join(' · ')}. Check Integrations immediately; the current board is being preserved.`
-        : (waitingForArrangement
-          ? `${waitingForArrangement} marketplace order${waitingForArrangement === 1 ? '' : 's'} ${waitingForArrangement === 1 ? 'is' : 'are'} missing a stored label. Arrange ${waitingForArrangement === 1 ? 'it' : 'them'} in the marketplace now; Store Ops will keep ${waitingForArrangement === 1 ? 'it' : 'them'} visible until recovered.`
-          : 'All visible marketplace orders are arranged and can be processed normally.');
+      automationPauseCopy.textContent = waitingForArrangement
+        ? `${waitingForArrangement} order${waitingForArrangement === 1 ? '' : 's'} still need marketplace arrangement. Arranged orders can be processed normally.`
+        : 'All visible marketplace orders are arranged and can be processed normally.';
     }
-    document.title = sourceFailureCount > 0
-      ? `(INGESTION FAILURE) ${baseDocumentTitle}`
-      : (waitingForArrangement > 0 ? `(${waitingForArrangement} ACTION REQUIRED) ${baseDocumentTitle}` : baseDocumentTitle);
   };
 
   const renderBoardMessage = (message, options = {}) => {
@@ -2237,7 +2193,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const isWeekendDependent = Boolean(order.weekendDependent);
       const cancellationRequested = orderPresentation.isCancellationRequested(order);
       const instantManualLifecycle = orderPresentation.isInstantManualLifecycle(order) && !order.labelBacked;
-      const arrangementMissing = orderPresentation.isMarketplaceArrangementMissing(order);
+      const marketplacePlatform = normalizeSourceKey(order.platform);
+      const pausedUnarranged = automaticArrangementPaused
+        && ['shopee', 'tiktok'].includes(marketplacePlatform)
+        && !order.labelBacked
+        && !instantManualLifecycle
+        && !cancellationRequested;
       const instantState = String(order.instantArrangementState || '').trim().toLowerCase();
       const pickupSlotLabel = order.handoverMethod === 'PICKUP' ? orderPresentation.formatHandoverSlot(order) : '';
       const handoverDescription = order.shippingProviderName
@@ -2274,14 +2235,14 @@ document.addEventListener('DOMContentLoaded', () => {
               ? 'Preparing label…'
               : (instantState === 'failed' ? 'Retry arrange' : 'Accept + arrange')));
         actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-instant-action" data-arrange-instant="${escapeHtml(order.id)}" ${instantDisabled ? 'disabled' : ''}><span>${escapeHtml(instantLabel)}</span></button>`;
-      } else if (arrangementMissing) {
+      } else if (pausedUnarranged) {
         actionButton = isWeekendDependent
           ? `<button type="button" class="admin-start-order-btn admin-paused-order-btn is-weekend-dependent-action" disabled><span>${order.weekendDependentAutoWindowOpen ? 'Weekend auto-arranging' : 'Arrange manually now'}</span></button>`
-          : '<button type="button" class="admin-start-order-btn admin-paused-order-btn" disabled title="Automatic arrangement did not produce a stored label. Resolve this order in the marketplace now."><span>Arrange in marketplace</span></button>';
+          : '<button type="button" class="admin-start-order-btn admin-paused-order-btn" disabled><span>Arrange in marketplace</span></button>';
       }
       return `
         <article
-          class="admin-order-card ${isCritical && !isLocked && !order.instant ? 'is-deadline-urgent' : ''} ${order.instant ? 'is-instant' : ''} ${isWeekendDependent ? 'is-weekend-dependent' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${arrangementMissing ? 'is-awaiting-arrangement is-arrangement-attention' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
+          class="admin-order-card ${isCritical && !isLocked && !order.instant ? 'is-deadline-urgent' : ''} ${order.instant ? 'is-instant' : ''} ${isWeekendDependent ? 'is-weekend-dependent' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${pausedUnarranged ? 'is-awaiting-arrangement' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
           data-order-id="${escapeHtml(order.id)}"
           data-source-key="${escapeHtml(sourceKey)}"
           ${claimedBySelf ? 'data-claim-owner="self" title="Right-click for claim actions"' : ''}
@@ -2499,7 +2460,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const openFulfillment = (orderId) => {
     const order = state.orders.find((item) => item.id === orderId);
     if (!order) return;
-    if (orderPresentation.isMarketplaceArrangementMissing(order)) return;
+    if (
+      automaticArrangementPaused
+      && ['shopee', 'tiktok'].includes(normalizeSourceKey(order.platform))
+      && !order.labelBacked
+    ) return;
     if (orderPresentation.isCancellationRequested(order) || orderPresentation.requiresManualInstantArrangement(order)) return;
     if (order.locked && !order.currentEmployeeCanWork) return;
     applyOptimisticClaim(order);
