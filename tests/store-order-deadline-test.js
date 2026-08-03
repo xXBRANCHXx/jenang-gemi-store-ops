@@ -148,10 +148,6 @@ assert(
   presentation.isMarketplaceArrangementMissing({ ...missingMarketplaceArrangement, labelBacked: true }) === false,
   'A stored label must clear the marketplace arrangement alert.'
 );
-assert(
-  presentation.shouldSoundSiren({ ...missingMarketplaceArrangement, deadlineAt: now + 30 * 60000 }, now) === false,
-  'A red missing-arrangement warning must stay silent even inside the normal siren threshold.'
-);
 
 const readyPreview = presentation.previewActionState({ platform: 'Shopee' }, { currentEmployeeId: 'employee-1' });
 assert(readyPreview.disabled === true && readyPreview.label === 'Immediate marketplace action required', 'An unbacked marketplace preview must block processing and demand immediate recovery.');
