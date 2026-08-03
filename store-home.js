@@ -4,6 +4,16 @@
     .toLowerCase()
     .replace(/[^a-z0-9._-]+/g, '-')
     .replace(/^[._-]+|[._-]+$/g, '');
+  const requiredMarketplaceSources = new Set([
+    'shopee:jenang-gemi-shopee',
+    'shopee:zero-shopee',
+    'tiktok:jenang-gemi-tiktok',
+    'tiktok:zero-tiktok'
+  ]);
+  const isRequiredMarketplaceSourceError = (value) => {
+    const match = String(value || '').trim().toLowerCase().match(/^(shopee|tiktok):([^:]+):/);
+    return Boolean(match && requiredMarketplaceSources.has(`${match[1]}:${match[2]}`));
+  };
   const normalizedMarketplaceStatus = (order) => String(
     order?.marketplaceStatus || order?.marketplace_status || order?.orderStatus || order?.order_status || ''
   ).trim().toUpperCase();
@@ -217,6 +227,7 @@
     requiresManualInstantArrangement,
     isInstantManualLifecycle,
     isMarketplaceArrangementMissing,
+    isRequiredMarketplaceSourceError,
     formatHandoverSlot,
     filterOrdersByHandover,
     shouldShowOrderLoading,
@@ -1418,7 +1429,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     bigSetEnabled = Boolean(cachedMeta.bigSetEnabled);
     automaticArrangementPaused = Boolean(cachedMeta.automaticArrangementPaused);
-    orderSourceErrors = Array.isArray(cachedMeta.sourceErrors) ? cachedMeta.sourceErrors.map(String) : [];
+    orderSourceErrors = Array.isArray(cachedMeta.sourceErrors)
+      ? cachedMeta.sourceErrors.map(String).filter(orderPresentation.isRequiredMarketplaceSourceError)
+      : [];
     const cachedOrders = normalizeCachedOrders();
     if (!cachedOrders.length) return false;
     ordersEtag = String(cachedMeta.etag || '');
@@ -1438,7 +1451,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const rows = Array.isArray(cached) ? cached : (Array.isArray(cached?.orders) ? cached.orders : []);
     bigSetEnabled = Boolean(cached?.bigSetEnabled);
     automaticArrangementPaused = Boolean(cached?.automaticArrangementPaused);
-    orderSourceErrors = Array.isArray(cached?.sourceErrors) ? cached.sourceErrors.map(String) : [];
+    orderSourceErrors = Array.isArray(cached?.sourceErrors)
+      ? cached.sourceErrors.map(String).filter(orderPresentation.isRequiredMarketplaceSourceError)
+      : [];
     const cachedOrders = normalizeCachedOrders(rows);
     if (!cachedOrders.length) return false;
     ordersEtag = String(cached?.etag || ordersEtag || '');
@@ -1468,7 +1483,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const meta = payload.meta && typeof payload.meta === 'object' ? payload.meta : {};
     bigSetEnabled = Boolean(meta.big_set_enabled);
     automaticArrangementPaused = Boolean(meta.automation_paused);
-    const refreshErrors = Array.isArray(meta.errors) ? meta.errors : [];
+    const refreshErrors = Array.isArray(meta.errors) ? meta.errors.map(String) : [];
+    const requiredRefreshErrors = refreshErrors.filter(orderPresentation.isRequiredMarketplaceSourceError);
     const configuredSources = Number(meta.configured_sources || 0);
     const successfulAccounts = Number(meta.successful_accounts || 0);
     const partnerOrdersMeta = meta.partner_orders && typeof meta.partner_orders === 'object' ? meta.partner_orders : {};
@@ -1476,17 +1492,7 @@ document.addEventListener('DOMContentLoaded', () => {
       || Number(meta.stale_account_count || 0) > 0
       || Boolean(partnerOrdersMeta.stale)
       || (configuredSources > 0 && successfulAccounts === 0);
-    orderSourceErrors = refreshErrors.map(String);
-    if (Number(meta.stale_account_count || 0) > 0) {
-      const staleCount = Number(meta.stale_account_count);
-      orderSourceErrors.push(`${staleCount} marketplace source${staleCount === 1 ? '' : 's'} returned stale data`);
-    }
-    if (partnerOrdersMeta.stale) {
-      orderSourceErrors.push(String(partnerOrdersMeta.stale_reason || 'Partner order source returned stale data'));
-    }
-    if (configuredSources > 0 && successfulAccounts === 0) {
-      orderSourceErrors.push('No configured marketplace source returned a confirmed live response');
-    }
+    orderSourceErrors = requiredRefreshErrors;
     orderSourceErrors = Array.from(new Set(orderSourceErrors.filter(Boolean)));
 
     partnerOrderSources = (Array.isArray(payload.meta?.partner_orders?.sources) ? payload.meta.partner_orders.sources : [])
