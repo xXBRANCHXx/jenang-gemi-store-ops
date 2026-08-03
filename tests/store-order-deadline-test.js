@@ -130,17 +130,40 @@ assert(
   'Orders at or past their deadline must not sound the siren.'
 );
 
+const missingMarketplaceArrangement = {
+  platform: 'TikTok',
+  marketplaceStatus: 'AWAITING_SHIPMENT',
+  labelBacked: false,
+  deadlineAt: now + 12 * 60 * 60000
+};
+assert(
+  presentation.isMarketplaceArrangementMissing(missingMarketplaceArrangement) === true,
+  'An unarranged TikTok or Tokopedia unified-commerce order must be classified as action-required.'
+);
+assert(
+  presentation.isMarketplaceArrangementMissing({ ...missingMarketplaceArrangement, platform: 'Tokopedia' }) === true,
+  'A Tokopedia-branded unified-commerce row must receive the same never-silent protection.'
+);
+assert(
+  presentation.isMarketplaceArrangementMissing({ ...missingMarketplaceArrangement, labelBacked: true }) === false,
+  'A stored label must clear the marketplace arrangement alert.'
+);
+
 const readyPreview = presentation.previewActionState({ platform: 'Shopee' }, { currentEmployeeId: 'employee-1' });
-assert(readyPreview.disabled === false && readyPreview.label === 'Start order', 'A ready order preview must offer Start order.');
+assert(readyPreview.disabled === true && readyPreview.label === 'Immediate marketplace action required', 'An unbacked marketplace preview must block processing and demand immediate recovery.');
+
+const labelBackedPreview = presentation.previewActionState({ platform: 'Shopee', labelBacked: true }, { currentEmployeeId: 'employee-1' });
+assert(labelBackedPreview.disabled === false && labelBackedPreview.label === 'Start order', 'A label-backed marketplace preview must offer Start order.');
 
 const ownPreview = presentation.previewActionState(
-  { platform: 'Shopee', claimedBy: 'employee-1' },
+  { platform: 'Shopee', labelBacked: true, claimedBy: 'employee-1' },
   { currentEmployeeId: 'employee-1' }
 );
 assert(ownPreview.disabled === false && ownPreview.label === 'Resume order', 'An employee must be able to resume their own order from its preview.');
 
 const lockedPreview = presentation.previewActionState({
   platform: 'Shopee',
+  labelBacked: true,
   locked: true,
   currentEmployeeCanWork: false,
   claimedByName: 'Dina'

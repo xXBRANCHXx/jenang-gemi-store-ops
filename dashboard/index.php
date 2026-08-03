@@ -182,10 +182,10 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
             <main class="admin-layout">
                 <section class="admin-panel admin-panel-wide admin-fulfillment-panel">
                     <div class="admin-order-board-wrap">
-                        <div class="admin-queue-notice" data-automation-pause-notice role="status" hidden>
+                        <div class="admin-queue-notice" data-automation-pause-notice role="alert" aria-live="assertive" hidden>
                             <span class="admin-queue-notice-icon" aria-hidden="true">!</span>
                             <div>
-                                <strong>Automatic arrangement is paused</strong>
+                                <strong data-automation-pause-title>Automatic arrangement is paused</strong>
                                 <span data-automation-pause-copy>Unarranged marketplace orders stay visible for manual follow-up.</span>
                             </div>
                         </div>

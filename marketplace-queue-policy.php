@@ -103,7 +103,11 @@ function jg_store_ops_marketplace_order_visible(
     $manualAction = jg_store_ops_marketplace_cancellation_requested($order)
         || jg_store_ops_marketplace_instant_manual_order($order);
     if ($requireLabelBacked && !$labelBacked && !$manualAction) {
-        return false;
+        // Never turn an arrangement or label-storage failure into a missing
+        // order. The order APIs still reject fulfillment actions until a
+        // validated stored label exists; keeping the row visible gives Store
+        // Ops an actionable exception instead of silently losing the order.
+        return true;
     }
     return $labelBacked || $manualAction || !jg_store_ops_marketplace_awaiting_collection($order, $sourcePlatform);
 }
