@@ -96,6 +96,7 @@ function jg_store_ops_shell_open(array $options = []): void
     $attributes = array_merge([
         'class' => 'admin-app ' . $appClass,
         'data-store-shell' => true,
+        'data-store-active' => $active,
         'data-employee-id' => $employee['id'],
         'data-employee-name' => $employee['name'],
         'data-employee-profiles-endpoint' => $rootPrefix . 'api/employees-v2/',
@@ -166,7 +167,9 @@ function jg_store_ops_shell_open(array $options = []): void
                     <?php echo jg_store_ops_shell_svg('panel'); ?>
                 </button>
                 <section class="admin-store-page-title">
-                    <span><?php echo htmlspecialchars($eyebrow, ENT_QUOTES, 'UTF-8'); ?></span>
+                    <?php if ($eyebrow !== ''): ?>
+                        <span><?php echo htmlspecialchars($eyebrow, ENT_QUOTES, 'UTF-8'); ?></span>
+                    <?php endif; ?>
                     <h1><?php echo htmlspecialchars($title, ENT_QUOTES, 'UTF-8'); ?></h1>
                     <?php if ($description !== ''): ?>
                         <p><?php echo htmlspecialchars($description, ENT_QUOTES, 'UTF-8'); ?></p>

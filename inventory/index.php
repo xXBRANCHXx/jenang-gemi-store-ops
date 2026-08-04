@@ -31,10 +31,8 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
     jg_store_ops_shell_open([
         'root_prefix' => '../',
         'active' => 'inventory',
-        'title' => 'Production Receiving',
-        'eyebrow' => 'Store Ops',
-        'description' => 'Confirm delivered purchase-order lines. Checked quantities enter inventory immediately.',
-        'indicator' => 'Live receiving',
+        'title' => 'Inventory',
+        'eyebrow' => '',
         'app_attributes' => [
             'data-transactions' => true,
             'data-transactions-endpoint' => '../api/transactions/',
@@ -44,10 +42,10 @@ $transactionsJsVersion = (string) @filemtime(dirname(__DIR__) . '/transactions.j
 
         <main class="admin-layout admin-po-receiving">
             <section class="admin-po-receiving-toolbar">
-                <div class="admin-po-filter-tabs">
-                    <button type="button" class="is-active" data-po-filter="open">Ready to receive</button>
-                    <button type="button" data-po-filter="all">All orders</button>
-                    <button type="button" data-po-filter="received">Completed</button>
+                <div class="admin-po-filter-tabs" role="group" aria-label="Inventory order view">
+                    <button type="button" class="is-active" data-po-filter="open" aria-pressed="true">Ready to receive</button>
+                    <button type="button" data-po-filter="all" aria-pressed="false">All orders</button>
+                    <button type="button" data-po-filter="received" aria-pressed="false">Completed</button>
                 </div>
                 <div class="admin-po-toolbar-status">
                     <span><b data-po-open>0</b> open</span>

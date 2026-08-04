@@ -111,7 +111,9 @@
   const renderOrders = () => {
     if (!orderList) return;
     filterButtons.forEach((button) => {
-      button.classList.toggle('is-active', button.dataset.poFilter === state.filter);
+      const isActive = button.dataset.poFilter === state.filter;
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-pressed', String(isActive));
     });
     const orders = filteredOrders();
     if (!orders.length) {
