@@ -71,4 +71,23 @@ try {
 }
 po_receiving_expect(true, $overReceiptRejected, 'A completed PO cannot add the same stock twice.');
 
+$pdo->exec("INSERT INTO purchase_orders
+    (po_number, request_key, status, note, line_count, ordered_qty, received_qty, estimated_total, placed_by, placed_at, updated_at)
+    VALUES ('JG-PO-CANCELLED', 'request-cancelled', 'cancelled', '', 1, 2, 0, 20000, 'Executive', '2026-07-31 02:00:00', '2026-07-31 02:00:00')");
+$cancelledOrderId = (int) $pdo->lastInsertId();
+$pdo->exec("INSERT INTO purchase_order_items
+    (purchase_order_id, sku, product_name, moq, ordered_qty, received_qty, unit_cost, line_note, created_at, updated_at)
+    VALUES ({$cancelledOrderId}, 'BUBUR30', '30 pack Bubur', 2, 2, 0, 10000, '', '2026-07-31 02:00:00', '2026-07-31 02:00:00')");
+$cancelledItemId = (int) $pdo->lastInsertId();
+po_receiving_expect(1, count(jg_store_ops_purchase_orders_fetch($pdo)), 'Cancelled POs must be removed from the Store Ops receiving list.');
+$cancelledReceiptRejected = false;
+try {
+    jg_store_ops_purchase_orders_receive($pdo, $cancelledOrderId, [
+        ['item_id' => $cancelledItemId, 'quantity' => 1],
+    ], 'Store Ops test');
+} catch (RuntimeException) {
+    $cancelledReceiptRejected = true;
+}
+po_receiving_expect(true, $cancelledReceiptRejected, 'Store Ops must reject a late receipt for a cancelled PO.');
+
 echo "purchase-order-receiving-test: ok\n";

@@ -135,8 +135,9 @@ function jg_store_ops_purchase_orders_fetch(PDO $pdo, int $limit = 100): array
     $orders = $pdo->query(
         'SELECT id, po_number, status, note, line_count, ordered_qty, received_qty,
                 estimated_total, placed_by, placed_at, updated_at, completed_at
-         FROM purchase_orders
-         ORDER BY CASE status WHEN "pending" THEN 0 WHEN "partially_received" THEN 1 ELSE 2 END,
+	         FROM purchase_orders
+	         WHERE status <> "cancelled"
+	         ORDER BY CASE status WHEN "pending" THEN 0 WHEN "partially_received" THEN 1 ELSE 2 END,
                   placed_at DESC, id DESC
          LIMIT ' . $limit
     )->fetchAll();
@@ -235,9 +236,12 @@ function jg_store_ops_purchase_orders_receive(
         if (!is_array($order)) {
             throw new RuntimeException('Purchase order not found.');
         }
-        if ((string) ($order['status'] ?? '') === 'received') {
-            throw new RuntimeException('This purchase order has already been received in full.');
-        }
+	        $orderStatus = (string) ($order['status'] ?? '');
+	        if (!in_array($orderStatus, ['pending', 'partially_received'], true)) {
+	            throw new RuntimeException($orderStatus === 'cancelled'
+	                ? 'This purchase order was cancelled in Executive.'
+	                : 'This purchase order has already been received in full.');
+	        }
 
         $itemStmt = $pdo->prepare(
             'SELECT id, sku, ordered_qty, received_qty
