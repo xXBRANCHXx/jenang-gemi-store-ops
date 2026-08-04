@@ -6729,6 +6729,10 @@ button.admin-store-sidebar-profile:hover {
   padding: 0 10px 8px;
 }
 
+.admin-store-shell .admin-po-receiving {
+  padding: 0 10px 8px;
+}
+
 .admin-walkins-work,
 .admin-walkins-side {
   display: grid;
