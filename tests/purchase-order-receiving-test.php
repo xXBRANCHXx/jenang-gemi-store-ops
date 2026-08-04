@@ -90,4 +90,23 @@ try {
 }
 po_receiving_expect(true, $cancelledReceiptRejected, 'Store Ops must reject a late receipt for a cancelled PO.');
 
+$pdo->exec("INSERT INTO purchase_orders
+    (po_number, request_key, status, note, line_count, ordered_qty, received_qty, estimated_total, placed_by, placed_at, updated_at)
+    VALUES ('JG-PO-DRAFT', 'request-draft', 'draft', '', 1, 2, 0, 20000, 'Executive', '2026-07-31 03:00:00', '2026-07-31 03:00:00')");
+$draftOrderId = (int) $pdo->lastInsertId();
+$pdo->exec("INSERT INTO purchase_order_items
+    (purchase_order_id, sku, product_name, moq, ordered_qty, received_qty, unit_cost, line_note, created_at, updated_at)
+    VALUES ({$draftOrderId}, 'BUBUR30', '30 pack Bubur', 2, 2, 0, 10000, '', '2026-07-31 03:00:00', '2026-07-31 03:00:00')");
+$draftItemId = (int) $pdo->lastInsertId();
+po_receiving_expect(1, count(jg_store_ops_purchase_orders_fetch($pdo)), 'Draft PDFs must stay out of Store Ops until Executive confirms them.');
+$draftReceiptRejected = false;
+try {
+    jg_store_ops_purchase_orders_receive($pdo, $draftOrderId, [
+        ['item_id' => $draftItemId, 'quantity' => 1],
+    ], 'Store Ops test');
+} catch (RuntimeException) {
+    $draftReceiptRejected = true;
+}
+po_receiving_expect(true, $draftReceiptRejected, 'Store Ops must reject receiving against an unconfirmed draft.');
+
 echo "purchase-order-receiving-test: ok\n";

@@ -25,6 +25,6 @@ assert.match(script, /setInterval[\s\S]*45000/);
 
 assert.match(api, /jg_store_ops_purchase_orders_receive/);
 assert.match(api, /purchase_order_metrics/);
-assert.match(fs.readFileSync(path.join(root, 'purchase-orders-bootstrap.php'), 'utf8'), /WHERE status <> "cancelled"/);
+assert.match(fs.readFileSync(path.join(root, 'purchase-orders-bootstrap.php'), 'utf8'), /WHERE status IN \("pending", "partially_received", "received"\)/);
 
 console.log('purchase-order-receiving-ui-test: ok');

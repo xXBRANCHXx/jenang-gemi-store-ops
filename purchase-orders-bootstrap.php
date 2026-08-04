@@ -136,7 +136,7 @@ function jg_store_ops_purchase_orders_fetch(PDO $pdo, int $limit = 100): array
         'SELECT id, po_number, status, note, line_count, ordered_qty, received_qty,
                 estimated_total, placed_by, placed_at, updated_at, completed_at
 	         FROM purchase_orders
-	         WHERE status <> "cancelled"
+	         WHERE status IN ("pending", "partially_received", "received")
 	         ORDER BY CASE status WHEN "pending" THEN 0 WHEN "partially_received" THEN 1 ELSE 2 END,
                   placed_at DESC, id DESC
          LIMIT ' . $limit
