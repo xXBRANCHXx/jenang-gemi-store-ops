@@ -31,6 +31,6 @@ assert.match(api, /jg_store_ops_resolve_order_by_id[\s\S]*?items_source.*?order_
 assert.match(bootstrap, /f\.status = \"FULFILLED\"[\s\S]*?event_type = \"fulfill\"/, 'The records query must require completed state and a real fulfill event.');
 assert.doesNotMatch(bootstrap, /event_type = \"remove_from_listed\"/, 'Removed queue rows must not be included as processed records.');
 assert.match(fulfillment, /items_json LONGTEXT[\s\S]*?jg_store_ops_fulfillment_items_snapshot[\s\S]*?items_json = CASE/, 'Future processed orders must persist their complete product snapshot.');
-assert.match(printLabel, /markFulfilledOnServer[\s\S]*?product_name:[\s\S]*?quantity:[\s\S]*?fulfilled_at:[\s\S]*?items/, 'Print completion must send every ordered product, including Skip Scan items.');
+assert.match(printLabel, /const completionItems[\s\S]*?product_name:[\s\S]*?quantity:[\s\S]*?orderActionPayload\('fulfill_order',[\s\S]*?fulfilled_at:[\s\S]*?items: completionItems\(\)/, 'Print completion must send every ordered product, including Skip Scan items.');
 
 console.log('order-records-ui-test: ok');

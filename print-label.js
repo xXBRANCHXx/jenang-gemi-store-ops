@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const ordersStorageKey = 'jg-store-live-orders';
   const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
-  const pendingScanQueueStorageKey = 'jg-store-pending-scan-queues-v1';
   const ordersEndpoint = '../../api/orders-v2/';
   const orderIdNode = document.querySelector('[data-print-order-id]');
   const statusNode = document.querySelector('[data-print-status]');
@@ -63,7 +62,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const packageNumber = String(order?.packageNumber || order?.package_number || params.get('package') || params.get('package_id') || '');
   let printConfirmationTimer = 0;
   let printLifecycleCleanup = () => {};
-  let printFinalizationPromise = null;
   let printClosing = false;
   let printInProgress = false;
   let labelUrl = '';
@@ -88,29 +86,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return account || platform || 'default';
   };
 
-  const scanQueueKey = () => [
-    normalizeSourceKey(order?.platform || ''),
-    sourceKeyFromOrder(order),
-    String(order?.id || orderId || '')
-  ].join('\u0000');
-
-  const readPendingScanQueues = () => {
-    try {
-      const parsed = JSON.parse(window.localStorage.getItem(pendingScanQueueStorageKey) || '{}');
-      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-    } catch (_error) {
-      return {};
-    }
-  };
-
-  const writePendingScanQueues = (queues) => {
-    try {
-      window.localStorage.setItem(pendingScanQueueStorageKey, JSON.stringify(queues));
-    } catch (_error) {
-      // Keep the queue available in this page load if storage is blocked.
-    }
-  };
-
   const orderActionPayload = (action, extra = {}) => ({
     action,
     order_id: String(order?.id || orderId || ''),
@@ -119,66 +94,6 @@ document.addEventListener('DOMContentLoaded', () => {
     label_backed: labelLoaded || Boolean(order?.labelBacked || order?.label_backed),
     ...extra
   });
-
-  const postOrderAction = async (action, extra = {}, options = {}) => {
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 15000);
-    try {
-      const response = await fetch(ordersEndpoint, {
-        method: 'POST',
-        credentials: 'same-origin',
-        keepalive: Boolean(options.keepalive),
-        signal: controller.signal,
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(orderActionPayload(action, extra))
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || payload.ok === false) {
-        throw new Error(payload.error || 'Unable to update fulfillment state.');
-      }
-      return payload;
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new Error('Store Ops took too long to update this order. Confirm again to retry.');
-      }
-      throw error;
-    } finally {
-      window.clearTimeout(timeout);
-    }
-  };
-
-  const flushPendingScanQueueForOrder = async () => {
-    if (!order || isReprint) return;
-    const queues = readPendingScanQueues();
-    let key = scanQueueKey();
-    let queue = queues[key];
-    if (!queue) {
-      const fallback = Object.entries(queues).find(([, candidate]) => (
-        candidate
-        && typeof candidate === 'object'
-        && String(candidate.order_id || '').trim() === String(order.id || orderId || '').trim()
-      ));
-      if (fallback) {
-        key = fallback[0];
-        queue = fallback[1];
-      }
-    }
-    if (!queue || typeof queue !== 'object') return;
-
-    const events = Array.isArray(queue.events) ? queue.events.filter((event) => event && typeof event === 'object') : [];
-    const progress = queue.progress && typeof queue.progress === 'object'
-      ? queue.progress
-      : { completed: 0, required: 0 };
-    await postOrderAction('claim_order', {}, { keepalive: true });
-    if (events.length) {
-      await postOrderAction('record_scan', { events, progress });
-    }
-    if (queue.complete) {
-      await postOrderAction('complete_scan', { progress });
-    }
-    delete queues[key];
-    writePendingScanQueues(queues);
-  };
 
   const setError = (message) => {
     if (!errorNode) return;
@@ -222,34 +137,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const markPrintedOnServer = async () => {
-    if (!order) return;
-    await postOrderAction(isReprint ? 'reprint_label' : 'label_printed', {
-      printed_at: new Date().toISOString()
-    }, { keepalive: true });
-  };
+  const completionItems = () => (Array.isArray(order?.items) ? order.items : []).map((item) => ({
+    sku: String(item.sku || item.tag || item.sourceSkus?.[0] || ''),
+    product_name: String(item.productName || item.scanProductName || item.product_name || ''),
+    quantity: Math.max(0, Number(item.quantity || item.qty || 0))
+  })).filter((item) => item.quantity > 0 && (item.sku || item.product_name));
 
-  const markFulfilledOnServer = async () => {
-    if (!order || isReprint) return;
-    const items = (Array.isArray(order.items) ? order.items : []).map((item) => ({
-      sku: String(item.sku || item.tag || item.sourceSkus?.[0] || ''),
-      product_name: String(item.productName || item.scanProductName || item.product_name || ''),
-      quantity: Math.max(0, Number(item.quantity || item.qty || 0))
-    })).filter((item) => item.quantity > 0 && (item.sku || item.product_name));
-    await postOrderAction('fulfill_order', {
-      fulfilled_at: new Date().toISOString(),
-      items
-    }, { keepalive: true });
-  };
-
-  const beginPrintFinalization = () => {
-    if (printFinalizationPromise) return printFinalizationPromise;
-    const pending = isReprint ? markPrintedOnServer() : markFulfilledOnServer();
-    printFinalizationPromise = pending.catch((error) => {
-      printFinalizationPromise = null;
-      throw error;
-    });
-    return printFinalizationPromise;
+  const queuePrintCompletion = () => {
+    if (!order || typeof navigator.sendBeacon !== 'function') return false;
+    const timestamp = new Date().toISOString();
+    const payload = isReprint
+      ? orderActionPayload('reprint_label', { printed_at: timestamp })
+      : orderActionPayload('fulfill_order', { fulfilled_at: timestamp, items: completionItems() });
+    try {
+      return navigator.sendBeacon(
+        ordersEndpoint,
+        new Blob([JSON.stringify(payload)], { type: 'application/json' })
+      );
+    } catch (_error) {
+      return false;
+    }
   };
 
   const setConfirmationDisabled = (disabled) => {
@@ -285,10 +192,15 @@ document.addEventListener('DOMContentLoaded', () => {
     printClosing = true;
     resetPrintLifecycle();
     setConfirmationDisabled(true);
-    if (!isReprint) markPrinted();
-    if (statusNode) statusNode.textContent = isReprint ? 'Finalizing reprint' : 'Removed from Listed · finalizing';
     setError('');
-    const finalization = beginPrintFinalization();
+    if (!queuePrintCompletion()) {
+      printClosing = false;
+      setConfirmationDisabled(false);
+      if (statusNode) statusNode.textContent = 'Confirmation not sent';
+      setError('Store Ops could not register the confirmation. Press Printed successfully again.');
+      return;
+    }
+    if (!isReprint) markPrinted();
     printInProgress = false;
     if (statusNode) statusNode.textContent = 'Print confirmed';
     try {
@@ -297,16 +209,6 @@ document.addEventListener('DOMContentLoaded', () => {
       // Closing the print tab does not depend on focusing its opener.
     }
     window.close();
-    finalization.then(() => {
-      printClosing = false;
-    }).catch((error) => {
-      printInProgress = true;
-      printClosing = false;
-      setConfirmationDisabled(false);
-      if (confirmationNode) confirmationNode.hidden = false;
-      if (statusNode) statusNode.textContent = 'Update failed';
-      setError(error instanceof Error ? error.message : 'Unable to finish updating the printed order.');
-    });
     window.setTimeout(() => {
       setConfirmationDisabled(false);
       setError('Print confirmed. Your browser prevented automatic closing; you can close this tab.');
@@ -442,13 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
       setPrintEnabled(true);
       return;
     }
-    if (!isReprint) markPrinted();
     showPrintConfirmationFallback();
-    beginPrintFinalization().catch((error) => {
-      showPrintConfirmationFallback('Update failed');
-      if (statusNode) statusNode.textContent = 'Update failed';
-      setError(error instanceof Error ? error.message : 'Unable to finish updating the printed order.');
-    });
   };
 
   const retryPrintDialog = () => {
@@ -457,11 +353,6 @@ document.addEventListener('DOMContentLoaded', () => {
     printClosing = false;
     if (!openPrintDialog()) return;
     showPrintConfirmationFallback();
-    beginPrintFinalization().catch((error) => {
-      showPrintConfirmationFallback('Update failed');
-      if (statusNode) statusNode.textContent = 'Update failed';
-      setError(error instanceof Error ? error.message : 'Unable to finish updating the printed order.');
-    });
   };
 
   const platformLabel = (value) => {
