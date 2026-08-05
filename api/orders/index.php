@@ -430,56 +430,6 @@ function jg_store_ops_orders_filter_marketplace_queue(
     return $filtered;
 }
 
-/**
- * Carrier handoff proves that a marketplace order has left the store. Repair
- * any missing final browser callback, then omit the now-completed row from the
- * response. Stock deduction and the fulfillment write are both idempotent.
- *
- * @param array<int, mixed> $orders
- * @param array<int, string> $errors
- * @return array<int, array<string, mixed>>
- */
-function jg_store_ops_orders_reconcile_handed_over(
-    PDO $pdo,
-    array $orders,
-    int &$reconciledCount,
-    array &$errors
-): array {
-    $remaining = [];
-    foreach ($orders as $order) {
-        if (!is_array($order) || !jg_store_ops_marketplace_handed_over($order)) {
-            if (is_array($order)) {
-                $remaining[] = $order;
-            }
-            continue;
-        }
-
-        $key = jg_store_ops_fulfillment_key_from_order($order);
-        $key['package_id'] = trim((string) ($order['packageNumber'] ?? $order['package_id'] ?? ''));
-        $items = is_array($order['items'] ?? null) ? $order['items'] : [];
-        $sourceLabel = $key['source_platform'] . ':' . $key['source_account'] . ':' . $key['order_id'];
-        try {
-            jg_store_ops_fulfillment_validate_key($key);
-            jg_store_ops_order_stock_deduct($pdo, $key, $items);
-            jg_store_ops_fulfillment_reconcile_marketplace_handover($pdo, $key, $items);
-        } catch (Throwable $error) {
-            $errors[] = $sourceLabel . ': carrier handoff reconciliation failed: ' . $error->getMessage();
-            $remaining[] = $order;
-            continue;
-        }
-
-        try {
-            jg_store_ops_orders_marketplace_status_callback($key, 'IS_PROCESSED');
-        } catch (Throwable $error) {
-            // Local completion is already durable. A later refresh retries this
-            // callback while the upstream stored-label row still exists.
-            $errors[] = $sourceLabel . ': processed callback retry needed: ' . $error->getMessage();
-        }
-        $reconciledCount++;
-    }
-    return $remaining;
-}
-
 function jg_store_ops_orders_proxy_file(string $url, string $fallbackFilename): void
 {
     if (function_exists('curl_init')) {
@@ -1307,7 +1257,6 @@ $decoded = [
 $errors = [];
 $successfulAccounts = 0;
 $processedCollectionOrders = 0;
-$reconciledHandoverOrders = 0;
 $localHardSetKnown = false;
 $localHardSetEnabled = false;
 $localAutomaticSources = [];
@@ -1398,16 +1347,6 @@ foreach ($marketplaceSources as $source) {
 }
 
 $decoded = jg_store_ops_orders_map_item_skus($decoded);
-try {
-    $decoded['orders'] = jg_store_ops_orders_reconcile_handed_over(
-        jg_store_ops_fulfillment_db(),
-        is_array($decoded['orders'] ?? null) ? $decoded['orders'] : [],
-        $reconciledHandoverOrders,
-        $errors
-    );
-} catch (Throwable $handoverError) {
-    $errors[] = 'Marketplace handoff reconciliation unavailable: ' . $handoverError->getMessage();
-}
 $partnerOrders = jg_store_ops_orders_refresh_partner_orders(jg_store_ops_partner_orders_list());
 $websiteOrders = [];
 $websiteIngestionState = ['enabled' => false];
@@ -1432,7 +1371,6 @@ $decoded['meta']['website_orders'] = [
 ];
 $decoded['meta']['errors'] = $errors;
 $decoded['meta']['processed_collection_count'] = $processedCollectionOrders;
-$decoded['meta']['reconciled_handover_count'] = $reconciledHandoverOrders;
 $decoded['meta']['marketplace_enabled'] = $marketplaceFeedEnabled;
 $decoded['meta']['marketplace_feed_mode'] = !$localHardSetKnown
     ? 'blocked'

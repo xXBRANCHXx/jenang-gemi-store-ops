@@ -68,24 +68,6 @@ function jg_store_ops_marketplace_status(array $order): string
     return '';
 }
 
-/**
- * A carrier-handoff status is stronger than an arrangement status: the parcel
- * has left the store and the order can no longer be worked from Listed. These
- * statuses are used to repair a missing final Store Ops browser callback.
- */
-function jg_store_ops_marketplace_handed_over(array $order, string $sourcePlatform = ''): bool
-{
-    $platform = strtolower(trim((string) ($order['platform'] ?? $order['source_platform'] ?? $sourcePlatform)));
-    $status = jg_store_ops_marketplace_status($order);
-    if ($platform === 'shopee' || str_contains($platform, 'shopee')) {
-        return in_array($status, ['PICKED_UP', 'SHIPPED', 'TO_CONFIRM_RECEIVE', 'DELIVERED', 'COMPLETED'], true);
-    }
-    if ($platform === 'tiktok' || str_contains($platform, 'tiktok')) {
-        return in_array($status, ['PICKED_UP', 'IN_TRANSIT', 'SHIPPED', 'TO_CONFIRM_RECEIVE', 'DELIVERED', 'COMPLETED'], true);
-    }
-    return false;
-}
-
 function jg_store_ops_marketplace_pre_activation_visible(array $order, string $sourcePlatform): bool
 {
     if (jg_store_ops_marketplace_label_backed($order)) {
