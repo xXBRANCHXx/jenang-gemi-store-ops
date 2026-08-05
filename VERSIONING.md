@@ -1,6 +1,6 @@
 # Jenang Gemi Store Ops Versioning
 
-Current store version: `1.04.34`
+Current store version: `1.04.35`
 
 Versioning rule:
 - Default behavior: increment the last two digits by `+1`.

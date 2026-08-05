@@ -323,16 +323,21 @@ function jg_store_ops_fulfillment_insert_order_if_missing(PDO $pdo, array $key):
 {
     jg_store_ops_fulfillment_validate_key($key);
     $now = jg_store_ops_fulfillment_now();
-    $stmt = $pdo->prepare(
-        'INSERT INTO store_ops_order_fulfillment_v2 (
-            source_platform, source_account, order_id, status, created_at, updated_at
-        ) VALUES (
-            :source_platform, :source_account, :order_id, "UNCLAIMED", :created_at, :updated_at
-        )
-        ON DUPLICATE KEY UPDATE
-            source_account = IF(source_account = "", VALUES(source_account), source_account),
-            updated_at = updated_at'
-    );
+    $sqlite = strtolower((string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME)) === 'sqlite';
+    $stmt = $pdo->prepare($sqlite
+        ? 'INSERT OR IGNORE INTO store_ops_order_fulfillment_v2 (
+               source_platform, source_account, order_id, status, created_at, updated_at
+           ) VALUES (
+               :source_platform, :source_account, :order_id, "UNCLAIMED", :created_at, :updated_at
+           )'
+        : 'INSERT INTO store_ops_order_fulfillment_v2 (
+               source_platform, source_account, order_id, status, created_at, updated_at
+           ) VALUES (
+               :source_platform, :source_account, :order_id, "UNCLAIMED", :created_at, :updated_at
+           )
+           ON DUPLICATE KEY UPDATE
+               source_account = IF(source_account = "", VALUES(source_account), source_account),
+               updated_at = updated_at');
     $stmt->execute([
         ':source_platform' => $key['source_platform'],
         ':source_account' => $key['source_account'],
@@ -349,7 +354,7 @@ function jg_store_ops_fulfillment_fetch_order(PDO $pdo, array $key, bool $forUpd
               AND source_account = :source_account
               AND order_id = :order_id
             LIMIT 1';
-    if ($forUpdate) {
+    if ($forUpdate && strtolower((string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME)) === 'mysql') {
         $sql .= ' FOR UPDATE';
     }
 
@@ -783,6 +788,73 @@ function jg_store_ops_fulfillment_mark_fulfilled(PDO $pdo, array $key, string $e
         jg_store_ops_fulfillment_log_event($pdo, $key, 'fulfill', $employeeId, $employeeName, [
             'items' => $snapshot,
         ]);
+        $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
+        $pdo->commit();
+        return is_array($row) ? $row : [];
+    } catch (Throwable $throwable) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $throwable;
+    }
+}
+
+/**
+ * Repair a missing browser completion after the marketplace confirms carrier
+ * handoff. Inventory is reconciled before this function is called, so this
+ * transition may safely bypass an abandoned employee claim.
+ */
+function jg_store_ops_fulfillment_reconcile_marketplace_handover(PDO $pdo, array $key, array $items = []): array
+{
+    $pdo->beginTransaction();
+    try {
+        jg_store_ops_fulfillment_insert_order_if_missing($pdo, $key);
+        $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, true);
+        if (!is_array($row)) {
+            throw new RuntimeException('Unable to reconcile the handed-over marketplace order.');
+        }
+
+        $status = strtoupper(trim((string) ($row['status'] ?? '')));
+        if ($status === 'FULFILLED') {
+            $pdo->commit();
+            return $row;
+        }
+        if ($status === 'CANCELLED') {
+            throw new RuntimeException('A cancelled Store Ops order cannot be reconciled as handed over.');
+        }
+
+        $snapshot = jg_store_ops_fulfillment_items_snapshot($items);
+        $itemsJson = $snapshot !== []
+            ? json_encode($snapshot, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+            : null;
+        $now = jg_store_ops_fulfillment_now();
+        $stmt = $pdo->prepare(
+            'UPDATE store_ops_order_fulfillment_v2
+             SET status = "FULFILLED",
+                 fulfilled_at = COALESCE(fulfilled_at, :fulfilled_at),
+                 items_json = COALESCE(:items_json, items_json),
+                 last_activity_at = :last_activity_at,
+                 updated_at = :updated_at
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            ':fulfilled_at' => $now,
+            ':items_json' => $itemsJson,
+            ':last_activity_at' => $now,
+            ':updated_at' => $now,
+            ':id' => (int) $row['id'],
+        ]);
+        jg_store_ops_fulfillment_log_event(
+            $pdo,
+            $key,
+            'fulfill',
+            'system-marketplace',
+            'Marketplace sync',
+            [
+                'message' => 'Reconciled after the marketplace confirmed carrier handoff.',
+                'items' => $snapshot,
+            ]
+        );
         $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
         $pdo->commit();
         return is_array($row) ? $row : [];
