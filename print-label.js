@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ordersStorageKey = 'jg-store-live-orders';
   const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
+  const pendingCompletionQueueStorageKey = 'jg-store-pending-order-completions-v1';
   const ordersEndpoint = '../../api/orders-v2/';
   const orderIdNode = document.querySelector('[data-print-order-id]');
   const statusNode = document.querySelector('[data-print-status]');
@@ -143,20 +144,54 @@ document.addEventListener('DOMContentLoaded', () => {
     quantity: Math.max(0, Number(item.quantity || item.qty || 0))
   })).filter((item) => item.quantity > 0 && (item.sku || item.product_name));
 
+  const completionQueueKey = (payload) => [
+    normalizeSourceKey(payload?.source_platform || ''),
+    normalizeSourceKey(payload?.source_account || ''),
+    String(payload?.order_id || '').trim(),
+    String(payload?.action || '').trim()
+  ].join('\u0000');
+
+  const readPendingCompletionQueue = () => {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(pendingCompletionQueueStorageKey) || '{}');
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (_error) {
+      return {};
+    }
+  };
+
+  const persistPendingCompletion = (payload) => {
+    try {
+      const queue = readPendingCompletionQueue();
+      queue[completionQueueKey(payload)] = {
+        payload,
+        queued_at: new Date().toISOString()
+      };
+      window.localStorage.setItem(pendingCompletionQueueStorageKey, JSON.stringify(queue));
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  };
+
   const queuePrintCompletion = () => {
-    if (!order || typeof navigator.sendBeacon !== 'function') return false;
+    if (!order) return false;
     const timestamp = new Date().toISOString();
     const payload = isReprint
       ? orderActionPayload('reprint_label', { printed_at: timestamp })
       : orderActionPayload('fulfill_order', { fulfilled_at: timestamp, items: completionItems() });
+    if (!persistPendingCompletion(payload)) return false;
+
+    if (typeof navigator.sendBeacon !== 'function') return true;
     try {
-      return navigator.sendBeacon(
+      navigator.sendBeacon(
         ordersEndpoint,
         new Blob([JSON.stringify(payload)], { type: 'application/json' })
       );
     } catch (_error) {
-      return false;
+      // The durable queue will retry from the dashboard.
     }
+    return true;
   };
 
   const setConfirmationDisabled = (disabled) => {

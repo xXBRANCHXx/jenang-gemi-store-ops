@@ -1138,6 +1138,7 @@ if ($method === 'POST') {
                     jg_store_ops_orders_marketplace_status_callback($key, 'IS_PROCESSED');
                 } catch (Throwable $callbackError) {
                     error_log('Marketplace processed callback failed: ' . $callbackError->getMessage());
+                    throw new RuntimeException('Marketplace did not acknowledge the processed status. Store Ops will retry.');
                 }
             }
             jg_store_ops_orders_fulfillment_response($pdo, $row);

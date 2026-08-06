@@ -300,6 +300,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const skuCatalogStorageKey = 'jg-store-sku-catalog';
   const printedOrderStorageKey = 'jg-store-printed-order-event';
   const activeOrderStorageKey = 'jg-store-active-order-id';
+  const pendingCompletionQueueStorageKey = 'jg-store-pending-order-completions-v1';
   const themeStorageKey = 'jg-admin-theme';
   const legacySourceColorStorageKey = 'jg-store-source-colors';
   const sidebarStorageKey = 'jg-store-sidebar-expanded';
@@ -358,6 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let reprintSearchTimer = 0;
   let reprintSearchController = null;
   let reprintSearchSequence = 0;
+  let completionQueueFlushPromise = null;
   let reprintProfiles = [];
   let selectedReprintProfile = null;
 
@@ -1757,6 +1759,59 @@ document.addEventListener('DOMContentLoaded', () => {
     return payload;
   };
 
+  const readPendingCompletionQueue = () => {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(pendingCompletionQueueStorageKey) || '{}');
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (_error) {
+      return {};
+    }
+  };
+
+  const removeAcknowledgedCompletion = (key, queuedAt) => {
+    try {
+      const queue = readPendingCompletionQueue();
+      if (!queue[key] || String(queue[key].queued_at || '') !== queuedAt) return;
+      delete queue[key];
+      window.localStorage.setItem(pendingCompletionQueueStorageKey, JSON.stringify(queue));
+    } catch (_error) {
+      // Keep retrying the acknowledged action if local persistence is temporarily unavailable.
+    }
+  };
+
+  const flushPendingOrderCompletions = () => {
+    if (completionQueueFlushPromise) return completionQueueFlushPromise;
+    completionQueueFlushPromise = (async () => {
+      let acknowledged = 0;
+      const queue = readPendingCompletionQueue();
+      for (const [key, entry] of Object.entries(queue)) {
+        const payload = entry && typeof entry === 'object' && entry.payload && typeof entry.payload === 'object'
+          ? entry.payload
+          : null;
+        if (!payload || !['fulfill_order', 'reprint_label'].includes(String(payload.action || ''))) continue;
+        try {
+          const response = await fetch(ordersEndpoint, {
+            method: 'POST',
+            credentials: 'same-origin',
+            keepalive: true,
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const responsePayload = await readJsonResponse(response, 'Unable to finish a queued order.');
+          if (!response.ok || responsePayload.ok === false) continue;
+          removeAcknowledgedCompletion(key, String(entry.queued_at || ''));
+          acknowledged += 1;
+        } catch (_error) {
+          // Durable entries remain queued until Store Ops and the source acknowledge them.
+        }
+      }
+      return acknowledged;
+    })().finally(() => {
+      completionQueueFlushPromise = null;
+    });
+    return completionQueueFlushPromise;
+  };
+
   const showBoardAlert = (message) => {
     if (!board || !message) return;
     board.insertAdjacentHTML('afterbegin', `<div class="admin-board-empty admin-board-alert">${escapeHtml(message)}</div>`);
@@ -2995,8 +3050,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (event.key === printedOrderStorageKey) {
       closeFulfillment();
-      refreshOrders(false).catch(() => {});
+      flushPendingOrderCompletions()
+        .finally(() => refreshOrders(false, { force: true }).catch(() => {}));
       renderBoard();
+      return;
+    }
+    if (event.key === pendingCompletionQueueStorageKey) {
+      flushPendingOrderCompletions()
+        .finally(() => refreshOrders(false, { force: true }).catch(() => {}));
       return;
     }
     if (event.key === sourceColorStorageKey) {
@@ -3083,7 +3144,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.addEventListener('focus', () => {
     loadSourceColorMap().catch(() => {});
-    refreshOrders(false).catch(() => {});
+    flushPendingOrderCompletions()
+      .finally(() => refreshOrders(false, { force: true }).catch(() => {}));
   });
 
   const initialize = async () => {
@@ -3105,7 +3167,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSourceColorMap().catch(reportSourceColorError);
 
     window.setTimeout(() => {
-      refreshOrders(true, { force: true }).catch(() => {});
+      flushPendingOrderCompletions()
+        .finally(() => refreshOrders(true, { force: true }).catch(() => {}));
       refreshSkuCatalog()
         .then((updated) => {
           if (updated) refreshOrders(false, { force: true }).catch(() => {});
@@ -3113,7 +3176,8 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch(() => {});
       window.setInterval(() => {
         formatClock();
-        refreshOrders(false).catch(() => {});
+        flushPendingOrderCompletions()
+          .finally(() => refreshOrders(false).catch(() => {}));
       }, ordersRefreshIntervalMs);
     }, hasCachedOrders ? cachedStartupRefreshDelayMs : 0);
   };
