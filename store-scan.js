@@ -5,8 +5,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const ordersStorageKey = 'jg-store-live-orders';
   const activeOrderStorageKey = 'jg-store-active-order-id';
   const pendingScanQueueStorageKey = 'jg-store-pending-scan-queues-v1';
+  const skuCatalogStorageKey = 'jg-store-sku-catalog';
   const scanBridgeEndpoint = '../../api/scan-bridge/';
   const scanSerialEndpoint = '../../api/scan-serial/';
+  const skuDbEndpoint = '../../api/sku-db/';
   const ordersEndpoint = '../../api/orders-v2/';
   const scanFlushDelayMs = 30000;
   const orderIdNode = document.querySelector('[data-scan-order-id]');
@@ -15,6 +17,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const scanProgress = document.querySelector('[data-scan-progress]');
   const scanStatus = document.querySelector('[data-scan-status]');
   const syncStatus = document.querySelector('[data-sync-status]');
+  const stockWarning = document.querySelector('[data-stock-warning]');
+  const stockWarningProducts = document.querySelector('[data-stock-warning-products]');
+  const stockWarningDismiss = document.querySelector('[data-stock-warning-dismiss]');
 
   const escapeHtml = (value) => String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -64,6 +69,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let scanCompletionQueued = false;
   let claimSynced = false;
   let claimSyncPromise = null;
+  let stockRowsByCode = new Map();
+  let soldOutByScanSku = new Map();
+  let soldOutSignature = '';
+  let dismissedSoldOutSignature = '';
+  let stockRefreshPromise = null;
 
   if (orderIdNode) orderIdNode.textContent = order?.id || 'Order missing';
 
@@ -104,6 +114,99 @@ document.addEventListener('DOMContentLoaded', () => {
     if (Array.isArray(item.sourceBarcodes)) return item.sourceBarcodes;
     const barcode = String(item.barcode || '').trim();
     return barcode ? [barcode] : [];
+  };
+
+  const stockCode = (value) => String(value || '').trim().toUpperCase();
+
+  const stockCandidatesFor = (item) => Array.from(new Set([
+    ...sourceSkusFor(item),
+    item.sku,
+    item.tag
+  ].map(stockCode).filter(Boolean)));
+
+  const readCachedStockRows = () => {
+    try {
+      const cached = JSON.parse(window.localStorage.getItem(skuCatalogStorageKey) || 'null');
+      const rows = Array.isArray(cached) ? cached : (Array.isArray(cached?.items) ? cached.items : []);
+      const orderRows = Array.isArray(order?.items) ? order.items : [];
+      return rows.concat(orderRows).filter((row) => row && typeof row === 'object');
+    } catch (_error) {
+      return [];
+    }
+  };
+
+  const stockQuantityForRow = (row) => {
+    const value = row.current_stock ?? row.currentStock;
+    if (value === '' || value === null || typeof value === 'undefined') return null;
+    const quantity = Number(value);
+    return Number.isFinite(quantity) ? quantity : null;
+  };
+
+  const applyStockRows = (rows) => {
+    const nextRowsByCode = new Map();
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+      if (!row || typeof row !== 'object' || stockQuantityForRow(row) === null) return;
+      [row.sku, row.tag].map(stockCode).filter(Boolean).forEach((code) => {
+        if (!nextRowsByCode.has(code)) nextRowsByCode.set(code, row);
+      });
+    });
+
+    stockRowsByCode = nextRowsByCode;
+    const nextSoldOut = new Map();
+    scanItems().forEach((item) => {
+      const rowsForItem = Array.from(new Set(stockCandidatesFor(item)
+        .map((code) => stockRowsByCode.get(code))
+        .filter(Boolean)));
+      const soldOutRows = rowsForItem.filter((row) => Number(stockQuantityForRow(row)) <= 0);
+      if (!soldOutRows.length) return;
+      nextSoldOut.set(scanSkuFor(item), {
+        name: String(item.productName || item.scanProductName || scanSkuFor(item) || 'Order product'),
+        skus: Array.from(new Set(soldOutRows.map((row) => stockCode(row.sku || row.tag)).filter(Boolean)))
+      });
+    });
+
+    const nextSignature = Array.from(nextSoldOut.values())
+      .flatMap((alert) => alert.skus)
+      .sort()
+      .join('|');
+    if (!nextSignature) dismissedSoldOutSignature = '';
+    soldOutByScanSku = nextSoldOut;
+    soldOutSignature = nextSignature;
+    render();
+  };
+
+  const stockWarningRequiresDismissal = () => Boolean(
+    soldOutSignature && soldOutSignature !== dismissedSoldOutSignature
+  );
+
+  const renderStockWarning = () => {
+    if (!stockWarning) return;
+    const requiresDismissal = stockWarningRequiresDismissal();
+    stockWarning.hidden = !requiresDismissal;
+    if (!requiresDismissal) return;
+    const names = Array.from(soldOutByScanSku.values()).map((alert) => alert.name);
+    if (stockWarningProducts) {
+      stockWarningProducts.textContent = `${names.join(', ')} ${names.length === 1 ? 'is' : 'are'} sold out (stock 0).`;
+    }
+  };
+
+  const refreshStockInBackground = () => {
+    if (!order || stockRefreshPromise) return stockRefreshPromise;
+    stockRefreshPromise = fetch(skuDbEndpoint, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' }
+    })
+      .then((response) => readJsonResponse(response, 'Unable to refresh inventory.').then((payload) => {
+        if (!response.ok) throw new Error(payload.error || 'Unable to refresh inventory.');
+        applyStockRows(payload.database?.skus || []);
+        return true;
+      }))
+      .catch(() => false)
+      .finally(() => {
+        stockRefreshPromise = null;
+      });
+    return stockRefreshPromise;
   };
 
   const normalizeSourceKey = (value) => String(value || '')
@@ -349,6 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const maybeOpenPrintLabelPage = () => {
     if (!order || printRedirecting) return;
+    if (stockWarningRequiresDismissal()) return;
     if (totalRequired() <= 0 || totalScanned() < totalRequired()) return;
     scanCompletionQueued = true;
     persistPendingScanQueue();
@@ -400,6 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const render = () => {
+    renderStockWarning();
     if (!order) {
       if (scanList) scanList.innerHTML = '<div class="admin-board-empty">Return to the order board and start an order first.</div>';
       if (scanProgress) scanProgress.textContent = '0/0';
@@ -417,15 +522,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const manualRequired = manualQuantityFor(item);
         const count = skipped + Math.min(scanCountFor(scanSku), manualRequired, required);
         const complete = count >= required;
+        const soldOut = soldOutByScanSku.get(scanSku);
         const sourceSkus = sourceSkusFor(item).filter((sku) => sku && sku !== scanSku);
         const codeLabel = sourceSkus.length === 1
           ? `Order ${sourceSkus[0]} -> scan ${scanSku}`
           : `${scanSku} / ${item.scanBarcode || item.barcode}`;
         return `
-          <article class="admin-scan-item ${complete ? 'is-complete' : ''}">
+          <article class="admin-scan-item ${complete ? 'is-complete' : ''} ${soldOut ? 'is-sold-out' : ''}">
             <div>
               <strong>${escapeHtml(item.scanProductName || item.productName)}</strong>
               <span>${escapeHtml(skipped > 0 ? `${codeLabel} / Skip Scan` : codeLabel)}</span>
+              ${soldOut ? '<span class="admin-scan-item-stock-warning"><b>SOLD OUT</b> Stock is 0 · Update PO amount received</span>' : ''}
             </div>
             <em>${count}/${escapeHtml(required)}</em>
           </article>
@@ -442,6 +549,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!order || !value) return false;
     const scannedCode = skuFromBarcode(value);
     if (!scannedCode) return false;
+    if (stockWarningRequiresDismissal()) {
+      const message = 'Sold-out product detected. Dismiss the stock warning before scanning.';
+      setError(message);
+      setScanStatus('SCAN BLOCKED — SOLD OUT', 'Update PO amount received, or dismiss the warning to continue.');
+      if (stockWarningDismiss instanceof HTMLButtonElement) stockWarningDismiss.focus();
+      return false;
+    }
     const now = Date.now();
     if (lastScanKey === scannedCode && now - lastScanAt < 450) return false;
     lastScanKey = scannedCode;
@@ -648,6 +762,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.addEventListener('keydown', (event) => {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.target === stockWarningDismiss && (event.key === 'Enter' || event.key === ' ')) return;
 
     if (event.key === 'Enter' || event.key === 'Tab') {
       event.preventDefault();
@@ -662,7 +777,34 @@ document.addEventListener('DOMContentLoaded', () => {
     scanBufferTimer = window.setTimeout(submitScanBuffer, 260);
   });
 
+  stockWarningDismiss?.addEventListener('click', () => {
+    if (!soldOutSignature) return;
+    dismissedSoldOutSignature = soldOutSignature;
+    setError('');
+    render();
+    setScanStatus('Stock warning dismissed', 'Scanning is enabled. Confirm the PO amount received before printing.');
+    if (totalRequired() > 0 && totalScanned() >= totalRequired()) {
+      window.setTimeout(maybeOpenPrintLabelPage, 120);
+    }
+  });
+
+  let stockResumeTimer = 0;
+  const refreshStockOnResume = () => {
+    window.clearTimeout(stockResumeTimer);
+    stockResumeTimer = window.setTimeout(() => {
+      refreshStockInBackground();
+    }, 40);
+  };
+
+  window.addEventListener('focus', refreshStockOnResume);
+  window.addEventListener('pageshow', refreshStockOnResume);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshStockOnResume();
+  });
+
   const initialize = async () => {
+    applyStockRows(readCachedStockRows());
+    refreshStockInBackground();
     try {
       const response = await fetch(scanBridgeEndpoint, {
         cache: 'no-store',
@@ -699,6 +841,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   window.addEventListener('pagehide', () => {
+    window.clearTimeout(stockResumeTimer);
     window.clearTimeout(flushTimer);
     flushTimer = 0;
     persistPendingScanQueue();

@@ -58,6 +58,15 @@ $storeScanJsVersion = (string) @filemtime(dirname(__DIR__, 2) . '/store-scan.js'
                         <span>Scan each product barcode.</span>
                     </div>
                 </div>
+                <section class="admin-scan-stock-alert" data-stock-warning role="alert" aria-live="assertive" hidden>
+                    <span class="admin-scan-stock-alert-icon" aria-hidden="true">!</span>
+                    <div>
+                        <strong>SOLD OUT — DO NOT SCAN YET</strong>
+                        <p data-stock-warning-products>One or more products in this order have no stock.</p>
+                        <b>Please update PO amount received before continuing to print.</b>
+                    </div>
+                    <button type="button" data-stock-warning-dismiss>Dismiss and allow scanning</button>
+                </section>
                 <p class="admin-sync-status" data-sync-status hidden>Sync pending</p>
                 <p class="admin-form-error" data-scan-error hidden></p>
                 <div class="admin-scan-list" data-scan-list></div>

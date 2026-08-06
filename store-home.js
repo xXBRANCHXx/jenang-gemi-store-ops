@@ -1138,6 +1138,7 @@ document.addEventListener('DOMContentLoaded', () => {
       productId: String(row.product_id || ''),
       baseProductName: String(row.product_name || ''),
       skipScan: Boolean(row.skip_scan),
+      currentStock: Number(row.current_stock ?? 0),
       productName: productNameFromSkuRow(row) || sku
     };
   };

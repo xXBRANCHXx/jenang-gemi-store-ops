@@ -2180,6 +2180,48 @@ button, input {
   background: rgba(157, 255, 0, 0.08);
 }
 
+@keyframes admin-scan-sold-out-pulse {
+  0%,
+  100% {
+    border-color: #ff2d55;
+    background: rgba(127, 0, 25, 0.32);
+    box-shadow: 0 0 0 0 rgba(255, 45, 85, 0.18);
+  }
+  50% {
+    border-color: #ff8aa0;
+    background: rgba(220, 0, 42, 0.48);
+    box-shadow: 0 0 0 7px rgba(255, 45, 85, 0.2), 0 0 28px rgba(255, 45, 85, 0.34);
+  }
+}
+
+.admin-scan-item.is-sold-out,
+.admin-scan-item.is-complete.is-sold-out {
+  border-width: 2px;
+  animation: admin-scan-sold-out-pulse 0.9s ease-in-out infinite;
+}
+
+.admin-scan-item .admin-scan-item-stock-warning {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+  overflow: visible;
+  color: #ffd7df;
+  font-size: 0.82rem;
+  font-weight: 850;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.admin-scan-item-stock-warning b {
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: #ff1744;
+  color: #fff;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+}
+
 .admin-scan-input {
   width: 100%;
   min-height: 58px;
@@ -2450,6 +2492,97 @@ button, input {
   color: var(--admin-muted);
   font-size: 0.86rem;
   font-weight: 800;
+}
+
+.admin-scan-stock-alert {
+  position: sticky;
+  z-index: 12;
+  top: 10px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 18px;
+  border: 3px solid #ff4769;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #a80020, #5d0012);
+  color: #fff;
+  box-shadow: 0 14px 40px rgba(115, 0, 22, 0.5);
+  animation: admin-scan-sold-out-pulse 0.9s ease-in-out infinite;
+}
+
+.admin-scan-stock-alert[hidden] {
+  display: none;
+}
+
+.admin-scan-stock-alert-icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #fff;
+  color: #b30024;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2rem;
+  font-weight: 900;
+}
+
+.admin-scan-stock-alert div {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-scan-stock-alert strong {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(1.15rem, 2vw, 1.7rem);
+  letter-spacing: 0.04em;
+}
+
+.admin-scan-stock-alert p {
+  margin: 0;
+  font-weight: 800;
+}
+
+.admin-scan-stock-alert b {
+  color: #ffe6a7;
+  font-size: 0.92rem;
+}
+
+.admin-scan-stock-alert button {
+  min-height: 52px;
+  padding: 0 18px;
+  border: 2px solid #fff;
+  border-radius: 12px;
+  background: #fff;
+  color: #8f001b;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.admin-scan-stock-alert button:focus-visible {
+  outline: 4px solid #ffd43b;
+  outline-offset: 3px;
+}
+
+@media (max-width: 760px) {
+  .admin-scan-stock-alert {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .admin-scan-stock-alert button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-scan-stock-alert,
+  .admin-scan-item.is-sold-out,
+  .admin-scan-item.is-complete.is-sold-out {
+    animation: none;
+  }
 }
 
 .admin-sync-status {
