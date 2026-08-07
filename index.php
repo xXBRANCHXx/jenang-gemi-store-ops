@@ -3,7 +3,22 @@ declare(strict_types=1);
 
 require __DIR__ . '/auth-runtime.php';
 
+function jg_admin_login_return_path(mixed $value): string
+{
+    $path = ltrim(trim((string) $value), '/');
+    if (
+        $path === ''
+        || str_contains($path, '..')
+        || str_contains($path, '://')
+        || preg_match('/^[A-Za-z0-9_\/.?&=%+-]+$/', $path) !== 1
+    ) {
+        return './dashboard/';
+    }
+    return './' . $path;
+}
+
 $hasError = false;
+$returnPath = jg_admin_login_return_path($_POST['return_to'] ?? $_GET['return'] ?? 'dashboard/');
 $employeeProfiles = jg_admin_employee_profiles_for_login();
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $submittedCode = (string) ($_POST['admin_code'] ?? '');
@@ -12,14 +27,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ? jg_admin_attempt_employee_login($submittedEmployeeId, $submittedCode)
         : jg_admin_attempt_login($submittedCode);
     if ($loggedIn) {
-        header('Location: ./dashboard/');
+        header('Location: ' . $returnPath);
         exit;
     }
     $hasError = true;
 }
 
 if (jg_admin_is_authenticated()) {
-    header('Location: ./dashboard/');
+    header('Location: ' . $returnPath);
     exit;
 }
 
@@ -47,6 +62,10 @@ $adminCssVersion = (string) @filemtime(__DIR__ . '/admin.css');
                 <p>Secure access to SKU, inventory, order, and integration operations for `store.jenanggemi.com`.</p>
             </div>
             <form method="post" class="admin-login-form" autocomplete="on" data-employee-login-form>
+                <input type="hidden" name="return_to" value="<?php echo htmlspecialchars(ltrim($returnPath, './'), ENT_QUOTES, 'UTF-8'); ?>">
+                <?php if (($_GET['reason'] ?? '') === 'auth_required'): ?>
+                    <p class="admin-login-error">Your Store Ops session needs to be renewed before starting an order.</p>
+                <?php endif; ?>
                 <?php if ($employeeProfiles !== []): ?>
                     <div class="admin-employee-login-grid" role="radiogroup" aria-label="Employee profile">
                         <?php foreach ($employeeProfiles as $index => $employee): ?>

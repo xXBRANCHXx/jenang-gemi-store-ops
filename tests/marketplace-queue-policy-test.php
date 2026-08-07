@@ -18,6 +18,9 @@ marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible(['platform
 marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible(['platform' => 'Shopee', 'marketplaceStatus' => 'READY_TO_SHIP', 'instant' => true, 'manualArrangementRequired' => false, 'instantArrangementState' => 'display_only'], 'shopee', true), 'An Instant row from the temporary display-only contract must remain visible during migration.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible(['platform' => 'Shopee', 'marketplaceStatus' => 'PROCESSED', 'instant' => true, 'instantArrangementState' => 'label_pending'], 'shopee', true), 'An arranged Instant order must remain visible while Store Ops processing is incomplete.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible(['platform' => 'Shopee', 'marketplaceStatus' => 'IN_CANCEL', 'cancellationRequested' => true], 'shopee', true), 'A cancellation request must remain visible without a stored label.');
+$failedTikTokArrangement = ['platform' => 'TikTok', 'marketplaceStatus' => 'AWAITING_SHIPMENT', 'arrangementRetryRequired' => true, 'labelBacked' => false];
+marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible($failedTikTokArrangement, 'tiktok', true), 'An exhausted TikTok/Tokopedia arrangement must remain visible without a label.');
+marketplace_queue_expect(false, jg_store_ops_marketplace_failed_arrangement($failedTikTokArrangement + ['instant' => true]), 'The regular-order recovery contract must never classify an Instant order as a failed arrangement alert.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible(['platform' => 'Shopee', 'marketplaceStatus' => 'PROCESSED', 'labelBacked' => true], 'shopee', true), 'Marketplace PROCESSED means arranged and must remain Listed until Store Ops processes it.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible(['platform' => 'Shopee', 'marketplaceStatus' => 'Shipped', 'labelBacked' => true], 'shopee', true), 'Marketplace shipping progress must not erase an order Store Ops has not processed.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible(['platform' => 'TikTok', 'shipping_status' => 'SHIPPED', 'labelBacked' => true], 'tiktok', true), 'A label-backed TikTok order must remain Listed until Store Ops records fulfillment.');
@@ -45,6 +48,7 @@ marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible($offTikTok
 marketplace_queue_expect(false, jg_store_ops_marketplace_order_visible($awaitingCollection, 'tiktok', false, true), 'Big Set OFF must hide TikTok AWAITING_COLLECTION.');
 $ordersApi = file_get_contents(dirname(__DIR__) . '/api/orders/index.php');
 $ordersV2Api = file_get_contents(dirname(__DIR__) . '/api/orders-v2/index.php');
+$storeHome = file_get_contents(dirname(__DIR__) . '/store-home.js');
 marketplace_queue_expect(
     true,
     is_string($ordersApi)
@@ -52,6 +56,22 @@ marketplace_queue_expect(
         && str_contains($ordersApi, '$localAutomationPaused || !$localHardSetEnabled')
         && str_contains($ordersV2Api, '$localAutomationPaused || !$localHardSetEnabled'),
     'Hard Set PAUSED must use the same unarranged-only marketplace queue as Big Set OFF.'
+);
+marketplace_queue_expect(
+    true,
+    is_string($ordersV2Api)
+        && str_contains($ordersV2Api, "'retry_arrangement'")
+        && str_contains($ordersV2Api, '/fulfillment/retry-arrangement')
+        && str_contains($ordersV2Api, "'manual_retry' => true"),
+    'Store Ops must proxy an explicit, single-attempt TikTok/Tokopedia arrangement retry.'
+);
+marketplace_queue_expect(
+    true,
+    is_string($storeHome)
+        && str_contains($storeHome, 'data-retry-arrangement')
+        && str_contains($storeHome, 'Arrangement failed — retry')
+        && str_contains($storeHome, "postOrderAction('retry_arrangement', order)"),
+    'Failed TikTok/Tokopedia cards must show and run their retry action.'
 );
 marketplace_queue_expect(
     true,
@@ -67,6 +87,9 @@ marketplace_queue_expect(true, jg_store_ops_marketplace_action_enabled(['source_
 marketplace_queue_expect(false, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee', 'cancellation_requested' => true], true), 'Cancellation-requested marketplace orders must block Store Ops processing.');
 marketplace_queue_expect(false, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee'], true), 'An unarranged regular marketplace row must remain read-only.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee', 'instant' => true, 'action' => 'arrange_instant_shipment'], true), 'The explicit Instant arrangement action must be available when Big Set is active.');
+marketplace_queue_expect(true, jg_store_ops_marketplace_action_enabled($failedTikTokArrangement + ['source_platform' => 'tiktok', 'action' => 'retry_arrangement'], true), 'A failed TikTok/Tokopedia card must allow only its explicit retry action.');
+marketplace_queue_expect(false, jg_store_ops_marketplace_action_enabled($failedTikTokArrangement + ['source_platform' => 'tiktok', 'action' => 'claim_order'], true), 'A failed TikTok/Tokopedia arrangement must not enter picking before a label exists.');
+marketplace_queue_expect(false, jg_store_ops_marketplace_action_enabled($failedTikTokArrangement + ['source_platform' => 'tiktok', 'action' => 'retry_arrangement'], true, true), 'A failed arrangement cannot be retried while automatic arrangement is paused.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee', 'label_backed' => true], true, true), 'Pausing automatic arrangement must not block work on an already arranged label-backed order.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee', 'instant' => true, 'action' => 'arrange_instant_shipment'], true, true), 'The explicit Instant arrangement button must remain available while automatic arrangement is paused.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_action_enabled(['source_platform' => 'shopee', 'action' => 'release_order'], false, true), 'A profile must be able to release its local claim even when marketplace automation is unavailable.');

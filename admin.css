@@ -10367,3 +10367,25 @@ button.admin-store-sidebar-profile:hover {
     padding-left: 0;
   }
 }
+.admin-order-card.is-arrangement-failed {
+  border-color: #ffb020;
+  box-shadow: inset 0 0 0 1px rgba(255, 176, 32, .35);
+}
+
+.admin-arrangement-failed-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 176, 32, .65);
+  border-radius: 999px;
+  background: rgba(255, 176, 32, .14);
+  color: #ffb020;
+  font-size: .56rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.admin-start-order-btn.is-arrangement-retry {
+  background: #ffb020;
+  color: #15100a;
+}

@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 const JG_ADMIN_CODE_HASH = 'ba7e42d060466c149e331452cc58339e64b62a3b61ed953e90f3ec274495f59d';
+const JG_ADMIN_SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 require_once __DIR__ . '/store-ops-fulfillment-runtime.php';
 
@@ -54,8 +55,10 @@ function jg_admin_start_session(): void
         return;
     }
 
+    ini_set('session.gc_maxlifetime', (string) JG_ADMIN_SESSION_TTL_SECONDS);
+    ini_set('session.cookie_lifetime', (string) JG_ADMIN_SESSION_TTL_SECONDS);
     session_set_cookie_params([
-        'lifetime' => 0,
+        'lifetime' => JG_ADMIN_SESSION_TTL_SECONDS,
         'path' => '/',
         'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
         'httponly' => true,
@@ -73,12 +76,25 @@ function jg_admin_is_authenticated(): bool
         return false;
     }
 
+    $loginAt = trim((string) ($_SESSION['jg_admin_login_at'] ?? ''));
+    $loginTimestamp = $loginAt !== '' ? strtotime($loginAt) : false;
+    if ($loginTimestamp === false) {
+        // Preserve sessions created immediately before this rollout instead of
+        // forcing an unexpected login in the middle of an order.
+        $_SESSION['jg_admin_login_at'] = gmdate(DATE_ATOM);
+    } elseif (time() - $loginTimestamp >= JG_ADMIN_SESSION_TTL_SECONDS) {
+        jg_admin_clear_authenticated_session();
+        return false;
+    }
+
     $employeeId = trim((string) ($_SESSION['jg_admin_employee_id'] ?? ''));
     $employeeProfiles = jg_admin_employee_profiles_for_login();
     if ($employeeProfiles === []) {
         if (jg_admin_employee_profiles_load_failed()) {
-            jg_admin_clear_authenticated_session();
-            return false;
+            // A temporary profile-database outage must not eject an operator
+            // who already has a valid weekly server session mid-fulfillment.
+            // New logins still fail closed while the directory is unavailable.
+            return true;
         }
         return true;
     }

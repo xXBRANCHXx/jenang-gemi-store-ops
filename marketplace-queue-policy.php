@@ -35,6 +35,14 @@ function jg_store_ops_marketplace_instant_manual_order(array $order): bool
     return in_array($state, ['display_only', 'required', 'requested', 'label_pending', 'failed', 'big_set_off'], true);
 }
 
+function jg_store_ops_marketplace_failed_arrangement(array $order): bool
+{
+    $platform = strtolower(trim((string) ($order['platform'] ?? $order['source_platform'] ?? '')));
+    return empty($order['instant'])
+        && ($platform === 'tiktok' || str_contains($platform, 'tiktok') || str_contains($platform, 'tokopedia'))
+        && (!empty($order['arrangementRetryRequired']) || !empty($order['arrangement_retry_required']));
+}
+
 function jg_store_ops_marketplace_awaiting_collection(array $order, string $sourcePlatform): bool
 {
     $platform = strtolower(trim((string) ($order['platform'] ?? $order['source_platform'] ?? $sourcePlatform)));
@@ -101,7 +109,8 @@ function jg_store_ops_marketplace_order_visible(
     }
     $labelBacked = jg_store_ops_marketplace_label_backed($order);
     $manualAction = jg_store_ops_marketplace_cancellation_requested($order)
-        || jg_store_ops_marketplace_instant_manual_order($order);
+        || jg_store_ops_marketplace_instant_manual_order($order)
+        || jg_store_ops_marketplace_failed_arrangement($order);
     if ($requireLabelBacked && !$labelBacked && !$manualAction) {
         return false;
     }
@@ -128,6 +137,11 @@ function jg_store_ops_marketplace_action_enabled(array $key, bool $localHardSetE
     }
     if (!$localHardSetEnabled || jg_store_ops_marketplace_cancellation_requested($key)) {
         return false;
+    }
+    if (jg_store_ops_marketplace_failed_arrangement($key)) {
+        return !$automationPaused
+            && $platform === 'tiktok'
+            && strtolower(trim((string) ($key['action'] ?? ''))) === 'retry_arrangement';
     }
     if (
         !empty($key['instant'])

@@ -341,6 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let bigSetEnabled = false;
   let automaticArrangementPaused = false;
   let orderSourceErrors = [];
+  const startingOrderIds = new Set();
   const scannerBarcodeWaitSeconds = 6;
   const scannerBarcodeWaitMs = scannerBarcodeWaitSeconds * 1000;
   let state = {
@@ -725,6 +726,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const preview = text.replace(/\s+/g, ' ').trim().slice(0, 220);
       throw new Error(`${fallbackMessage} Expected JSON but got HTTP ${response.status}: ${preview || 'no response body'}`);
     }
+  };
+
+  class StoreOpsAuthenticationRequiredError extends Error {}
+
+  const redirectToStoreOpsLogin = () => {
+    window.location.assign('../?reason=auth_required&return=dashboard%2F');
   };
 
   const serverCanSeeLocalUsb = () => {
@@ -1363,6 +1370,9 @@ document.addEventListener('DOMContentLoaded', () => {
       shipmentArranged: Boolean(order.shipmentArranged || order.shipment_arranged),
       instantArrangementState: String(order.instantArrangementState || order.instant_arrangement_state || ''),
       instantArrangementError: String(order.instantArrangementError || order.instant_arrangement_error || ''),
+      arrangementRetryRequired: !Boolean(order.instant) && Boolean(order.arrangementRetryRequired || order.arrangement_retry_required),
+      arrangementRetryState: String(order.arrangementRetryState || order.arrangement_retry_state || ''),
+      arrangementRetryError: String(order.arrangementRetryError || order.arrangement_retry_error || ''),
       weekendDependent: Boolean(order.weekendDependent || order.weekend_dependent),
       weekendDependentAutoWindowOpen: Boolean(order.weekendDependentAutoWindowOpen || order.weekend_dependent_auto_window_open),
       weekendDependentCutoff: String(order.weekendDependentCutoff || order.weekend_dependent_cutoff || ''),
@@ -1740,6 +1750,8 @@ document.addEventListener('DOMContentLoaded', () => {
     marketplace_status: String(order?.marketplaceStatus || extra.marketplace_status || ''),
     instant: Boolean(order?.instant),
     manual_arrangement_required: Boolean(order?.manualArrangementRequired),
+    arrangement_retry_required: Boolean(order?.arrangementRetryRequired),
+    arrangement_retry_state: String(order?.arrangementRetryState || ''),
     cancellation_requested: orderPresentation.isCancellationRequested(order),
     label_backed: Boolean(order?.labelBacked),
     ...extra
@@ -1754,6 +1766,9 @@ document.addEventListener('DOMContentLoaded', () => {
       body: JSON.stringify(orderActionPayload(action, order, extra))
     });
     const payload = await readJsonResponse(response, 'Unable to update order.');
+    if (response.status === 401) {
+      throw new StoreOpsAuthenticationRequiredError(payload.error || 'Store Ops sign-in required.');
+    }
     if (!response.ok || payload.ok === false) {
       throw new Error(payload.error || 'Unable to update order.');
     }
@@ -2270,6 +2285,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const isDropOff = orderPresentation.isDropOff(order);
       const isWeekendDependent = Boolean(order.weekendDependent);
       const cancellationRequested = orderPresentation.isCancellationRequested(order);
+      const arrangementRetryRequired = Boolean(order.arrangementRetryRequired);
       const instantManualLifecycle = orderPresentation.isInstantManualLifecycle(order) && !order.labelBacked;
       const marketplacePlatform = normalizeSourceKey(order.platform);
       const pausedUnarranged = automaticArrangementPaused
@@ -2303,6 +2319,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (cancellationRequested) {
         const marketplaceName = String(order.platform || 'marketplace').trim() || 'marketplace';
         actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-cancellation" title="Cancellation requested — do not process. Resolve it in ${escapeHtml(marketplaceName)}." disabled><span>Handle in ${escapeHtml(marketplaceName)}</span></button>`;
+      } else if (arrangementRetryRequired) {
+        const retrying = String(order.arrangementRetryState || '').toLowerCase() === 'retrying';
+        actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-arrangement-retry" data-retry-arrangement="${escapeHtml(order.id)}" title="${escapeHtml(order.arrangementRetryError || 'Automatic shipment arrangement exhausted its retries.')}" ${retrying || automaticArrangementPaused ? 'disabled' : ''}><span>${automaticArrangementPaused ? 'Arrangement paused' : (retrying ? 'Retrying…' : 'Arrangement failed — retry')}</span></button>`;
       } else if (instantManualLifecycle) {
         const instantDisabled = !bigSetEnabled || isLocked || ['requested', 'label_pending'].includes(instantState);
         const instantLabel = !bigSetEnabled
@@ -2320,7 +2339,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       return `
         <article
-          class="admin-order-card ${isCritical && !isLocked && !order.instant ? 'is-deadline-urgent' : ''} ${order.instant ? 'is-instant' : ''} ${isWeekendDependent ? 'is-weekend-dependent' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${pausedUnarranged ? 'is-awaiting-arrangement' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
+          class="admin-order-card ${isCritical && !isLocked && !order.instant ? 'is-deadline-urgent' : ''} ${order.instant ? 'is-instant' : ''} ${isWeekendDependent ? 'is-weekend-dependent' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${arrangementRetryRequired ? 'is-arrangement-failed' : ''} ${pausedUnarranged ? 'is-awaiting-arrangement' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
           data-order-id="${escapeHtml(order.id)}"
           data-source-key="${escapeHtml(sourceKey)}"
           ${claimedBySelf ? 'data-claim-owner="self" title="Right-click for claim actions"' : ''}
@@ -2332,6 +2351,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="admin-order-card-top">
             <span class="admin-order-id">${escapeHtml(order.id)}</span>
             ${isWeekendDependent ? `<span class="admin-weekend-dependent-badge" title="Must be arranged on Saturday before ${escapeHtml(order.weekendDependentCutoff || '11:30')}">Weekend Dependent</span>` : ''}
+            ${arrangementRetryRequired ? `<span class="admin-arrangement-failed-badge" title="${escapeHtml(order.arrangementRetryError || 'Arrangement failed')}">Arrangement failed</span>` : ''}
             ${isDropOff ? `<span class="admin-dropoff-badge" aria-label="${escapeHtml(handoverDescription)}" title="${escapeHtml(handoverDescription)}">Drop-off</span>` : ''}
             ${order.instant ? '<span class="admin-instant-badge" role="img" aria-label="Instant shipping order" title="Instant shipping order"><svg viewBox="0 0 32 20" aria-hidden="true" focusable="false"><path class="admin-instant-badge-speed" d="M2 6h5.5M1 10h5M3 14h4.5"/><path class="admin-instant-badge-truck" d="M8.5 6.5h11v7.5h-11zM19.5 9.2h4.1l3.1 3.2V14h-7.2zM22.1 9.2v3.2h4.6"/><circle class="admin-instant-badge-wheel" cx="11.5" cy="15" r="2"/><circle class="admin-instant-badge-wheel" cx="23.5" cy="15" r="2"/></svg><span class="admin-instant-badge-label">Instant</span></span>' : ''}
           </div>
@@ -2484,58 +2504,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const applyOptimisticClaim = (order) => {
-    const now = new Date().toISOString();
-    order.fulfillmentStatus = ['SCAN_COMPLETED', 'LABEL_PRINTED'].includes(String(order.fulfillmentStatus || ''))
-      ? order.fulfillmentStatus
-      : 'CLAIMED';
-    order.claimedBy = currentEmployee.id;
-    order.claimedByName = currentEmployee.name;
-    order.claimedAt = order.claimedAt || now;
-    order.locked = false;
-    order.currentEmployeeCanWork = true;
-    order.claimStale = false;
-    order.started = true;
-    order.clientClaimPending = true;
-    order.clientClaimRequestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  };
-
-  const releaseAfterPendingClaim = (order) => {
-    if (!order?.clientClaimReleaseRequested) return;
-    postOrderAction('release_order', order, {}, { keepalive: true })
-      .then((payload) => {
-        applyFulfillmentState(order, payload.fulfillment || payload.order);
-        saveOrders();
-        renderBoard();
-      })
-      .catch(() => refreshOrders(false, { force: true }).catch(() => {}));
-  };
-
-  const syncClaimInBackground = (order, claimRequestId) => {
-    postOrderAction('claim_order', order, {}, { keepalive: true })
-      .then((payload) => {
-        if (order.clientClaimRequestId !== claimRequestId) return;
-        order.clientClaimPending = false;
-        delete order.clientClaimRequestId;
-        applyFulfillmentState(order, payload.fulfillment || payload.order);
-        saveOrders();
-        if (state.activeOrderId === order.id) renderPickStage(order);
-        renderBoard();
-        releaseAfterPendingClaim(order);
-      })
-      .catch((error) => {
-        if (order.clientClaimRequestId !== claimRequestId) return;
-        order.clientClaimPending = false;
-        delete order.clientClaimRequestId;
-        order.started = false;
-        if (state.activeOrderId === order.id) closeFulfillment(false);
-        refreshOrders(false, { force: true }).catch(() => {});
-        renderBoard();
-        showBoardAlert(error instanceof Error ? error.message : 'Unable to claim this order.');
-      });
-  };
-
-  const openFulfillment = (orderId) => {
+  const openFulfillment = async (orderId) => {
     const order = state.orders.find((item) => item.id === orderId);
     if (!order) return;
     if (
@@ -2545,21 +2514,36 @@ document.addEventListener('DOMContentLoaded', () => {
     ) return;
     if (orderPresentation.isCancellationRequested(order) || orderPresentation.requiresManualInstantArrangement(order)) return;
     if (order.locked && !order.currentEmployeeCanWork) return;
-    applyOptimisticClaim(order);
-    state.activeOrderId = order.id;
-    state.previewOrderId = '';
-    state.scans = new Map();
-    saveOrders();
-    refreshSiren();
-    renderPickStage(order);
-    if (previewStage) previewStage.hidden = true;
-    if (pickStage) pickStage.hidden = false;
-    if (modal) {
-      modal.dataset.mode = 'pick';
-      modal.hidden = false;
+    if (startingOrderIds.has(order.id)) return;
+    startingOrderIds.add(order.id);
+    try {
+      // Claiming is the authentication preflight. The pick flow never opens
+      // until the server confirms both the weekly session and this profile.
+      const payload = await postOrderAction('claim_order', order);
+      applyFulfillmentState(order, payload.fulfillment || payload.order);
+      state.activeOrderId = order.id;
+      state.previewOrderId = '';
+      state.scans = new Map();
+      saveOrders();
+      refreshSiren();
+      renderPickStage(order);
+      if (previewStage) previewStage.hidden = true;
+      if (pickStage) pickStage.hidden = false;
+      if (modal) {
+        modal.dataset.mode = 'pick';
+        modal.hidden = false;
+      }
+    } catch (error) {
+      if (error instanceof StoreOpsAuthenticationRequiredError) {
+        redirectToStoreOpsLogin();
+        return;
+      }
+      await refreshOrders(false, { force: true }).catch(() => {});
+      showBoardAlert(error instanceof Error ? error.message : 'Unable to claim this order.');
+    } finally {
+      startingOrderIds.delete(order.id);
+      renderBoard();
     }
-    renderBoard();
-    syncClaimInBackground(order, order.clientClaimRequestId);
   };
 
   const arrangeInstantShipment = async (orderId) => {
@@ -2583,6 +2567,27 @@ document.addEventListener('DOMContentLoaded', () => {
       saveOrders();
       renderBoard();
       showBoardAlert(order.instantArrangementError);
+    }
+  };
+
+  const retryFailedArrangement = async (orderId) => {
+    const order = state.orders.find((item) => item.id === orderId);
+    if (!order?.arrangementRetryRequired || automaticArrangementPaused) return;
+    order.arrangementRetryState = 'retrying';
+    renderBoard();
+    try {
+      await postOrderAction('retry_arrangement', order);
+      await refreshOrders(false, { force: true });
+    } catch (error) {
+      if (error instanceof StoreOpsAuthenticationRequiredError) {
+        redirectToStoreOpsLogin();
+        return;
+      }
+      order.arrangementRetryState = 'failed';
+      await refreshOrders(false, { force: true }).catch(() => {});
+      showBoardAlert(error instanceof Error ? error.message : 'Shipment arrangement failed again.');
+    } finally {
+      renderBoard();
     }
   };
 
@@ -2734,6 +2739,11 @@ document.addEventListener('DOMContentLoaded', () => {
   board?.addEventListener('click', (event) => {
     unlockAudio();
     const target = event.target instanceof Element ? event.target : null;
+    const retryButton = target?.closest('[data-retry-arrangement]');
+    if (retryButton instanceof HTMLButtonElement) {
+      if (!retryButton.disabled) retryFailedArrangement(retryButton.dataset.retryArrangement || '');
+      return;
+    }
     const instantButton = target?.closest('[data-arrange-instant]');
     if (instantButton instanceof HTMLButtonElement) {
       if (!instantButton.disabled) arrangeInstantShipment(instantButton.dataset.arrangeInstant || '');

@@ -41,6 +41,8 @@ Operational backend for `store.jenanggemi.com`.
 - `/orders/` redirects to `/invoice-records/`
 - `/integrations/`
 - `/logout/`
+- Store Ops login sessions last seven days. Starting an order first confirms the active server session and employee profile; an expired session returns to login before the pick/scan workflow opens.
+- Post-cutover TikTok/Tokopedia orders that exhaust automatic shipment-arrangement retries remain visible in Listed as blocked alert cards. Operators can retry arrangement from the card; picking stays disabled until API Ingest confirms arrangement and stores a valid label. Shopee and Instant-order queue behavior is unchanged.
 - `/api/orders-v2/` (active fulfillment dashboard endpoint)
 - `/api/orders/` (compatible legacy endpoint)
 - `/api/order-lookup/`

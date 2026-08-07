@@ -230,6 +230,84 @@ function jg_store_ops_orders_arrange_instant(array $key, array $payload, string 
     return is_array($decoded['arrangement'] ?? null) ? $decoded['arrangement'] : [];
 }
 
+/** @return array<string,mixed> */
+function jg_store_ops_orders_retry_arrangement(array $key, array $payload, string $employeeId, string $employeeName): array
+{
+    $platform = (string) ($key['source_platform'] ?? '');
+    if ($platform !== 'tiktok') {
+        throw new RuntimeException('Arrangement retry is available only for TikTok/Tokopedia orders.');
+    }
+    $baseUrl = rtrim(jg_store_ops_orders_config('JG_SHOPEE_INGEST_BASE_URL', 'shopee_ingest_base_url', 'https://api.jenanggemi.com'), '/');
+    $setupToken = jg_store_ops_marketplace_setup_token($platform);
+    if ($baseUrl === '' || $setupToken === '') {
+        throw new RuntimeException('TikTok/Tokopedia arrangement retry is not configured.');
+    }
+    $body = json_encode([
+        'platform' => $platform,
+        'account_key' => (string) ($key['source_account'] ?? ''),
+        'order_id' => (string) ($key['order_id'] ?? ''),
+        'package_id' => trim((string) ($payload['package_id'] ?? $payload['package_number'] ?? '')),
+        'manual_retry' => true,
+        'requested_by' => ['id' => $employeeId, 'name' => $employeeName],
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if (!is_string($body)) {
+        throw new RuntimeException('Unable to prepare the arrangement retry request.');
+    }
+
+    $raw = false;
+    $status = 0;
+    if (function_exists('curl_init')) {
+        $curl = curl_init($baseUrl . '/fulfillment/retry-arrangement');
+        if ($curl === false) {
+            throw new RuntimeException('Unable to initialize the arrangement retry request.');
+        }
+        curl_setopt_array($curl, [
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => [
+                'Accept: application/json',
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $setupToken,
+            ],
+            CURLOPT_POSTFIELDS => $body,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 90,
+        ]);
+        $raw = curl_exec($curl);
+        $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        $curlError = curl_error($curl);
+        curl_close($curl);
+        if (!is_string($raw)) {
+            throw new RuntimeException($curlError !== '' ? $curlError : 'API Ingest did not answer the arrangement retry request.');
+        }
+    } else {
+        $context = stream_context_create(['http' => [
+            'method' => 'POST',
+            'header' => "Accept: application/json\r\nContent-Type: application/json\r\nAuthorization: Bearer {$setupToken}\r\n",
+            'content' => $body,
+            'timeout' => 90,
+            'ignore_errors' => true,
+        ]]);
+        $raw = @file_get_contents($baseUrl . '/fulfillment/retry-arrangement', false, $context);
+        foreach ((array) ($http_response_header ?? []) as $header) {
+            if (preg_match('/^HTTP\/\S+\s+(\d{3})/', (string) $header, $matches) === 1) {
+                $status = (int) $matches[1];
+                break;
+            }
+        }
+    }
+    $decoded = is_string($raw) ? json_decode($raw, true) : null;
+    if (!is_array($decoded) || $status >= 400 || empty($decoded['ok'])) {
+        $lastError = is_array($decoded['order'] ?? null) ? trim((string) ($decoded['order']['last_error'] ?? '')) : '';
+        throw new RuntimeException($lastError !== ''
+            ? 'Arrangement failed again: ' . $lastError
+            : (is_array($decoded) && !empty($decoded['error'])
+                ? (string) $decoded['error']
+                : 'API Ingest did not accept the arrangement retry request.'));
+    }
+    return is_array($decoded['order'] ?? null) ? $decoded['order'] : [];
+}
+
 function jg_store_ops_orders_fetch(string $url): array
 {
     $cached = jg_store_ops_orders_cache_read($url);
@@ -1136,7 +1214,7 @@ if ($method === 'POST') {
         exit;
     }
 
-    $validActions = ['claim_order', 'begin_fulfillment', 'release_order', 'remove_order', 'record_scan', 'complete_scan', 'label_printed', 'fulfill_order', 'reprint_label', 'arrange_instant_shipment'];
+    $validActions = ['claim_order', 'begin_fulfillment', 'release_order', 'remove_order', 'record_scan', 'complete_scan', 'label_printed', 'fulfill_order', 'reprint_label', 'arrange_instant_shipment', 'retry_arrangement'];
     if (!in_array($action, $validActions, true)) {
         jg_store_ops_orders_fail('Unknown action.', 400);
     }
@@ -1194,6 +1272,11 @@ if ($method === 'POST') {
         }
         if ($action === 'arrange_instant_shipment') {
             $arrangement = jg_store_ops_orders_arrange_instant($key, $payload, $employeeId, $employeeName);
+            echo json_encode(['ok' => true, 'arrangement' => $arrangement], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+        if ($action === 'retry_arrangement') {
+            $arrangement = jg_store_ops_orders_retry_arrangement($key, $payload, $employeeId, $employeeName);
             echo json_encode(['ok' => true, 'arrangement' => $arrangement], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
             exit;
         }
