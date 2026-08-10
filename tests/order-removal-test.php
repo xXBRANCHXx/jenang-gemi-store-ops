@@ -36,10 +36,12 @@ foreach (['api/orders/index.php', 'api/orders-v2/index.php'] as $endpoint) {
         str_contains($source, "'remove_order'")
         && str_contains($source, 'jg_admin_verify_employee_passcode')
         && str_contains($source, "if (\$key['source_platform'] === 'whatsapp')")
+        && str_contains($source, "jg_store_ops_website_stock_state(\$pdo, 'whatsapp', \$key['order_id'])")
         && str_contains($source, 'jg_store_ops_whatsapp_cancel_unclaimed')
+        && str_contains($source, "jg_store_ops_website_callback(\$pdo, 'whatsapp', \$key['order_id'], 'FULFILLED')")
         && str_contains($source, "jg_store_ops_orders_marketplace_status_callback(\$key, 'IS_PROCESSED')")
         && str_contains($source, 'jg_store_ops_fulfillment_remove_from_listed'),
-        $endpoint . ' must verify Branch Login and remove the order from both marketplace and Store Ops queues.'
+        $endpoint . ' must verify Branch Login, audit WhatsApp stock, and remove orders without repeating a deduction.'
     );
 }
 
@@ -55,8 +57,17 @@ $dashboard = (string) file_get_contents(dirname(__DIR__) . '/dashboard/index.php
 order_removal_expect(
     str_contains($dashboard, 'data-unclaim-order')
     && strpos($dashboard, 'data-unclaim-order') < strpos($dashboard, 'data-remove-order')
-    && str_contains($dashboard, 'name="passcode" type="password"'),
-    'The right-click menu must keep Unclaim first and show Remove with a password confirmation dialog.'
+    && str_contains($dashboard, 'name="passcode" type="password"')
+    && str_contains($dashboard, 'data-remove-order-stock-audit'),
+    'The right-click menu must keep Unclaim first and show Remove with a password confirmation and stock audit.'
+);
+
+$storeHome = (string) file_get_contents(dirname(__DIR__) . '/store-home.js');
+order_removal_expect(
+    str_contains($storeHome, "completion_audit: '1'")
+    && str_contains($storeHome, 'Stock already deducted')
+    && str_contains($storeHome, 'Removing this card will not deduct it again.'),
+    'The Remove dialog must display the authoritative stock audit before confirmation.'
 );
 
 echo "order-removal-test: ok\n";

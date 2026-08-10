@@ -270,6 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const removeOrderModal = document.querySelector('[data-remove-order-modal]');
   const removeOrderForm = document.querySelector('[data-remove-order-form]');
   const removeOrderId = document.querySelector('[data-remove-order-id]');
+  const removeOrderStockAudit = document.querySelector('[data-remove-order-stock-audit]');
   const removeOrderError = document.querySelector('[data-remove-order-error]');
   const removeOrderSubmit = document.querySelector('[data-remove-order-submit]');
   const reprintModal = document.querySelector('[data-reprint-modal]');
@@ -1337,11 +1338,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const stored = storedById.get(String(order.id || ''));
     if (!stored) return order;
     const printedLabel = stored.printedLabel || order.printedLabel || null;
-    const locallyPrinted = Boolean(printedLabel && printedLabel.printedAt);
+    const serverAcknowledged = Boolean(printedLabel && printedLabel.serverAcknowledgedAt);
     return {
       ...order,
       printedLabel,
-      ...(locallyPrinted ? {
+      ...(serverAcknowledged ? {
         status: 'FULFILLED',
         fulfillmentStatus: 'FULFILLED',
         started: false
@@ -2695,7 +2696,44 @@ document.addEventListener('DOMContentLoaded', () => {
       removeOrderError.hidden = true;
       removeOrderError.textContent = '';
     }
+    if (removeOrderStockAudit) {
+      removeOrderStockAudit.textContent = '';
+      removeOrderStockAudit.removeAttribute('data-state');
+    }
     if (removeOrderSubmit instanceof HTMLButtonElement) removeOrderSubmit.disabled = false;
+  };
+
+  const loadRemoveOrderStockAudit = async (order) => {
+    if (!removeOrderStockAudit) return;
+    removeOrderStockAudit.textContent = 'Checking the shared stock ledger…';
+    removeOrderStockAudit.dataset.state = 'checking';
+    const params = new URLSearchParams({
+      completion_audit: '1',
+      order_id: String(order.id || ''),
+      source_platform: normalizeSourceKey(order.platform || ''),
+      source_account: sourceKeyFromOrder(order)
+    });
+    try {
+      const response = await fetch(`${ordersEndpoint}?${params.toString()}`, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await readJsonResponse(response, 'Unable to audit order stock.');
+      if (!response.ok || payload.ok === false) throw new Error(payload.error || 'Unable to audit order stock.');
+      const stock = payload.stock && typeof payload.stock === 'object' ? payload.stock : {};
+      const deductedAt = String(stock.deducted_at || '').trim();
+      if (stock.deducted) {
+        removeOrderStockAudit.textContent = `Stock already deducted${deductedAt ? ` at ${deductedAt} UTC` : ''}. Removing this card will not deduct it again.`;
+        removeOrderStockAudit.dataset.state = 'deducted';
+      } else {
+        removeOrderStockAudit.textContent = 'Stock has not been deducted. Removing this card will cancel it without changing inventory.';
+        removeOrderStockAudit.dataset.state = 'not-deducted';
+      }
+    } catch (error) {
+      removeOrderStockAudit.textContent = error instanceof Error ? error.message : 'Unable to audit order stock.';
+      removeOrderStockAudit.dataset.state = 'error';
+    }
   };
 
   const openRemoveOrderModal = (orderId) => {
@@ -2709,6 +2747,7 @@ document.addEventListener('DOMContentLoaded', () => {
       removeOrderError.textContent = '';
     }
     removeOrderModal.hidden = false;
+    loadRemoveOrderStockAudit(order).catch(() => {});
     const passcodeField = removeOrderForm?.elements.namedItem('passcode');
     if (passcodeField instanceof HTMLInputElement) {
       passcodeField.value = '';

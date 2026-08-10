@@ -79,7 +79,16 @@ foreach ($channels as $key) {
     astra_deduction_expect(true, $result['deducted'], $key['source_platform'] . ' must deduct stock on first fulfillment.');
     $retry = jg_store_ops_order_stock_deduct($pdo, $key, []);
     astra_deduction_expect(false, $retry['deducted'], $key['source_platform'] . ' fulfillment retries must not deduct twice.');
+    $state = jg_store_ops_order_stock_state($pdo, $key);
+    astra_deduction_expect(true, $state['deducted'], $key['source_platform'] . ' stock audit must prove the completed deduction.');
+    astra_deduction_expect('deducted', $state['status'], $key['source_platform'] . ' stock audit must expose its ledger status.');
 }
+$missingState = jg_store_ops_order_stock_state($pdo, [
+    'source_platform' => 'whatsapp',
+    'source_account' => 'whatsapp',
+    'order_id' => 'NOT-DEDUCTED',
+]);
+astra_deduction_expect(false, $missingState['deducted'], 'An order absent from the stock ledger must never be reported as deducted.');
 $stocks = astra_deduction_stocks($pdo);
 astra_deduction_expect(17, $stocks['BUBUR15'], 'Every requested sales channel must subtract exactly one base unit.');
 astra_deduction_expect(8, $stocks['BUBUR30'], 'Derived Bubur 30 stock must remain half of base after all channels.');
@@ -130,6 +139,21 @@ foreach ([$legacyApi, $currentApi] as $apiSource) {
             && str_contains($apiSource, 'jg_store_ops_website_deduct_stock')
             && str_contains($apiSource, 'jg_store_ops_order_stock_deduct'),
         'Every fulfillment API must route website/WhatsApp and marketplace/Partner stock deduction.'
+    );
+    $ownershipCheckPosition = strpos($apiSource, 'jg_store_ops_fulfillment_assert_can_work($existing, $employeeId)');
+    $stockDeductionPosition = strpos($apiSource, 'jg_store_ops_website_deduct_stock($pdo');
+    astra_deduction_expect(
+        true,
+        $ownershipCheckPosition !== false
+            && $stockDeductionPosition !== false
+            && $ownershipCheckPosition < $stockDeductionPosition,
+        'Every fulfillment API must validate completion ownership before changing stock.'
+    );
+    astra_deduction_expect(
+        true,
+        str_contains($apiSource, "isset(\$_GET['completion_audit'])")
+            && str_contains($apiSource, 'jg_store_ops_order_stock_state($pdo, $key)'),
+        'Every fulfillment API must expose the authenticated shared completion audit.'
     );
 }
 $walkInSource = (string) file_get_contents(dirname(__DIR__) . '/walk-ins-bootstrap.php');

@@ -1030,9 +1030,20 @@ if ($method === 'POST') {
             }
 
             if ($key['source_platform'] === 'whatsapp') {
-                jg_store_ops_whatsapp_cancel_unclaimed($pdo, $key['order_id']);
-                $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
-                jg_store_ops_orders_fulfillment_response($pdo, is_array($row) ? $row : []);
+                $stockState = jg_store_ops_website_stock_state($pdo, 'whatsapp', $key['order_id']);
+                if (empty($stockState['deducted'])) {
+                    jg_store_ops_whatsapp_cancel_unclaimed($pdo, $key['order_id']);
+                    $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
+                    jg_store_ops_orders_fulfillment_response($pdo, is_array($row) ? $row : []);
+                }
+
+                $row = jg_store_ops_fulfillment_remove_from_listed($pdo, $key, $employeeId, $employeeName);
+                try {
+                    jg_store_ops_website_callback($pdo, 'whatsapp', $key['order_id'], 'FULFILLED');
+                } catch (Throwable $callbackError) {
+                    error_log('Recovered WhatsApp completion callback failed: ' . $callbackError->getMessage());
+                }
+                jg_store_ops_orders_fulfillment_response($pdo, $row);
             }
 
             if ($key['source_platform'] === 'partner'
@@ -1159,6 +1170,14 @@ if ($method === 'POST') {
 
         if ($action === 'fulfill_order') {
             $items = is_array($payload['items'] ?? null) ? $payload['items'] : [];
+            $existing = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
+            $alreadyFulfilled = is_array($existing)
+                && strtoupper((string) ($existing['status'] ?? '')) === 'FULFILLED';
+            if (!$alreadyFulfilled) {
+                // Validate ownership before the separately idempotent stock
+                // transaction. A rejected completion must never adjust stock.
+                jg_store_ops_fulfillment_assert_can_work($existing, $employeeId);
+            }
             if (in_array($key['source_platform'], JG_STORE_OPS_WEBSITE_PLATFORMS, true)) {
                 jg_store_ops_website_deduct_stock($pdo, $key['source_platform'], $key['order_id']);
             } else {
@@ -1199,6 +1218,34 @@ if ($method === 'POST') {
 
 if ($method !== 'GET') {
     jg_store_ops_orders_fail('Method not allowed.', 405);
+}
+
+if (isset($_GET['completion_audit'])) {
+    try {
+        $pdo = jg_store_ops_fulfillment_db();
+        $key = jg_store_ops_fulfillment_key_from_payload($_GET);
+        jg_store_ops_fulfillment_validate_key($key);
+        $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
+        $stock = in_array($key['source_platform'], JG_STORE_OPS_WEBSITE_PLATFORMS, true)
+            ? jg_store_ops_website_stock_state($pdo, $key['source_platform'], $key['order_id'])
+            : jg_store_ops_order_stock_state($pdo, $key);
+        echo json_encode([
+            'ok' => true,
+            'key' => $key,
+            'fulfillment' => jg_store_ops_fulfillment_state_from_row(
+                $row,
+                jg_store_ops_orders_current_employee_id(),
+                jg_store_ops_fulfillment_employee_map($pdo)
+            ),
+            'stock' => $stock,
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    } catch (InvalidArgumentException | RuntimeException $error) {
+        jg_store_ops_orders_fail($error->getMessage(), 422);
+    } catch (Throwable $error) {
+        error_log('Store Ops completion audit failed: ' . $error->getMessage());
+        jg_store_ops_orders_fail('Unable to audit order completion.', 500);
+    }
 }
 
 $baseUrl = rtrim(jg_store_ops_orders_config('JG_SHOPEE_INGEST_BASE_URL', 'shopee_ingest_base_url', 'https://api.jenanggemi.com'), '/');

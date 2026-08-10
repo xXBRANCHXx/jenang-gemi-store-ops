@@ -766,6 +766,44 @@ function jg_store_ops_website_deduct_stock(PDO $pdo, string $platform, string $o
     return !empty($result['deducted']);
 }
 
+/**
+ * Include the pre-ASTRA website marker so orders completed during the earlier
+ * rollout can still be audited safely. New completions are proven by the
+ * account-scoped ASTRA ledger.
+ *
+ * @return array{deducted:bool,status:string,deducted_at:?string,deductions:array<int,array<string,mixed>>,legacy_marker:bool}
+ */
+function jg_store_ops_website_stock_state(PDO $pdo, string $platform, string $orderId): array
+{
+    $platform = strtolower(trim($platform));
+    $orderId = trim($orderId);
+    if (!in_array($platform, JG_STORE_OPS_WEBSITE_PLATFORMS, true) || $orderId === '') {
+        throw new InvalidArgumentException('A website or WhatsApp order is required for stock audit.');
+    }
+    jg_store_ops_website_ensure_schema($pdo);
+    $ledger = jg_store_ops_order_stock_state($pdo, [
+        'source_platform' => $platform,
+        'source_account' => $platform,
+        'order_id' => $orderId,
+    ]);
+    $stmt = $pdo->prepare(
+        'SELECT stock_deducted_at
+         FROM store_ops_website_orders
+         WHERE source_platform = :platform AND order_id = :order_id
+         LIMIT 1'
+    );
+    $stmt->execute([':platform' => $platform, ':order_id' => $orderId]);
+    $legacyDeductedAt = $stmt->fetchColumn();
+    $legacyMarker = is_string($legacyDeductedAt) && trim($legacyDeductedAt) !== '';
+    if ($legacyMarker && empty($ledger['deducted'])) {
+        $ledger['deducted'] = true;
+        $ledger['status'] = 'legacy_deducted';
+        $ledger['deducted_at'] = trim((string) $legacyDeductedAt);
+    }
+    $ledger['legacy_marker'] = $legacyMarker;
+    return $ledger;
+}
+
 function jg_store_ops_website_callback(PDO $pdo, string $platform, string $orderId, string $status): void
 {
     if (!in_array($platform, JG_STORE_OPS_WEBSITE_PLATFORMS, true)) return;

@@ -115,12 +115,13 @@ document.addEventListener('DOMContentLoaded', () => {
     writeOrders(orders);
   };
 
-  const markPrinted = () => {
+  const markPrinted = (serverAcknowledgedAt) => {
     if (!order) return;
     const printedLabel = {
       source: String(order.platform || 'shopee').toLowerCase(),
       orderId: order.id,
-      printedAt: new Date().toISOString()
+      printedAt: new Date().toISOString(),
+      serverAcknowledgedAt
     };
     updateStoredOrder((currentOrder) => {
       currentOrder.printedLabel = printedLabel;
@@ -174,24 +175,39 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const queuePrintCompletion = () => {
-    if (!order) return false;
+  const removeAcknowledgedCompletion = (key) => {
+    try {
+      const queue = readPendingCompletionQueue();
+      delete queue[key];
+      window.localStorage.setItem(pendingCompletionQueueStorageKey, JSON.stringify(queue));
+    } catch (_error) {
+      // The dashboard can safely retry the idempotent completion later.
+    }
+  };
+
+  const submitPrintCompletion = async () => {
+    if (!order) throw new Error('Order is missing.');
     const timestamp = new Date().toISOString();
     const payload = isReprint
       ? orderActionPayload('reprint_label', { printed_at: timestamp })
       : orderActionPayload('fulfill_order', { fulfilled_at: timestamp, items: completionItems() });
-    if (!persistPendingCompletion(payload)) return false;
-
-    if (typeof navigator.sendBeacon !== 'function') return true;
-    try {
-      navigator.sendBeacon(
-        ordersEndpoint,
-        new Blob([JSON.stringify(payload)], { type: 'application/json' })
-      );
-    } catch (_error) {
-      // The durable queue will retry from the dashboard.
+    if (!persistPendingCompletion(payload)) {
+      throw new Error('Store Ops could not save the completion for retry.');
     }
-    return true;
+    const key = completionQueueKey(payload);
+    const response = await fetch(ordersEndpoint, {
+      method: 'POST',
+      credentials: 'same-origin',
+      keepalive: true,
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const responsePayload = await response.json().catch(() => ({}));
+    if (!response.ok || responsePayload.ok === false) {
+      throw new Error(responsePayload.error || 'Store Ops did not confirm completion.');
+    }
+    removeAcknowledgedCompletion(key);
+    return new Date().toISOString();
   };
 
   const setConfirmationDisabled = (disabled) => {
@@ -221,21 +237,25 @@ document.addEventListener('DOMContentLoaded', () => {
     if (statusNode) statusNode.textContent = status;
   };
 
-  const closeConfirmedPrintTab = () => {
+  const closeConfirmedPrintTab = async () => {
     if ((!printInProgress && !labelLoaded) || printClosing) return;
     printInProgress = true;
     printClosing = true;
     resetPrintLifecycle();
     setConfirmationDisabled(true);
     setError('');
-    if (!queuePrintCompletion()) {
+    if (statusNode) statusNode.textContent = 'Confirming with Store Ops';
+    try {
+      const serverAcknowledgedAt = await submitPrintCompletion();
+      if (!isReprint) markPrinted(serverAcknowledgedAt);
+    } catch (error) {
       printClosing = false;
+      printInProgress = true;
       setConfirmationDisabled(false);
       if (statusNode) statusNode.textContent = 'Confirmation not sent';
-      setError('Store Ops could not register the confirmation. Press Printed successfully again.');
+      setError(`${error instanceof Error ? error.message : 'Store Ops could not register the confirmation.'} This order remains listed on every device; press Printed successfully to retry.`);
       return;
     }
-    if (!isReprint) markPrinted();
     printInProgress = false;
     if (statusNode) statusNode.textContent = 'Print confirmed';
     try {

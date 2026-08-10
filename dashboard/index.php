@@ -226,7 +226,8 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
                         </div>
                         <button type="button" class="admin-ghost-btn" data-close-remove-order>Close</button>
                     </div>
-                    <p class="admin-reprint-intro">Remove <strong data-remove-order-id></strong> from listed orders without processing its inventory.</p>
+                    <p class="admin-reprint-intro">Remove <strong data-remove-order-id></strong> from listed orders.</p>
+                    <p class="admin-reprint-intro" data-remove-order-stock-audit data-state="checking">Checking the shared stock ledger…</p>
                     <label class="admin-reprint-field">
                         <span>Branch Login passcode</span>
                         <input class="admin-settings-input" name="passcode" type="password" autocomplete="current-password" maxlength="128" required>

@@ -378,6 +378,54 @@ function jg_store_ops_order_stock_ensure_schema(PDO $pdo): void
 }
 
 /**
+ * Read the idempotency ledger without changing inventory. This is the
+ * authoritative proof used by completion recovery and the protected operator
+ * audit endpoint.
+ *
+ * @param array<string,mixed> $key
+ * @return array{deducted:bool,status:string,deducted_at:?string,deductions:array<int,array<string,mixed>>}
+ */
+function jg_store_ops_order_stock_state(PDO $pdo, array $key): array
+{
+    $platform = strtolower(trim((string) ($key['source_platform'] ?? $key['platform'] ?? '')));
+    $platform = trim((string) preg_replace('/[^a-z0-9._-]+/', '-', $platform), '.-_');
+    $account = strtolower(trim((string) ($key['source_account'] ?? $key['account'] ?? '')));
+    $account = trim((string) preg_replace('/[^a-z0-9._-]+/', '-', $account), '.-_');
+    $orderId = trim((string) ($key['order_id'] ?? $key['order'] ?? ''));
+    if ($platform === '' || $orderId === '') {
+        throw new InvalidArgumentException('Order source and order number are required for stock audit.');
+    }
+    if ($account === '') {
+        $account = 'default';
+    }
+
+    jg_store_ops_order_stock_ensure_schema($pdo);
+    $stmt = $pdo->prepare(
+        'SELECT status, deductions_json, deducted_at
+         FROM store_ops_inventory_order_deductions
+         WHERE source_platform = :source_platform
+           AND source_account = :source_account
+           AND order_id = :order_id
+         LIMIT 1'
+    );
+    $stmt->execute([
+        ':source_platform' => substr($platform, 0, 32),
+        ':source_account' => substr($account, 0, 96),
+        ':order_id' => substr($orderId, 0, 160),
+    ]);
+    $row = $stmt->fetch();
+    $status = is_array($row) ? strtolower(trim((string) ($row['status'] ?? ''))) : '';
+    $deductions = is_array($row) ? json_decode((string) ($row['deductions_json'] ?? ''), true) : null;
+    $deductedAt = is_array($row) ? trim((string) ($row['deducted_at'] ?? '')) : '';
+    return [
+        'deducted' => $status === 'deducted',
+        'status' => $status !== '' ? $status : 'not_recorded',
+        'deducted_at' => $deductedAt !== '' ? $deductedAt : null,
+        'deductions' => is_array($deductions) ? array_values(array_filter($deductions, 'is_array')) : [],
+    ];
+}
+
+/**
  * Deduct a queued order once. The account-scoped ledger makes browser retries,
  * keepalive retries, and repeated callbacks idempotent.
  *
