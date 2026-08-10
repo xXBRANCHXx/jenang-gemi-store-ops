@@ -1408,10 +1408,7 @@ button, input {
 }
 
 .admin-order-card.is-weekend-dependent {
-  --weekend-rest-bg: color-mix(in srgb, var(--admin-surface-soft) 90%, #f59e0b 10%);
-  --weekend-alert-bg: color-mix(in srgb, var(--admin-surface-soft) 70%, #f59e0b 30%);
-  animation: admin-weekend-dependent-pulse 0.82s ease-in-out infinite;
-  border-color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.72);
 }
 
 .admin-weekend-dependent-badge {
@@ -1428,16 +1425,28 @@ button, input {
   text-transform: uppercase;
 }
 
-@keyframes admin-weekend-dependent-pulse {
+.admin-order-card.is-manual-arrangement {
+  --manual-rest-bg: color-mix(in srgb, var(--admin-surface-soft) 88%, #0ea5e9 12%);
+  --manual-alert-bg: color-mix(in srgb, var(--admin-surface-soft) 68%, #0ea5e9 32%);
+  animation: admin-manual-arrangement-pulse 0.92s ease-in-out infinite;
+  border-color: #38bdf8;
+}
+
+:root[data-admin-theme='light'] .admin-order-card.is-manual-arrangement {
+  --manual-rest-bg: #f0f9ff;
+  --manual-alert-bg: #dbeafe;
+}
+
+@keyframes admin-manual-arrangement-pulse {
   0%, 100% {
-    border-color: rgba(245, 158, 11, 0.65);
-    background: var(--weekend-rest-bg);
-    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.08);
+    border-color: rgba(56, 189, 248, 0.68);
+    background: var(--manual-rest-bg);
+    box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.08);
   }
   50% {
-    border-color: #fbbf24;
-    background: var(--weekend-alert-bg);
-    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.28);
+    border-color: #38bdf8;
+    background: var(--manual-alert-bg);
+    box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.28);
   }
 }
 
@@ -1696,6 +1705,7 @@ button, input {
 .admin-order-card.has-manual-action .admin-order-meta,
 .admin-cancellation-alert,
 .admin-instant-action-error,
+.admin-shopee-action-error,
 .admin-manual-order-btn {
   grid-column: 1 / -1;
 }
@@ -1705,7 +1715,8 @@ button, input {
 }
 
 .admin-cancellation-alert,
-.admin-instant-action-error {
+.admin-instant-action-error,
+.admin-shopee-action-error {
   padding: 4px 6px;
   border-radius: 6px;
   font-size: 8px;
@@ -1725,6 +1736,12 @@ button, input {
   color: #fecaca;
 }
 
+.admin-shopee-action-error {
+  border: 1px solid rgba(56, 189, 248, 0.72);
+  background: rgba(7, 89, 133, 0.5);
+  color: #bae6fd;
+}
+
 .admin-manual-order-btn {
   width: 100%;
   max-width: none;
@@ -1734,6 +1751,11 @@ button, input {
 
 .admin-manual-order-btn.is-instant-action:not(:disabled) {
   background: #ef4444;
+  color: #fff;
+}
+
+.admin-manual-order-btn.is-shopee-action.is-manual-needed:not(:disabled) {
+  background: #0284c7;
   color: #fff;
 }
 

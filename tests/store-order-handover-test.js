@@ -114,6 +114,8 @@ assert(
 const dashboardTemplate = fs.readFileSync(path.join(__dirname, '../dashboard/index.php'), 'utf8');
 const storeHome = fs.readFileSync(path.join(__dirname, '../store-home.js'), 'utf8');
 const adminCss = fs.readFileSync(path.join(__dirname, '../admin.css'), 'utf8');
+const ordersApi = fs.readFileSync(path.join(__dirname, '../api/orders/index.php'), 'utf8');
+const ordersV2Api = fs.readFileSync(path.join(__dirname, '../api/orders-v2/index.php'), 'utf8');
 assert(
   dashboardTemplate.includes('data-order-board aria-busy="true"')
     && dashboardTemplate.includes('admin-board-empty admin-board-loading'),
@@ -181,14 +183,32 @@ assert(
   storeHome.includes("Number(Boolean(b?.instant)) - Number(Boolean(a?.instant))")
     && storeHome.includes("Number(Boolean(b?.weekendDependent)) - Number(Boolean(a?.weekendDependent))")
     && storeHome.includes('Weekend Dependent')
-    && storeHome.includes('Arrange manually now')
+    && storeHome.includes('data-arrange-shopee')
+    && storeHome.includes("postOrderAction('arrange_shopee_shipment', order)")
+    && storeHome.includes('shopeeManualRequired')
+    && storeHome.includes('manualArrangementNeeded')
+    && storeHome.includes("shopeeState === 'automatic' && !automaticArrangementPaused")
+    && storeHome.includes('Auto-arranging…')
+    && storeHome.includes('Manual arrange')
+    && storeHome.includes('Retry label')
+    && storeHome.includes("order.weekendDependentCutoff || '12:00'")
     && storeHome.includes("isWeekendDependent ? 'is-weekend-dependent' : ''"),
-  'Instant orders must sort first, while Weekend Dependent orders retain their next-priority badge and manual cutoff handling.'
+  'Instant orders must sort first, while every regular Shopee order retains a visible arrangement lifecycle and Weekend Dependent badge.'
+);
+assert(
+  ordersApi.includes("'/fulfillment/arrange-shopee'")
+    && ordersV2Api.includes("'/fulfillment/arrange-shopee'")
+    && ordersApi.includes("'arrange_shopee_shipment'")
+    && ordersV2Api.includes("'arrange_shopee_shipment'"),
+  'Both Store Ops order APIs must proxy the explicit regular Shopee fallback.'
 );
 assert(
   adminCss.includes('.admin-order-card.is-weekend-dependent')
-    && adminCss.includes('@keyframes admin-weekend-dependent-pulse'),
-  'Weekend Dependent orders must blink with their own amber treatment.'
+    && adminCss.includes('.admin-order-card.is-manual-arrangement')
+    && adminCss.includes('@keyframes admin-manual-arrangement-pulse')
+    && adminCss.includes('.admin-manual-order-btn.is-shopee-action.is-manual-needed:not(:disabled)')
+    && storeHome.includes("manualArrangementVisual ? 'is-manual-arrangement' : ''"),
+  'Only manual Shopee work must pulse cyan; Weekend Dependent status alone remains an amber badge and border.'
 );
 
 console.log('store-order-handover-test: ok');

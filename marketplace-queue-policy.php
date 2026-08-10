@@ -43,6 +43,14 @@ function jg_store_ops_marketplace_failed_arrangement(array $order): bool
         && (!empty($order['arrangementRetryRequired']) || !empty($order['arrangement_retry_required']));
 }
 
+function jg_store_ops_marketplace_shopee_manual_order(array $order): bool
+{
+    $platform = strtolower(trim((string) ($order['platform'] ?? $order['source_platform'] ?? '')));
+    return empty($order['instant'])
+        && ($platform === 'shopee' || str_contains($platform, 'shopee'))
+        && (!empty($order['shopeeManualRequired']) || !empty($order['shopee_manual_required']));
+}
+
 function jg_store_ops_marketplace_awaiting_collection(array $order, string $sourcePlatform): bool
 {
     $platform = strtolower(trim((string) ($order['platform'] ?? $order['source_platform'] ?? $sourcePlatform)));
@@ -110,7 +118,8 @@ function jg_store_ops_marketplace_order_visible(
     $labelBacked = jg_store_ops_marketplace_label_backed($order);
     $manualAction = jg_store_ops_marketplace_cancellation_requested($order)
         || jg_store_ops_marketplace_instant_manual_order($order)
-        || jg_store_ops_marketplace_failed_arrangement($order);
+        || jg_store_ops_marketplace_failed_arrangement($order)
+        || jg_store_ops_marketplace_shopee_manual_order($order);
     if ($requireLabelBacked && !$labelBacked && !$manualAction) {
         return false;
     }
@@ -146,6 +155,12 @@ function jg_store_ops_marketplace_action_enabled(array $key, bool $localHardSetE
     if (
         !empty($key['instant'])
         && strtolower(trim((string) ($key['action'] ?? ''))) === 'arrange_instant_shipment'
+    ) {
+        return true;
+    }
+    if (
+        jg_store_ops_marketplace_shopee_manual_order($key)
+        && strtolower(trim((string) ($key['action'] ?? ''))) === 'arrange_shopee_shipment'
     ) {
         return true;
     }

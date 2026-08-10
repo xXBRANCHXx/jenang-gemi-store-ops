@@ -156,35 +156,42 @@ function jg_store_ops_orders_marketplace_status_callback(array $key, string $sta
 }
 
 /** @return array<string,mixed> */
-function jg_store_ops_orders_arrange_instant(array $key, array $payload, string $employeeId, string $employeeName): array
+function jg_store_ops_orders_arrange_instant(
+    array $key,
+    array $payload,
+    string $employeeId,
+    string $employeeName,
+    string $requestPath = '/fulfillment/arrange-instant',
+    string $requestLabel = 'Instant'
+): array
 {
     $platform = (string) ($key['source_platform'] ?? '');
     if (!in_array($platform, ['shopee', 'tiktok'], true)) {
-        throw new RuntimeException('Instant shipment arrangement is available only for marketplace orders.');
+        throw new RuntimeException($requestLabel . ' shipment arrangement is available only for marketplace orders.');
     }
     $baseUrl = rtrim(jg_store_ops_orders_config('JG_SHOPEE_INGEST_BASE_URL', 'shopee_ingest_base_url', 'https://api.jenanggemi.com'), '/');
     $setupToken = jg_store_ops_marketplace_setup_token($platform);
     if ($baseUrl === '' || $setupToken === '') {
-        throw new RuntimeException('Marketplace Instant arrangement is not configured.');
+        throw new RuntimeException('Marketplace ' . $requestLabel . ' arrangement is not configured.');
     }
     $body = json_encode([
         'platform' => $platform,
         'account_key' => (string) ($key['source_account'] ?? ''),
         'order_id' => (string) ($key['order_id'] ?? ''),
-        'package_id' => trim((string) ($payload['package_id'] ?? $payload['package_number'] ?? '')),
-        'marketplace_status' => trim((string) ($payload['marketplace_status'] ?? '')),
+        'package_id' => trim((string) ($payload['package_id'] ?? $payload['package_number'] ?? $payload['packageNumber'] ?? '')),
+        'marketplace_status' => trim((string) ($payload['marketplace_status'] ?? $payload['marketplaceStatus'] ?? '')),
         'requested_by' => ['id' => $employeeId, 'name' => $employeeName],
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     if (!is_string($body)) {
-        throw new RuntimeException('Unable to prepare the Instant arrangement request.');
+        throw new RuntimeException('Unable to prepare the ' . $requestLabel . ' arrangement request.');
     }
 
     $raw = false;
     $status = 0;
     if (function_exists('curl_init')) {
-        $curl = curl_init($baseUrl . '/fulfillment/arrange-instant');
+        $curl = curl_init($baseUrl . $requestPath);
         if ($curl === false) {
-            throw new RuntimeException('Unable to initialize the Instant arrangement request.');
+            throw new RuntimeException('Unable to initialize the ' . $requestLabel . ' arrangement request.');
         }
         curl_setopt_array($curl, [
             CURLOPT_POST => true,
@@ -203,7 +210,7 @@ function jg_store_ops_orders_arrange_instant(array $key, array $payload, string 
         $curlError = curl_error($curl);
         curl_close($curl);
         if (!is_string($raw)) {
-            throw new RuntimeException($curlError !== '' ? $curlError : 'API Ingest did not answer the Instant arrangement request.');
+            throw new RuntimeException($curlError !== '' ? $curlError : 'API Ingest did not answer the ' . $requestLabel . ' arrangement request.');
         }
     } else {
         $context = stream_context_create(['http' => [
@@ -213,7 +220,7 @@ function jg_store_ops_orders_arrange_instant(array $key, array $payload, string 
             'timeout' => 90,
             'ignore_errors' => true,
         ]]);
-        $raw = @file_get_contents($baseUrl . '/fulfillment/arrange-instant', false, $context);
+        $raw = @file_get_contents($baseUrl . $requestPath, false, $context);
         foreach ((array) ($http_response_header ?? []) as $header) {
             if (preg_match('/^HTTP\/\S+\s+(\d{3})/', (string) $header, $matches) === 1) {
                 $status = (int) $matches[1];
@@ -225,9 +232,25 @@ function jg_store_ops_orders_arrange_instant(array $key, array $payload, string 
     if (!is_array($decoded) || $status >= 400 || empty($decoded['ok'])) {
         throw new RuntimeException(is_array($decoded) && !empty($decoded['error'])
             ? (string) $decoded['error']
-            : 'API Ingest did not accept the Instant arrangement request.');
+            : 'API Ingest did not accept the ' . $requestLabel . ' arrangement request.');
     }
     return is_array($decoded['arrangement'] ?? null) ? $decoded['arrangement'] : [];
+}
+
+/** @return array<string,mixed> */
+function jg_store_ops_orders_arrange_shopee(array $key, array $payload, string $employeeId, string $employeeName): array
+{
+    if ((string) ($key['source_platform'] ?? '') !== 'shopee') {
+        throw new RuntimeException('Manual Shopee arrangement is available only for Shopee orders.');
+    }
+    return jg_store_ops_orders_arrange_instant(
+        $key,
+        $payload,
+        $employeeId,
+        $employeeName,
+        '/fulfillment/arrange-shopee',
+        'Shopee manual'
+    );
 }
 
 /** @return array<string,mixed> */
@@ -1214,7 +1237,7 @@ if ($method === 'POST') {
         exit;
     }
 
-    $validActions = ['claim_order', 'begin_fulfillment', 'release_order', 'remove_order', 'record_scan', 'complete_scan', 'label_printed', 'fulfill_order', 'reprint_label', 'arrange_instant_shipment', 'retry_arrangement'];
+    $validActions = ['claim_order', 'begin_fulfillment', 'release_order', 'remove_order', 'record_scan', 'complete_scan', 'label_printed', 'fulfill_order', 'reprint_label', 'arrange_instant_shipment', 'arrange_shopee_shipment', 'retry_arrangement'];
     if (!in_array($action, $validActions, true)) {
         jg_store_ops_orders_fail('Unknown action.', 400);
     }
@@ -1272,6 +1295,11 @@ if ($method === 'POST') {
         }
         if ($action === 'arrange_instant_shipment') {
             $arrangement = jg_store_ops_orders_arrange_instant($key, $payload, $employeeId, $employeeName);
+            echo json_encode(['ok' => true, 'arrangement' => $arrangement], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+        if ($action === 'arrange_shopee_shipment') {
+            $arrangement = jg_store_ops_orders_arrange_shopee($key, $payload, $employeeId, $employeeName);
             echo json_encode(['ok' => true, 'arrangement' => $arrangement], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
             exit;
         }

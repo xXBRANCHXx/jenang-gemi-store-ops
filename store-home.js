@@ -1376,6 +1376,9 @@ document.addEventListener('DOMContentLoaded', () => {
       weekendDependent: Boolean(order.weekendDependent || order.weekend_dependent),
       weekendDependentAutoWindowOpen: Boolean(order.weekendDependentAutoWindowOpen || order.weekend_dependent_auto_window_open),
       weekendDependentCutoff: String(order.weekendDependentCutoff || order.weekend_dependent_cutoff || ''),
+      shopeeManualRequired: Boolean(order.shopeeManualRequired || order.shopee_manual_required),
+      shopeeArrangementState: String(order.shopeeArrangementState || order.shopee_arrangement_state || ''),
+      shopeeArrangementError: String(order.shopeeArrangementError || order.shopee_arrangement_error || ''),
       handoverMethod: orderPresentation.normalizeHandoverMethod(order),
       shippingProviderName: String(order.shippingProviderName || order.shipping_provider_name || ''),
       handoverScheduledStartAt: String(order.handoverScheduledStartAt || order.handover_scheduled_start_at || ''),
@@ -2284,6 +2287,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const isLocked = order.locked && !order.currentEmployeeCanWork;
       const isDropOff = orderPresentation.isDropOff(order);
       const isWeekendDependent = Boolean(order.weekendDependent);
+      const shopeeManualRequired = Boolean(order.shopeeManualRequired);
       const cancellationRequested = orderPresentation.isCancellationRequested(order);
       const arrangementRetryRequired = Boolean(order.arrangementRetryRequired);
       const instantManualLifecycle = orderPresentation.isInstantManualLifecycle(order) && !order.labelBacked;
@@ -2294,6 +2298,14 @@ document.addEventListener('DOMContentLoaded', () => {
         && !instantManualLifecycle
         && !cancellationRequested;
       const instantState = String(order.instantArrangementState || '').trim().toLowerCase();
+      const shopeeState = String(order.shopeeArrangementState || '').trim().toLowerCase();
+      const automaticShopeePending = shopeeState === 'automatic' && !automaticArrangementPaused;
+      const manualArrangementNeeded = shopeeManualRequired && (
+        !shopeeState
+        || ['required', 'failed', 'label_failed'].includes(shopeeState)
+        || (shopeeState === 'automatic' && automaticArrangementPaused)
+      );
+      const manualArrangementVisual = manualArrangementNeeded || shopeeState === 'requested';
       const pickupSlotLabel = order.handoverMethod === 'PICKUP' ? orderPresentation.formatHandoverSlot(order) : '';
       const handoverDescription = order.shippingProviderName
         ? `Drop-off order via ${order.shippingProviderName}`
@@ -2319,6 +2331,28 @@ document.addEventListener('DOMContentLoaded', () => {
       if (cancellationRequested) {
         const marketplaceName = String(order.platform || 'marketplace').trim() || 'marketplace';
         actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-cancellation" title="Cancellation requested — do not process. Resolve it in ${escapeHtml(marketplaceName)}." disabled><span>Handle in ${escapeHtml(marketplaceName)}</span></button>`;
+      } else if (shopeeManualRequired) {
+        const shopeeDisabled = !bigSetEnabled
+          || isLocked
+          || automaticShopeePending
+          || ['processing', 'requested', 'label_pending'].includes(shopeeState);
+        const shopeeLabel = !bigSetEnabled
+          ? 'Big Set locked'
+          : (automaticShopeePending
+            ? 'Auto-arranging…'
+            : (shopeeState === 'processing'
+            ? 'Arranging…'
+            : (shopeeState === 'requested'
+            ? 'Arranging…'
+            : (shopeeState === 'label_pending'
+              ? 'Preparing label…'
+              : (shopeeState === 'label_failed'
+                ? 'Retry label'
+                : (shopeeState === 'failed' ? 'Retry arrange' : 'Manual arrange'))))));
+        const shopeeTitle = automaticShopeePending
+          ? 'Automatic Shopee arrangement is healthy and still owns this order.'
+          : (order.shopeeArrangementError || 'Arrange this Shopee order from Store Ops.');
+        actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-shopee-action ${manualArrangementNeeded ? 'is-manual-needed' : ''}" data-arrange-shopee="${escapeHtml(order.id)}" title="${escapeHtml(shopeeTitle)}" ${shopeeDisabled ? 'disabled' : ''}><span>${escapeHtml(shopeeLabel)}</span></button>`;
       } else if (arrangementRetryRequired) {
         const retrying = String(order.arrangementRetryState || '').toLowerCase() === 'retrying';
         actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-arrangement-retry" data-retry-arrangement="${escapeHtml(order.id)}" title="${escapeHtml(order.arrangementRetryError || 'Automatic shipment arrangement exhausted its retries.')}" ${retrying || automaticArrangementPaused ? 'disabled' : ''}><span>${automaticArrangementPaused ? 'Arrangement paused' : (retrying ? 'Retrying…' : 'Arrangement failed — retry')}</span></button>`;
@@ -2339,7 +2373,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       return `
         <article
-          class="admin-order-card ${isCritical && !isLocked && !order.instant ? 'is-deadline-urgent' : ''} ${order.instant ? 'is-instant' : ''} ${isWeekendDependent ? 'is-weekend-dependent' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${arrangementRetryRequired ? 'is-arrangement-failed' : ''} ${pausedUnarranged ? 'is-awaiting-arrangement' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
+          class="admin-order-card ${isCritical && !isLocked && !order.instant ? 'is-deadline-urgent' : ''} ${order.instant ? 'is-instant' : ''} ${isWeekendDependent ? 'is-weekend-dependent' : ''} ${manualArrangementVisual ? 'is-manual-arrangement' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${arrangementRetryRequired ? 'is-arrangement-failed' : ''} ${pausedUnarranged || shopeeManualRequired ? 'is-awaiting-arrangement' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
           data-order-id="${escapeHtml(order.id)}"
           data-source-key="${escapeHtml(sourceKey)}"
           ${claimedBySelf ? 'data-claim-owner="self" title="Right-click for claim actions"' : ''}
@@ -2350,7 +2384,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <button type="button" class="admin-order-preview-trigger" data-preview-order="${escapeHtml(order.id)}" aria-label="Preview order ${escapeHtml(order.id)}"></button>
           <div class="admin-order-card-top">
             <span class="admin-order-id">${escapeHtml(order.id)}</span>
-            ${isWeekendDependent ? `<span class="admin-weekend-dependent-badge" title="Must be arranged on Saturday before ${escapeHtml(order.weekendDependentCutoff || '11:30')}">Weekend Dependent</span>` : ''}
+            ${isWeekendDependent ? `<span class="admin-weekend-dependent-badge" title="Must be arranged on Saturday before ${escapeHtml(order.weekendDependentCutoff || '12:00')}">Weekend Dependent</span>` : ''}
             ${arrangementRetryRequired ? `<span class="admin-arrangement-failed-badge" title="${escapeHtml(order.arrangementRetryError || 'Arrangement failed')}">Arrangement failed</span>` : ''}
             ${isDropOff ? `<span class="admin-dropoff-badge" aria-label="${escapeHtml(handoverDescription)}" title="${escapeHtml(handoverDescription)}">Drop-off</span>` : ''}
             ${order.instant ? '<span class="admin-instant-badge" role="img" aria-label="Instant shipping order" title="Instant shipping order"><svg viewBox="0 0 32 20" aria-hidden="true" focusable="false"><path class="admin-instant-badge-speed" d="M2 6h5.5M1 10h5M3 14h4.5"/><path class="admin-instant-badge-truck" d="M8.5 6.5h11v7.5h-11zM19.5 9.2h4.1l3.1 3.2V14h-7.2zM22.1 9.2v3.2h4.6"/><circle class="admin-instant-badge-wheel" cx="11.5" cy="15" r="2"/><circle class="admin-instant-badge-wheel" cx="23.5" cy="15" r="2"/></svg><span class="admin-instant-badge-label">Instant</span></span>' : ''}
@@ -2361,6 +2395,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>${escapeHtml(claimLabel)}</span>
           </div>
           ${instantState === 'failed' && order.instantArrangementError ? `<div class="admin-instant-action-error">${escapeHtml(order.instantArrangementError)}</div>` : ''}
+          ${['failed', 'label_failed'].includes(shopeeState) && order.shopeeArrangementError ? `<div class="admin-shopee-action-error">${escapeHtml(order.shopeeArrangementError)}</div>` : ''}
           ${actionButton}
         </article>
       `;
@@ -2570,6 +2605,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  const arrangeShopeeShipment = async (orderId) => {
+    const order = state.orders.find((item) => item.id === orderId);
+    if (!order?.shopeeManualRequired || order.instant || orderPresentation.isCancellationRequested(order) || !bigSetEnabled) return;
+    order.shopeeArrangementState = 'requested';
+    order.shopeeArrangementError = '';
+    saveOrders();
+    renderBoard();
+    try {
+      const payload = await postOrderAction('arrange_shopee_shipment', order);
+      const arrangement = payload.arrangement && typeof payload.arrangement === 'object' ? payload.arrangement : {};
+      order.shopeeArrangementState = String(arrangement.state || 'requested');
+      order.shopeeArrangementError = String(arrangement.error || '');
+      saveOrders();
+      renderBoard();
+      await refreshOrders(false, { force: true });
+    } catch (error) {
+      if (error instanceof StoreOpsAuthenticationRequiredError) {
+        redirectToStoreOpsLogin();
+        return;
+      }
+      order.shopeeArrangementState = 'failed';
+      order.shopeeArrangementError = error instanceof Error ? error.message : 'Unable to arrange this Shopee shipment.';
+      saveOrders();
+      renderBoard();
+      showBoardAlert(order.shopeeArrangementError);
+    }
+  };
+
   const retryFailedArrangement = async (orderId) => {
     const order = state.orders.find((item) => item.id === orderId);
     if (!order?.arrangementRetryRequired || automaticArrangementPaused) return;
@@ -2747,6 +2810,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const instantButton = target?.closest('[data-arrange-instant]');
     if (instantButton instanceof HTMLButtonElement) {
       if (!instantButton.disabled) arrangeInstantShipment(instantButton.dataset.arrangeInstant || '');
+      return;
+    }
+    const shopeeButton = target?.closest('[data-arrange-shopee]');
+    if (shopeeButton instanceof HTMLButtonElement) {
+      if (!shopeeButton.disabled) arrangeShopeeShipment(shopeeButton.dataset.arrangeShopee || '');
       return;
     }
     const button = target?.closest('[data-start-order]');
