@@ -191,6 +191,7 @@ assert(
     && storeHome.includes('Auto-arranging…')
     && storeHome.includes('Manual arrange')
     && storeHome.includes('Retry label')
+    && storeHome.includes("order.instant && instantState === 'failed'")
     && storeHome.includes("order.weekendDependentCutoff || '12:00'")
     && storeHome.includes("isWeekendDependent ? 'is-weekend-dependent' : ''"),
   'Instant orders must sort first, while every regular Shopee order retains a visible arrangement lifecycle and Weekend Dependent badge.'

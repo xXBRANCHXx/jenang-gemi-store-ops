@@ -2394,7 +2394,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>${escapeHtml(sourceLabel)}</span>
             <span>${escapeHtml(claimLabel)}</span>
           </div>
-          ${instantState === 'failed' && order.instantArrangementError ? `<div class="admin-instant-action-error">${escapeHtml(order.instantArrangementError)}</div>` : ''}
+          ${order.instant && instantState === 'failed' && order.instantArrangementError ? `<div class="admin-instant-action-error">${escapeHtml(order.instantArrangementError)}</div>` : ''}
           ${['failed', 'label_failed'].includes(shopeeState) && order.shopeeArrangementError ? `<div class="admin-shopee-action-error">${escapeHtml(order.shopeeArrangementError)}</div>` : ''}
           ${actionButton}
         </article>
