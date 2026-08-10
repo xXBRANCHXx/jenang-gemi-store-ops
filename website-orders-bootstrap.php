@@ -809,6 +809,13 @@ function jg_store_ops_website_callback(PDO $pdo, string $platform, string $order
     if (!in_array($platform, JG_STORE_OPS_WEBSITE_PLATFORMS, true)) return;
     $status = strtoupper($status);
     if (!in_array($status, ['IS_BEING_FULFILLED', 'FULFILLED'], true)) return;
+    // The Store Ops source row must never remain Listed after the shared
+    // fulfillment transaction is final. Persist locally before the remote
+    // callback; if the callback fails, the caller keeps its durable action
+    // queued and retries this idempotent operation.
+    $pdo->prepare(
+        'UPDATE store_ops_website_orders SET status = :status, updated_at = :updated_at WHERE source_platform = :platform AND order_id = :order_id'
+    )->execute([':status' => $status, ':updated_at' => jg_store_ops_website_now(), ':platform' => $platform, ':order_id' => $orderId]);
     $base = rtrim(jg_store_ops_website_config('JG_EXECUTIVE_DASHBOARD_URL', 'executive_dashboard_url', 'https://admin.jenanggemi.com'), '/');
     $callbackPath = $platform === 'whatsapp' ? '/api/whatsapp-orders/?action=status_callback' : '/api/website-orders/?action=status_callback';
     jg_store_ops_website_request('POST', $base . $callbackPath, [
@@ -816,9 +823,6 @@ function jg_store_ops_website_callback(PDO $pdo, string $platform, string $order
         'order_id' => $orderId,
         'status' => $status,
     ]);
-    $pdo->prepare(
-        'UPDATE store_ops_website_orders SET status = :status, updated_at = :updated_at WHERE source_platform = :platform AND order_id = :order_id'
-    )->execute([':status' => $status, ':updated_at' => jg_store_ops_website_now(), ':platform' => $platform, ':order_id' => $orderId]);
 }
 
 function jg_store_ops_whatsapp_remove_from_listed(PDO $pdo, string $orderId): void

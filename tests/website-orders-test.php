@@ -167,12 +167,28 @@ website_ops_expect(
         && str_contains($websiteBootstrapSource, 'jg_store_ops_whatsapp_cancellation_state($pdo, $orderId)'),
     'Batched WhatsApp lifecycle reads must be bounded and reuse the authoritative single-order state.'
 );
+$localStatusPosition = strpos($websiteBootstrapSource, "UPDATE store_ops_website_orders SET status = :status");
+$remoteCallbackPosition = strpos($websiteBootstrapSource, "jg_store_ops_website_request('POST', \$base . \$callbackPath");
+website_ops_expect(
+    true,
+    $localStatusPosition !== false
+        && $remoteCallbackPosition !== false
+        && $localStatusPosition < $remoteCallbackPosition,
+    'Website completion must become durable in Store Ops before its retryable upstream callback.'
+);
 foreach (['api/orders/index.php', 'api/orders-v2/index.php'] as $ordersEndpoint) {
     $ordersSource = (string) file_get_contents(dirname(__DIR__) . '/' . $ordersEndpoint);
     website_ops_expect(
         true,
         preg_match('/action === \'claim_order\'[\s\S]*?source_platform\'] === \'whatsapp\'[\s\S]*?IS_BEING_FULFILLED[\s\S]*?jg_store_ops_orders_fulfillment_response/', $ordersSource) === 1,
         $ordersEndpoint . ' must report a WhatsApp claim as Processing before responding.'
+    );
+    website_ops_expect(
+        true,
+        str_contains($ordersSource, "if (\$action === 'fulfill_order')")
+            && str_contains($ordersSource, 'jg_store_ops_website_callback')
+            && !str_contains($ordersSource, 'Website order fulfilled callback failed'),
+        $ordersEndpoint . ' must retain the browser completion retry until the upstream website callback succeeds.'
     );
 }
 $fulfillmentRuntime = (string) file_get_contents(dirname(__DIR__) . '/store-ops-fulfillment-runtime.php');

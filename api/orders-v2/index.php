@@ -1421,11 +1421,9 @@ if ($method === 'POST') {
                 jg_store_ops_orders_partner_update_status($key['order_id'], 'FULFILLED');
             }
             if (in_array($key['source_platform'], JG_STORE_OPS_WEBSITE_PLATFORMS, true)) {
-                try {
-                    jg_store_ops_website_callback($pdo, $key['source_platform'], $key['order_id'], 'FULFILLED');
-                } catch (Throwable $callbackError) {
-                    error_log('Website order fulfilled callback failed: ' . $callbackError->getMessage());
-                }
+                // Do not acknowledge the browser's durable completion action
+                // until the upstream source also accepts the terminal state.
+                jg_store_ops_website_callback($pdo, $key['source_platform'], $key['order_id'], 'FULFILLED');
             }
             if (in_array($key['source_platform'], ['shopee', 'tiktok'], true)) {
                 try {
