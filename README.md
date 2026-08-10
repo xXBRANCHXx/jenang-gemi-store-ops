@@ -33,6 +33,12 @@ Operational backend for `store.jenanggemi.com`.
 - `/inventory/` is the production-receiving queue for Executive purchase orders.
   Checked full or partial line quantities are recorded as receipts and added
   through the ASTRA-aware stock engine in one database transaction.
+- `/returns/` records full or partial product returns from a verified original
+  order. Direct-to-stock reports add inventory immediately; production returns
+  require a total quote and create a confirmed PO tagged `Returned damaged
+  goods`, which follows the normal Executive payment and Inventory receiving
+  flow. Drafts remain resumable. Partner is shown but disabled until its
+  separate returns integration is available.
 - `/walk-ins/`
 - `/whatsapp-orders/`
 - `/order-records/`
@@ -46,6 +52,7 @@ Operational backend for `store.jenanggemi.com`.
 - `/api/orders-v2/` (active fulfillment dashboard endpoint)
 - `/api/orders/` (compatible legacy endpoint)
 - `/api/order-lookup/`
+- `/api/returns/`
 - `/api/walk-ins/`
 - `/api/invoice-records/`
 - `/api/profile-settings/`

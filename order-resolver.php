@@ -965,13 +965,14 @@ function jg_store_ops_order_resolver_sort_customer_profiles(array &$profiles, st
     });
 }
 
-function jg_store_ops_search_customer_profiles(string $query, int $limit = 100, bool $labelOnly = false): array
+function jg_store_ops_search_customer_profiles(string $query, int $limit = 100, bool $labelOnly = false, string $platform = ''): array
 {
     $query = trim($query);
     if ($query === '') {
         return [];
     }
     $limit = max(1, min(200, $limit));
+    $platform = $platform !== '' ? jg_store_ops_order_resolver_platform_key($platform) : '';
     $orders = [];
     foreach ([
         jg_store_ops_order_resolver_search_walkins($query, $limit),
@@ -983,6 +984,7 @@ function jg_store_ops_search_customer_profiles(string $query, int $limit = 100, 
             if (
                 is_array($order)
                 && jg_store_ops_order_resolver_order_matches_query($order, $query)
+                && ($platform === '' || jg_store_ops_order_resolver_platform_key((string) ($order['source']['platform'] ?? $order['source']['key'] ?? '')) === $platform)
                 && (!$labelOnly || !empty(jg_store_ops_order_resolver_shipping_label($order)['supported']))
             ) {
                 $orders[(string) ($order['source']['key'] ?? '') . ':' . (string) ($order['order_id'] ?? '')] = $order;

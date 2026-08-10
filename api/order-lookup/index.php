@@ -31,6 +31,14 @@ try {
         if (!is_array($order)) {
             jg_store_ops_order_lookup_fail('Order was not found.', 404);
         }
+        $requestedPlatform = jg_store_ops_order_resolver_platform_key((string) ($_GET['platform'] ?? ''));
+        $orderPlatform = jg_store_ops_order_resolver_platform_key((string) ($order['source']['platform'] ?? $order['source']['key'] ?? ''));
+        if ($requestedPlatform !== '' && $orderPlatform !== $requestedPlatform) {
+            jg_store_ops_order_lookup_fail(sprintf(
+                'That order belongs to %s, not the selected platform.',
+                jg_store_ops_order_resolver_source_label($orderPlatform)
+            ), 409);
+        }
         $order['shipping_label'] = jg_store_ops_order_resolver_shipping_label($order);
         echo json_encode(['ok' => true, 'order' => $order], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         exit;
@@ -47,7 +55,8 @@ try {
             'profiles' => jg_store_ops_search_customer_profiles(
                 $query,
                 (int) ($_GET['limit'] ?? 100),
-                in_array(strtolower(trim((string) ($_GET['label_only'] ?? ''))), ['1', 'true', 'yes', 'on'], true)
+                in_array(strtolower(trim((string) ($_GET['label_only'] ?? ''))), ['1', 'true', 'yes', 'on'], true),
+                (string) ($_GET['platform'] ?? '')
             ),
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         exit;
