@@ -66,6 +66,7 @@ $storeHome = (string) file_get_contents(dirname(__DIR__) . '/store-home.js');
 order_removal_expect(
     str_contains($storeHome, "completion_audit: '1'")
     && str_contains($storeHome, 'Stock already deducted')
+    && str_contains($storeHome, 'including a shortage of')
     && str_contains($storeHome, 'Removing this card will not deduct it again.'),
     'The Remove dialog must display the authoritative stock audit before confirmation.'
 );

@@ -106,17 +106,39 @@ astra_deduction_expect(7, $stocks['BUBUR45'], 'Every linked size must synchroniz
 $beforeFailure = astra_deduction_stocks($pdo);
 $shortageRejected = false;
 try {
-    jg_store_ops_order_stock_deduct($pdo, [
-        'source_platform' => 'walk_in',
-        'source_account' => 'pos',
-        'order_id' => 'WI-SHORTAGE',
-    ], [['sku' => 'BUBUR30', 'quantity' => 11]]);
+    $pdo->beginTransaction();
+    jg_store_ops_astra_apply_deduction($pdo, [['sku' => 'BUBUR30', 'quantity' => 11]], '2026-07-30 03:00:00');
+    $pdo->commit();
 } catch (RuntimeException $error) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
     $shortageRejected = str_contains($error->getMessage(), 'ASTRA base');
 }
-astra_deduction_expect(true, $shortageRejected, 'Insufficient ASTRA base stock must block fulfillment instead of clamping stock to zero.');
-astra_deduction_expect($beforeFailure, astra_deduction_stocks($pdo), 'A failed deduction must roll back every stock row.');
+astra_deduction_expect(true, $shortageRejected, 'Strict inventory movements must still reject a shortage.');
+astra_deduction_expect($beforeFailure, astra_deduction_stocks($pdo), 'A rejected strict deduction must roll back every stock row.');
 
+$shortageKey = [
+    'source_platform' => 'whatsapp',
+    'source_account' => 'whatsapp',
+    'order_id' => 'WA-SHORTAGE',
+];
+$shortageResult = jg_store_ops_order_stock_deduct($pdo, $shortageKey, [
+    ['sku' => 'BUBUR15', 'quantity' => 20],
+    ['sku' => 'BUBUR30', 'quantity' => 2],
+]);
+astra_deduction_expect(true, $shortageResult['deducted'], 'A physical order completion must be recorded when catalog stock is short.');
+astra_deduction_expect(0, $shortageResult['deductions'][0]['shortage_base_quantity'] ?? -1, 'Available shared base stock must be allocated once in deterministic SKU order.');
+astra_deduction_expect(3, $shortageResult['deductions'][1]['shortage_base_quantity'] ?? 0, 'The order ledger must retain the exact unresolved ASTRA base quantity across linked selling SKUs.');
+$shortageStocks = astra_deduction_stocks($pdo);
+astra_deduction_expect(0, $shortageStocks['BUBUR15'], 'A shortage completion must consume the available base stock without going negative.');
+astra_deduction_expect(0, $shortageStocks['BUBUR30'], 'Every linked selling SKU must synchronize to the clamped base stock.');
+$shortageState = jg_store_ops_order_stock_state($pdo, $shortageKey);
+astra_deduction_expect(true, $shortageState['deducted'], 'A shortage completion must remain idempotently recorded as processed.');
+astra_deduction_expect(true, $shortageState['has_shortage'], 'The shared audit must distinguish a completion with an inventory shortage.');
+astra_deduction_expect(3, $shortageState['shortage_base_quantity'], 'The shared audit must expose the exact shortage total without double-counting linked SKUs.');
+$shortageRetry = jg_store_ops_order_stock_deduct($pdo, $shortageKey, []);
+astra_deduction_expect(false, $shortageRetry['deducted'], 'A shortage completion retry must never change stock twice.');
+
+$afterShortage = astra_deduction_stocks($pdo);
 $unknownRejected = false;
 try {
     jg_store_ops_order_stock_deduct($pdo, [
@@ -128,7 +150,7 @@ try {
     $unknownRejected = true;
 }
 astra_deduction_expect(true, $unknownRejected, 'Unmapped marketplace lines must block fulfillment instead of silently skipping stock.');
-astra_deduction_expect($beforeFailure, astra_deduction_stocks($pdo), 'An unmapped SKU must not change stock.');
+astra_deduction_expect($afterShortage, astra_deduction_stocks($pdo), 'An unmapped SKU must not change stock.');
 
 $legacyApi = (string) file_get_contents(dirname(__DIR__) . '/api/orders/index.php');
 $currentApi = (string) file_get_contents(dirname(__DIR__) . '/api/orders-v2/index.php');

@@ -2724,7 +2724,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const stock = payload.stock && typeof payload.stock === 'object' ? payload.stock : {};
       const deductedAt = String(stock.deducted_at || '').trim();
       if (stock.deducted) {
-        removeOrderStockAudit.textContent = `Stock already deducted${deductedAt ? ` at ${deductedAt} UTC` : ''}. Removing this card will not deduct it again.`;
+        const shortage = Math.max(0, Number(stock.shortage_base_quantity || 0));
+        removeOrderStockAudit.textContent = shortage > 0
+          ? `Stock completion recorded${deductedAt ? ` at ${deductedAt} UTC` : ''}, including a shortage of ${shortage} ASTRA base units. Removing this card will not deduct it again.`
+          : `Stock already deducted${deductedAt ? ` at ${deductedAt} UTC` : ''}. Removing this card will not deduct it again.`;
         removeOrderStockAudit.dataset.state = 'deducted';
       } else {
         removeOrderStockAudit.textContent = 'Stock has not been deducted. Removing this card will cancel it without changing inventory.';

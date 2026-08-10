@@ -231,7 +231,8 @@ function jg_store_ops_astra_apply_movement(
     PDO $pdo,
     array $items,
     string $direction,
-    string $now
+    string $now,
+    bool $allowShortage = false
 ): array
 {
     if (!$pdo->inTransaction()) {
@@ -262,7 +263,7 @@ function jg_store_ops_astra_apply_movement(
             throw new RuntimeException(sprintf('%s is missing from the live stock catalog.', $stockSku));
         }
         $stockBefore = max(0, (int) ($row['current_stock'] ?? 0));
-        if ($direction === 'subtract' && $required > $stockBefore) {
+        if ($direction === 'subtract' && $required > $stockBefore && !$allowShortage) {
             throw new RuntimeException(sprintf(
                 'Cannot subtract stock: %s needs %d ASTRA base unit%s but only %d remain.',
                 $stockSku,
@@ -271,10 +272,13 @@ function jg_store_ops_astra_apply_movement(
                 $stockBefore
             ));
         }
+        $deducted = $direction === 'subtract' ? min($required, $stockBefore) : 0;
         $stockChanges[$stockSku] = [
             'stock_before' => $stockBefore,
-            'stock_after' => $direction === 'add' ? $stockBefore + $required : $stockBefore - $required,
+            'stock_after' => $direction === 'add' ? $stockBefore + $required : $stockBefore - $deducted,
             'base_quantity' => $required,
+            'base_deducted_quantity' => $direction === 'subtract' ? $deducted : 0,
+            'shortage_base_quantity' => $direction === 'subtract' ? max(0, $required - $deducted) : 0,
         ];
     }
 
@@ -310,12 +314,26 @@ function jg_store_ops_astra_apply_movement(
         // Lightweight tests and legacy databases may not have sku_meta yet.
     }
 
+    $remainingDeductedByStockSku = [];
+    foreach ($stockChanges as $stockSku => $change) {
+        $remainingDeductedByStockSku[$stockSku] = (int) ($change['base_deducted_quantity'] ?? 0);
+    }
     foreach ($plan as &$line) {
         $change = $stockChanges[$line['stock_sku']];
         $ratio = max(1.0, (float) ($line['stock_ratio'] ?? 1.0));
+        $requestedBaseQuantity = (int) ($line['base_quantity'] ?? 0);
+        $availableBaseQuantity = (int) ($remainingDeductedByStockSku[$line['stock_sku']] ?? 0);
+        $deductedBaseQuantity = $direction === 'subtract'
+            ? min($requestedBaseQuantity, $availableBaseQuantity)
+            : 0;
+        $remainingDeductedByStockSku[$line['stock_sku']] = max(0, $availableBaseQuantity - $deductedBaseQuantity);
         $line['direction'] = $direction;
         $line['stock_before'] = $change['stock_before'];
         $line['stock_after'] = $change['stock_after'];
+        $line['base_deducted_quantity'] = $deductedBaseQuantity;
+        $line['shortage_base_quantity'] = $direction === 'subtract'
+            ? max(0, $requestedBaseQuantity - $deductedBaseQuantity)
+            : 0;
         $line['selling_stock_before'] = jg_store_ops_astra_from_base_units($change['stock_before'], $ratio);
         $line['selling_stock_after'] = jg_store_ops_astra_from_base_units($change['stock_after'], $ratio);
     }
@@ -330,6 +348,19 @@ function jg_store_ops_astra_apply_movement(
 function jg_store_ops_astra_apply_deduction(PDO $pdo, array $items, string $now): array
 {
     return jg_store_ops_astra_apply_movement($pdo, $items, 'subtract', $now);
+}
+
+/**
+ * Record a physical order completion even when recorded inventory is already
+ * short. Available stock reaches zero and the immutable order ledger retains
+ * the unresolved quantity instead of rejecting the fulfillment fact.
+ *
+ * @param array<int,array<string,mixed>> $items
+ * @return array<int,array<string,mixed>>
+ */
+function jg_store_ops_astra_apply_fulfillment_deduction(PDO $pdo, array $items, string $now): array
+{
+    return jg_store_ops_astra_apply_movement($pdo, $items, 'subtract', $now, true);
 }
 
 /**
@@ -383,7 +414,7 @@ function jg_store_ops_order_stock_ensure_schema(PDO $pdo): void
  * audit endpoint.
  *
  * @param array<string,mixed> $key
- * @return array{deducted:bool,status:string,deducted_at:?string,deductions:array<int,array<string,mixed>>}
+ * @return array{deducted:bool,status:string,deducted_at:?string,deductions:array<int,array<string,mixed>>,has_shortage:bool,shortage_base_quantity:int}
  */
 function jg_store_ops_order_stock_state(PDO $pdo, array $key): array
 {
@@ -417,11 +448,19 @@ function jg_store_ops_order_stock_state(PDO $pdo, array $key): array
     $status = is_array($row) ? strtolower(trim((string) ($row['status'] ?? ''))) : '';
     $deductions = is_array($row) ? json_decode((string) ($row['deductions_json'] ?? ''), true) : null;
     $deductedAt = is_array($row) ? trim((string) ($row['deducted_at'] ?? '')) : '';
+    $deductionRows = is_array($deductions) ? array_values(array_filter($deductions, 'is_array')) : [];
+    $shortageBaseQuantity = array_reduce(
+        $deductionRows,
+        static fn (int $total, array $line): int => $total + max(0, (int) ($line['shortage_base_quantity'] ?? 0)),
+        0
+    );
     return [
         'deducted' => $status === 'deducted',
         'status' => $status !== '' ? $status : 'not_recorded',
         'deducted_at' => $deductedAt !== '' ? $deductedAt : null,
-        'deductions' => is_array($deductions) ? array_values(array_filter($deductions, 'is_array')) : [],
+        'deductions' => $deductionRows,
+        'has_shortage' => $shortageBaseQuantity > 0,
+        'shortage_base_quantity' => $shortageBaseQuantity,
     ];
 }
 
@@ -498,7 +537,7 @@ function jg_store_ops_order_stock_deduct(PDO $pdo, array $key, array $items): ar
             ];
         }
 
-        $deductions = jg_store_ops_astra_apply_deduction($pdo, $items, $now);
+        $deductions = jg_store_ops_astra_apply_fulfillment_deduction($pdo, $items, $now);
         $encoded = json_encode($deductions, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         $complete = $pdo->prepare(
             'UPDATE store_ops_inventory_order_deductions

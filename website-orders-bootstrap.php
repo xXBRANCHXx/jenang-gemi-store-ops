@@ -771,7 +771,7 @@ function jg_store_ops_website_deduct_stock(PDO $pdo, string $platform, string $o
  * rollout can still be audited safely. New completions are proven by the
  * account-scoped ASTRA ledger.
  *
- * @return array{deducted:bool,status:string,deducted_at:?string,deductions:array<int,array<string,mixed>>,legacy_marker:bool}
+ * @return array{deducted:bool,status:string,deducted_at:?string,deductions:array<int,array<string,mixed>>,has_shortage:bool,shortage_base_quantity:int,legacy_marker:bool}
  */
 function jg_store_ops_website_stock_state(PDO $pdo, string $platform, string $orderId): array
 {
