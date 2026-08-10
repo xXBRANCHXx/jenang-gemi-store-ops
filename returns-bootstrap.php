@@ -37,10 +37,17 @@ function jg_store_ops_returns_ensure_schema(PDO $pdo): void
                 source_account TEXT NOT NULL DEFAULT "",
                 customer_name TEXT NOT NULL DEFAULT "",
                 customer_username TEXT NOT NULL DEFAULT "",
+                fault_party TEXT NOT NULL DEFAULT "",
+                condition_code TEXT NOT NULL DEFAULT "",
+                partner_code TEXT NOT NULL DEFAULT "",
                 destination TEXT NOT NULL DEFAULT "",
                 status TEXT NOT NULL DEFAULT "draft",
                 quote_amount NUMERIC NULL,
                 purchase_order_id INTEGER NULL,
+                partner_bill_id TEXT NULL,
+                partner_adjustment_key TEXT NOT NULL DEFAULT "",
+                partner_selected_value NUMERIC NULL,
+                partner_adjustment_amount NUMERIC NULL,
                 created_by TEXT NOT NULL DEFAULT "Store Ops",
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
@@ -75,6 +82,7 @@ function jg_store_ops_returns_ensure_schema(PDO $pdo): void
                 FOREIGN KEY (return_id) REFERENCES store_ops_returns(id)
             )'
         );
+        jg_store_ops_returns_ensure_columns($pdo);
         $ensured[$connectionKey] = true;
         return;
     }
@@ -90,10 +98,17 @@ function jg_store_ops_returns_ensure_schema(PDO $pdo): void
             source_account VARCHAR(120) NOT NULL DEFAULT "",
             customer_name VARCHAR(160) NOT NULL DEFAULT "",
             customer_username VARCHAR(160) NOT NULL DEFAULT "",
+            fault_party VARCHAR(16) NOT NULL DEFAULT "",
+            condition_code VARCHAR(24) NOT NULL DEFAULT "",
+            partner_code VARCHAR(40) NOT NULL DEFAULT "",
             destination VARCHAR(24) NOT NULL DEFAULT "",
             status VARCHAR(32) NOT NULL DEFAULT "draft",
             quote_amount DECIMAL(14,2) NULL,
             purchase_order_id BIGINT UNSIGNED NULL,
+            partner_bill_id VARCHAR(120) NULL,
+            partner_adjustment_key VARCHAR(120) NOT NULL DEFAULT "",
+            partner_selected_value DECIMAL(14,2) NULL,
+            partner_adjustment_amount DECIMAL(14,2) NULL,
             created_by VARCHAR(80) NOT NULL DEFAULT "Store Ops",
             created_at DATETIME NOT NULL,
             updated_at DATETIME NOT NULL,
@@ -136,7 +151,33 @@ function jg_store_ops_returns_ensure_schema(PDO $pdo): void
                 FOREIGN KEY (return_id) REFERENCES store_ops_returns(id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
+    jg_store_ops_returns_ensure_columns($pdo);
     $ensured[$connectionKey] = true;
+}
+
+function jg_store_ops_returns_ensure_columns(PDO $pdo): void
+{
+    $definitions = [
+        'fault_party' => 'VARCHAR(16) NOT NULL DEFAULT ""',
+        'condition_code' => 'VARCHAR(24) NOT NULL DEFAULT ""',
+        'partner_code' => 'VARCHAR(40) NOT NULL DEFAULT ""',
+        'partner_bill_id' => 'VARCHAR(120) NULL',
+        'partner_adjustment_key' => 'VARCHAR(120) NOT NULL DEFAULT ""',
+        'partner_selected_value' => 'DECIMAL(14,2) NULL',
+        'partner_adjustment_amount' => 'DECIMAL(14,2) NULL',
+    ];
+    if (jg_store_ops_returns_driver($pdo) === 'sqlite') {
+        $columns = array_map(static fn (array $row): string => (string) ($row['name'] ?? ''), $pdo->query('PRAGMA table_info(store_ops_returns)')->fetchAll());
+        foreach ($definitions as $column => $definition) {
+            if (!in_array($column, $columns, true)) $pdo->exec('ALTER TABLE store_ops_returns ADD COLUMN ' . $column . ' ' . str_replace(['VARCHAR(16)', 'VARCHAR(24)', 'VARCHAR(40)', 'VARCHAR(120)', 'BIGINT', 'DECIMAL(14,2)'], ['TEXT', 'TEXT', 'TEXT', 'TEXT', 'INTEGER', 'NUMERIC'], $definition));
+        }
+        return;
+    }
+    $check = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "store_ops_returns" AND COLUMN_NAME = :column_name');
+    foreach ($definitions as $column => $definition) {
+        $check->execute([':column_name' => $column]);
+        if ((int) $check->fetchColumn() === 0) $pdo->exec('ALTER TABLE store_ops_returns ADD COLUMN ' . $column . ' ' . $definition);
+    }
 }
 
 function jg_store_ops_returns_number(string $prefix = 'JG-RET'): string
@@ -149,7 +190,7 @@ function jg_store_ops_returns_platform(mixed $value): string
     $platform = strtolower(trim((string) $value));
     $platform = trim((string) preg_replace('/[^a-z0-9]+/', '_', $platform), '_');
     return match ($platform) {
-        'shopee', 'tiktok', 'whatsapp', 'walk_in', 'zero_website', 'jenang_gemi_website' => $platform,
+        'shopee', 'tiktok', 'whatsapp', 'walk_in', 'zero_website', 'jenang_gemi_website', 'partner' => $platform,
         default => throw new InvalidArgumentException('Choose a valid sales platform.'),
     };
 }
@@ -213,6 +254,9 @@ function jg_store_ops_returns_find(PDO $pdo, int $returnId): array
     $itemStmt->execute([':return_id' => $returnId]);
     $report['id'] = (int) $report['id'];
     $report['purchase_order_id'] = $report['purchase_order_id'] === null ? null : (int) $report['purchase_order_id'];
+    $report['partner_bill_id'] = $report['partner_bill_id'] === null ? null : (string) $report['partner_bill_id'];
+    $report['partner_selected_value'] = $report['partner_selected_value'] === null ? null : (float) $report['partner_selected_value'];
+    $report['partner_adjustment_amount'] = $report['partner_adjustment_amount'] === null ? null : (float) $report['partner_adjustment_amount'];
     $report['quote_amount'] = $report['quote_amount'] === null ? null : (float) $report['quote_amount'];
     $report['items'] = array_map(static function (array $item): array {
         $item['id'] = (int) $item['id'];
@@ -241,7 +285,17 @@ function jg_store_ops_returns_save_draft(PDO $pdo, array $payload, string $creat
     $orderId = mb_substr(trim((string) ($payload['order_id'] ?? '')), 0, 160);
     $platform = jg_store_ops_returns_platform($payload['source_platform'] ?? '');
     $destination = strtolower(trim((string) ($payload['destination'] ?? '')));
-    if (!in_array($destination, ['', 'stock', 'production'], true)) throw new InvalidArgumentException('Choose a valid return destination.');
+    if (!in_array($destination, ['', 'stock', 'production', 'unrecoverable'], true)) throw new InvalidArgumentException('Choose a valid return destination.');
+    $faultParty = strtolower(trim((string) ($payload['fault_party'] ?? '')));
+    $conditionCode = strtolower(trim((string) ($payload['condition_code'] ?? '')));
+    $partnerCode = strtoupper(trim((string) ($payload['partner_code'] ?? '')));
+    if ($platform === 'partner') {
+        if (!in_array($faultParty, ['us', 'partner'], true)) throw new InvalidArgumentException('Choose who was at fault for the Partner return.');
+        if (!in_array($conditionCode, ['restock', 'damaged', 'unrecoverable'], true)) throw new InvalidArgumentException('Choose the condition of the Partner return.');
+        if ($partnerCode === '') throw new InvalidArgumentException('Choose the Partner for this return.');
+    } else {
+        $faultParty = $conditionCode = $partnerCode = '';
+    }
     if ($orderId === '') throw new InvalidArgumentException('Choose the original order first.');
     if ($requestKey === '') $requestKey = 'return-' . hash('sha256', $platform . '|' . $orderId . '|' . random_bytes(12));
     $items = jg_store_ops_returns_normalize_items((array) ($payload['items'] ?? []));
@@ -284,6 +338,7 @@ function jg_store_ops_returns_save_draft(PDO $pdo, array $payload, string $creat
                 'UPDATE store_ops_returns SET order_id = :order_id, source_platform = :source_platform,
                     source_label = :source_label, source_account = :source_account,
                     customer_name = :customer_name, customer_username = :customer_username,
+                    fault_party = :fault_party, condition_code = :condition_code, partner_code = :partner_code,
                     destination = :destination, quote_amount = :quote_amount, updated_at = :updated_at
                  WHERE id = :id'
             );
@@ -294,6 +349,9 @@ function jg_store_ops_returns_save_draft(PDO $pdo, array $payload, string $creat
                 ':source_account' => mb_substr(trim((string) ($payload['source_account'] ?? '')), 0, 120),
                 ':customer_name' => mb_substr(trim((string) ($payload['customer_name'] ?? '')), 0, 160),
                 ':customer_username' => mb_substr(trim((string) ($payload['customer_username'] ?? '')), 0, 160),
+                ':fault_party' => $faultParty,
+                ':condition_code' => $conditionCode,
+                ':partner_code' => mb_substr($partnerCode, 0, 40),
                 ':destination' => $destination,
                 ':quote_amount' => $quote,
                 ':updated_at' => $now,
@@ -304,11 +362,11 @@ function jg_store_ops_returns_save_draft(PDO $pdo, array $payload, string $creat
             $insert = $pdo->prepare(
                 'INSERT INTO store_ops_returns (
                     return_number, request_key, order_id, source_platform, source_label, source_account,
-                    customer_name, customer_username, destination, status, quote_amount,
+                    customer_name, customer_username, fault_party, condition_code, partner_code, destination, status, quote_amount,
                     created_by, created_at, updated_at
                  ) VALUES (
                     :return_number, :request_key, :order_id, :source_platform, :source_label, :source_account,
-                    :customer_name, :customer_username, :destination, "draft", :quote_amount,
+                    :customer_name, :customer_username, :fault_party, :condition_code, :partner_code, :destination, "draft", :quote_amount,
                     :created_by, :created_at, :updated_at
                  )'
             );
@@ -323,6 +381,9 @@ function jg_store_ops_returns_save_draft(PDO $pdo, array $payload, string $creat
                         ':source_account' => mb_substr(trim((string) ($payload['source_account'] ?? '')), 0, 120),
                         ':customer_name' => mb_substr(trim((string) ($payload['customer_name'] ?? '')), 0, 160),
                         ':customer_username' => mb_substr(trim((string) ($payload['customer_username'] ?? '')), 0, 160),
+                        ':fault_party' => $faultParty,
+                        ':condition_code' => $conditionCode,
+                        ':partner_code' => mb_substr($partnerCode, 0, 40),
                         ':destination' => $destination,
                         ':quote_amount' => $quote,
                         ':created_by' => mb_substr(trim($createdBy) ?: 'Store Ops', 0, 80),
@@ -371,7 +432,7 @@ function jg_store_ops_returns_validate_remaining(PDO $pdo, array $report): void
          FROM store_ops_return_items i
          INNER JOIN store_ops_returns r ON r.id = i.return_id
          WHERE r.source_platform = :platform AND r.order_id = :order_id
-           AND r.status IN ("completed_stock", "production_po_created") AND r.id <> :return_id
+           AND r.status IN ("completed_stock", "production_po_created", "completed_unrecoverable") AND r.id <> :return_id
          GROUP BY i.sku'
     );
     $stmt->execute([
@@ -488,11 +549,11 @@ function jg_store_ops_returns_create_production_po(PDO $pdo, array $report, stri
     return $poId;
 }
 
-function jg_store_ops_returns_complete(PDO $pdo, int $returnId, string $destination): array
+function jg_store_ops_returns_complete(PDO $pdo, int $returnId, string $destination, ?array $partnerAdjustment = null): array
 {
     jg_store_ops_returns_ensure_schema($pdo);
     $destination = strtolower(trim($destination));
-    if (!in_array($destination, ['stock', 'production'], true)) throw new InvalidArgumentException('Choose where the returned products are going.');
+    if (!in_array($destination, ['stock', 'production', 'unrecoverable'], true)) throw new InvalidArgumentException('Choose where the returned products are going.');
     if ($destination === 'production') jg_store_ops_returns_ensure_po_columns($pdo);
     $now = jg_store_ops_returns_now();
     $pdo->beginTransaction();
@@ -516,7 +577,11 @@ function jg_store_ops_returns_complete(PDO $pdo, int $returnId, string $destinat
         $state = $stateStmt->fetch();
         if (!is_array($state)) throw new RuntimeException('Return report not found.');
         if ((string) $state['status'] !== 'draft') {
-            $completedDestination = (string) $state['status'] === 'completed_stock' ? 'stock' : 'production';
+            $completedDestination = match ((string) $state['status']) {
+                'completed_stock' => 'stock',
+                'completed_unrecoverable' => 'unrecoverable',
+                default => 'production',
+            };
             if ($completedDestination !== $destination) {
                 throw new RuntimeException('This return was already completed with a different destination.');
             }
@@ -524,6 +589,9 @@ function jg_store_ops_returns_complete(PDO $pdo, int $returnId, string $destinat
             return jg_store_ops_returns_find($pdo, $returnId);
         }
         $report = jg_store_ops_returns_find($pdo, $returnId);
+        if ((string) ($report['source_platform'] ?? '') === 'partner' && !is_array($partnerAdjustment)) {
+            throw new RuntimeException('The Partner bill adjustment must be confirmed before completing this return.');
+        }
         jg_store_ops_returns_validate_remaining($pdo, $report);
         $poId = null;
         if ($destination === 'stock') {
@@ -554,19 +622,31 @@ function jg_store_ops_returns_complete(PDO $pdo, int $returnId, string $destinat
                     ':created_at' => $now,
                 ]);
             }
-        } else {
+        } elseif ($destination === 'production') {
             $poId = jg_store_ops_returns_create_production_po($pdo, $report, $now);
         }
-        $status = $destination === 'stock' ? 'completed_stock' : 'production_po_created';
+        $status = match ($destination) {
+            'stock' => 'completed_stock',
+            'unrecoverable' => 'completed_unrecoverable',
+            default => 'production_po_created',
+        };
         $update = $pdo->prepare(
             'UPDATE store_ops_returns SET destination = :destination, status = :status,
-                purchase_order_id = :purchase_order_id, updated_at = :updated_at, completed_at = :completed_at
+                purchase_order_id = :purchase_order_id, partner_bill_id = :partner_bill_id,
+                partner_adjustment_key = :partner_adjustment_key,
+                partner_selected_value = :partner_selected_value,
+                partner_adjustment_amount = :partner_adjustment_amount,
+                updated_at = :updated_at, completed_at = :completed_at
              WHERE id = :id AND status = "draft"'
         );
         $update->execute([
             ':destination' => $destination,
             ':status' => $status,
             ':purchase_order_id' => $poId,
+            ':partner_bill_id' => is_array($partnerAdjustment) ? ($partnerAdjustment['bill_id'] ?? null) : null,
+            ':partner_adjustment_key' => is_array($partnerAdjustment) ? mb_substr((string) ($partnerAdjustment['adjustment_key'] ?? ''), 0, 120) : '',
+            ':partner_selected_value' => is_array($partnerAdjustment) ? ($partnerAdjustment['selected_value'] ?? null) : null,
+            ':partner_adjustment_amount' => is_array($partnerAdjustment) ? ($partnerAdjustment['adjustment_amount'] ?? null) : null,
             ':updated_at' => $now,
             ':completed_at' => $now,
             ':id' => $returnId,

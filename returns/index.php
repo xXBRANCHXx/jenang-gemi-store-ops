@@ -67,10 +67,11 @@ $returnsJsVersion = (string) @filemtime(dirname(__DIR__) . '/returns.js');
                         <label><input type="radio" name="return_platform" value="whatsapp"><span>WhatsApp</span></label>
                         <label><input type="radio" name="return_platform" value="zero_website"><span>ZERO Website</span></label>
                         <label><input type="radio" name="return_platform" value="jenang_gemi_website"><span>Jenang Gemi Website</span></label>
-                        <label class="is-disabled"><input type="radio" name="return_platform" value="partner" disabled><span>Partner <small>Coming soon</small></span></label>
+                        <label><input type="radio" name="return_platform" value="partner"><span>Partner</span></label>
                         <label><input type="radio" name="return_platform" value="walk_in"><span>Walk In</span></label>
                     </div>
                 </fieldset>
+                <div data-return-standard-search>
                 <form class="admin-returns-search" data-return-search-form>
                     <label>
                         <span>Order ID or username</span>
@@ -84,6 +85,18 @@ $returnsJsVersion = (string) @filemtime(dirname(__DIR__) . '/returns.js');
                 <div class="admin-returns-search-results" id="return-search-results" data-return-search-results aria-live="polite">
                     <p>Select a platform to begin.</p>
                 </div>
+                </div>
+                <section class="admin-returns-partner-flow" data-return-partner-flow hidden>
+                    <fieldset class="admin-returns-fault">
+                        <legend>Who was at fault?</legend>
+                        <div>
+                            <label><input type="radio" name="return_fault" value="us"><span><strong>We were at fault</strong><small>The Partner receives a full refund.</small></span></label>
+                            <label><input type="radio" name="return_fault" value="partner"><span><strong>Partner was at fault</strong><small>The applicable handling fee is billed.</small></span></label>
+                        </div>
+                    </fieldset>
+                    <label class="admin-returns-partner-select"><span>Partner</span><select name="return_partner" disabled><option value="">Choose who was at fault first</option></select></label>
+                    <div class="admin-returns-partner-orders" data-return-partner-orders aria-live="polite"><p>Choose fault and a Partner to see their orders.</p></div>
+                </section>
             </section>
 
             <section class="admin-returns-card" data-return-step="2" hidden>
@@ -116,7 +129,13 @@ $returnsJsVersion = (string) @filemtime(dirname(__DIR__) . '/returns.js');
                         <span class="admin-returns-destination-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20V9l5 3V9l5 3V4h4l2 16zM8 16h2M13 16h2"/></svg></span>
                         <span><strong>Send back to production</strong><small>Creates a normal production PO. Stock increases only after delivery is confirmed in Inventory.</small></span>
                     </label>
+                    <label data-return-unrecoverable hidden>
+                        <input type="radio" name="return_destination" value="unrecoverable">
+                        <span class="admin-returns-destination-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 5l14 14M19 5 5 19"/></svg></span>
+                        <span><strong>Unrecoverable</strong><small>No stock movement or production PO will be created.</small></span>
+                    </label>
                 </fieldset>
+                <div class="admin-returns-partner-summary" data-return-partner-summary hidden></div>
                 <div class="admin-returns-quote" data-return-quote hidden>
                     <label><span>Production quote <b>Required</b></span><div><i>Rp</i><input name="quote_amount" inputmode="numeric" autocomplete="off" placeholder="0" aria-describedby="return-quote-help" required></div></label>
                     <small id="return-quote-help">Enter the total replacement quote. You can save this return and resume it later if the quote is not ready.</small>

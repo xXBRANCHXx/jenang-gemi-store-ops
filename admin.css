@@ -3335,6 +3335,129 @@ button, input {
   background: var(--admin-surface-soft);
 }
 
+[data-return-standard-search] {
+  display: grid;
+  gap: 16px;
+}
+
+[data-return-standard-search][hidden],
+.admin-returns-partner-flow[hidden],
+.admin-returns-partner-summary[hidden],
+.admin-returns-destinations label[hidden] {
+  display: none;
+}
+
+.admin-returns-partner-flow {
+  display: grid;
+  gap: 18px;
+  padding-top: 2px;
+}
+
+.admin-returns-fault {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.admin-returns-fault legend,
+.admin-returns-partner-select > span {
+  margin-bottom: 10px;
+  color: var(--admin-muted);
+  font-size: .74rem;
+  font-weight: 900;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.admin-returns-fault > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-returns-fault label {
+  position: relative;
+  cursor: pointer;
+}
+
+.admin-returns-fault input {
+  position: absolute;
+  opacity: 0;
+}
+
+.admin-returns-fault label > span {
+  display: grid;
+  gap: 4px;
+  min-height: 76px;
+  padding: 15px;
+  border: 1px solid var(--admin-border);
+  border-radius: 14px;
+  background: var(--admin-surface-soft);
+}
+
+.admin-returns-fault strong { color: var(--admin-text); font-size: .84rem; }
+.admin-returns-fault small { color: var(--admin-muted); font-size: .72rem; font-weight: 650; line-height: 1.45; }
+.admin-returns-fault input:checked + span { border-color: var(--admin-accent-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--admin-accent-primary) 12%, transparent); }
+
+.admin-returns-partner-select {
+  display: grid;
+}
+
+.admin-returns-partner-select select {
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: 13px;
+  background: var(--admin-surface-soft);
+  color: var(--admin-text);
+  font: inherit;
+  font-size: .84rem;
+  font-weight: 750;
+}
+
+.admin-returns-partner-orders {
+  display: grid;
+  gap: 7px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding: 11px;
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  background: var(--admin-surface-soft);
+}
+
+.admin-returns-partner-orders > header,
+.admin-returns-partner-orders button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.admin-returns-partner-orders > header { padding: 3px 5px 8px; }
+.admin-returns-partner-orders > header small,
+.admin-returns-partner-orders time,
+.admin-returns-partner-orders button small { color: var(--admin-muted); font-size: .7rem; font-weight: 700; }
+.admin-returns-partner-orders button { padding: 12px; border: 1px solid var(--admin-border); border-radius: 12px; background: var(--admin-surface); color: var(--admin-text); cursor: pointer; text-align: left; }
+.admin-returns-partner-orders button:hover { border-color: var(--admin-accent-primary); }
+.admin-returns-partner-orders button > span { display: grid; gap: 3px; }
+.admin-returns-partner-orders > p { margin: 0; padding: 24px 12px; color: var(--admin-muted); font-size: .78rem; font-weight: 700; text-align: center; }
+
+.admin-returns-partner-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  align-items: center;
+  padding: 15px 17px;
+  border: 1px solid var(--admin-border);
+  border-radius: 14px;
+  background: var(--admin-surface-soft);
+}
+
+.admin-returns-partner-summary span { color: var(--admin-muted); font-size: .72rem; font-weight: 850; text-transform: uppercase; }
+.admin-returns-partner-summary strong { color: var(--admin-text); font-size: 1.05rem; }
+.admin-returns-partner-summary small { grid-column: 1 / -1; color: var(--admin-muted); font-size: .72rem; font-weight: 650; }
+
 .admin-returns-search-results > p,
 .admin-returns-history-list > p {
   align-self: center;
@@ -3824,8 +3947,17 @@ button, input {
   }
 
   .admin-returns-search-row,
-  .admin-returns-destinations {
+  .admin-returns-destinations,
+  .admin-returns-fault > div {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-returns-partner-orders button {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-returns-partner-orders time {
+    justify-self: start;
   }
 
   .admin-returns-search-row button {

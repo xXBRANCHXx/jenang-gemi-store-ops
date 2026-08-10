@@ -24,13 +24,7 @@ $pdo->exec("INSERT INTO sku_skus VALUES
     ('BUBUR15', 'Bubur 15', 'jg', 'pack', 'bubur', 'original', 15, 15, 10, '2026-08-10 00:00:00'),
     ('BUBUR30', 'Bubur 30', 'jg', 'pack', 'bubur', 'original', 30, 15, 5, '2026-08-10 00:00:00')");
 
-$partnerRejected = false;
-try {
-    jg_store_ops_returns_platform('partner');
-} catch (InvalidArgumentException) {
-    $partnerRejected = true;
-}
-returns_expect(true, $partnerRejected, 'Partner returns must stay unavailable until the separate Partner system is connected.');
+returns_expect('partner', jg_store_ops_returns_platform('partner'), 'Partner must be an available return platform.');
 
 $basePayload = [
     'request_key' => 'return-test-stock',
@@ -98,6 +92,27 @@ $poItem = $pdo->query('SELECT ordered_qty, received_qty FROM purchase_order_item
 returns_expect(3, (int) ($poItem['ordered_qty'] ?? 0), 'The PO must replace exactly the returned quantity.');
 returns_expect(0, (int) ($poItem['received_qty'] ?? -1), 'Production return stock must wait for Inventory delivery confirmation.');
 returns_expect($stocks, array_map('intval', $pdo->query('SELECT sku, current_stock FROM sku_skus ORDER BY sku')->fetchAll(PDO::FETCH_KEY_PAIR)), 'Creating a production PO must not add stock early.');
+
+$unrecoverablePayload = [
+    ...$basePayload,
+    'request_key' => 'return-test-unrecoverable',
+    'order_id' => 'PARTNER-LOSS-1',
+    'source_platform' => 'partner',
+    'partner_code' => 'PARTNER-A',
+    'fault_party' => 'partner',
+    'condition_code' => 'unrecoverable',
+    'destination' => 'unrecoverable',
+];
+$unrecoverableDraft = jg_store_ops_returns_save_draft($pdo, $unrecoverablePayload, 'Operator Partner');
+$completedLoss = jg_store_ops_returns_complete($pdo, (int) $unrecoverableDraft['id'], 'unrecoverable', [
+    'bill_id' => 'PARTNER-A-WEEKLY-2026-08-10',
+    'adjustment_key' => 'store-return-' . $unrecoverableDraft['return_number'],
+    'selected_value' => 100000,
+    'adjustment_amount' => 100000,
+]);
+returns_expect('completed_unrecoverable', $completedLoss['status'] ?? '', 'Unrecoverable Partner returns must complete without stock or a PO.');
+returns_expect('PARTNER-A-WEEKLY-2026-08-10', $completedLoss['partner_bill_id'] ?? '', 'The Partner bill reference must be audited on the return.');
+returns_expect($stocks, array_map('intval', $pdo->query('SELECT sku, current_stock FROM sku_skus ORDER BY sku')->fetchAll(PDO::FETCH_KEY_PAIR)), 'Unrecoverable returns must not change stock.');
 
 $overReturn = [
     ...$basePayload,

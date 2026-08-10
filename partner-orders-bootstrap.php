@@ -206,11 +206,10 @@ function jg_store_ops_partner_orders_fetch_json(string $url, array $headers = []
         $raw = curl_exec($curl);
         $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
         $error = curl_error($curl);
-        curl_close($curl);
+        unset($curl);
         if (!is_string($raw) || $status >= 400) {
-            if ($error !== '') {
-                jg_store_ops_partner_orders_last_error($error);
-            }
+            $decodedError = is_string($raw) ? json_decode($raw, true) : null;
+            jg_store_ops_partner_orders_last_error($error !== '' ? $error : (is_array($decodedError) ? (string) ($decodedError['error'] ?? 'Partner service request failed.') : 'Partner service request failed.'));
             return null;
         }
     } else {
@@ -229,6 +228,55 @@ function jg_store_ops_partner_orders_fetch_json(string $url, array $headers = []
 
     $decoded = json_decode($raw, true);
     return is_array($decoded) ? $decoded : null;
+}
+
+function jg_store_ops_partner_returns_catalog(string $partnerCode = ''): array
+{
+    $token = jg_store_ops_partner_orders_feed_token();
+    if ($token === '') throw new RuntimeException('Partner return service is not configured.');
+    $url = jg_store_ops_partner_orders_feed_url();
+    $url .= (str_contains($url, '?') ? '&' : '?') . http_build_query(array_filter([
+        'action' => 'return_catalog',
+        'partner_code' => strtoupper(trim($partnerCode)),
+    ]));
+    $response = jg_store_ops_partner_orders_request_json('GET', $url, ['X-Store-Ops-Token: ' . $token]);
+    if (!is_array($response) || empty($response['ok'])) throw new RuntimeException(jg_store_ops_partner_orders_last_error() ?: 'Partner orders could not be loaded.');
+    $partners = [];
+    foreach ((array) ($response['partners'] ?? []) as $partner) {
+        if (!is_array($partner)) continue;
+        $code = strtoupper(trim((string) ($partner['code'] ?? '')));
+        if ($code === '') continue;
+        $name = jg_store_ops_partner_orders_partner_name($code);
+        $partners[] = ['code' => $code, 'name' => $name !== '' ? $name : $code, 'order_count' => (int) ($partner['order_count'] ?? 0)];
+    }
+    $orders = array_map('jg_store_ops_partner_orders_enrich_order', array_values(array_filter((array) ($response['orders'] ?? []), 'is_array')));
+    return ['partners' => $partners, 'orders' => $orders];
+}
+
+function jg_store_ops_partner_returns_apply_adjustment(array $report): array
+{
+    $token = jg_store_ops_partner_orders_feed_token();
+    if ($token === '') throw new RuntimeException('Partner return service is not configured.');
+    $items = [];
+    foreach ((array) ($report['items'] ?? []) as $item) {
+        if ((int) ($item['returned_qty'] ?? 0) > 0) $items[] = ['sku' => (string) $item['sku'], 'returned_qty' => (int) $item['returned_qty']];
+    }
+    $adjustmentKey = 'store-return-' . (string) ($report['return_number'] ?? $report['id'] ?? '');
+    $response = jg_store_ops_partner_orders_request_json('POST', jg_store_ops_partner_orders_feed_url(), [
+        'X-Store-Ops-Token: ' . $token,
+    ], [
+        'action' => 'apply_return_adjustment',
+        'adjustment_key' => $adjustmentKey,
+        'return_number' => (string) ($report['return_number'] ?? ''),
+        'partner_code' => (string) ($report['partner_code'] ?? ''),
+        'order_id' => jg_store_ops_partner_orders_original_id((string) ($report['order_id'] ?? '')),
+        'fault_party' => (string) ($report['fault_party'] ?? ''),
+        'condition_code' => (string) ($report['condition_code'] ?? ''),
+        'items' => $items,
+    ]);
+    $adjustment = is_array($response) && !empty($response['ok']) ? ($response['adjustment'] ?? null) : null;
+    if (!is_array($adjustment)) throw new RuntimeException(jg_store_ops_partner_orders_last_error() ?: 'The Partner bill could not be adjusted. The return remains saved as a draft.');
+    return $adjustment;
 }
 
 function jg_store_ops_partner_orders_request_json(string $method, string $url, array $headers = [], ?array $body = null): ?array
@@ -269,11 +317,10 @@ function jg_store_ops_partner_orders_request_json(string $method, string $url, a
         $raw = curl_exec($curl);
         $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
         $error = curl_error($curl);
-        curl_close($curl);
+        unset($curl);
         if (!is_string($raw) || $status >= 400) {
-            if ($error !== '') {
-                jg_store_ops_partner_orders_last_error($error);
-            }
+            $decodedError = is_string($raw) ? json_decode($raw, true) : null;
+            jg_store_ops_partner_orders_last_error($error !== '' ? $error : (is_array($decodedError) ? (string) ($decodedError['error'] ?? 'Partner service request failed.') : 'Partner service request failed.'));
             return null;
         }
     } else {

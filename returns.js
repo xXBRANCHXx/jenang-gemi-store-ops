@@ -17,8 +17,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const quoteInput = document.querySelector('input[name="quote_amount"]');
   const completeButton = document.querySelector('[data-return-complete]');
   const historyNode = document.querySelector('[data-return-history]');
+  const standardSearch = document.querySelector('[data-return-standard-search]');
+  const partnerFlow = document.querySelector('[data-return-partner-flow]');
+  const partnerSelect = document.querySelector('select[name="return_partner"]');
+  const partnerOrders = document.querySelector('[data-return-partner-orders]');
+  const partnerSummary = document.querySelector('[data-return-partner-summary]');
+  const unrecoverableChoice = document.querySelector('[data-return-unrecoverable]');
 
-  const state = { platform: '', order: null, items: [], destination: '', returnId: 0, requestKey: '', reports: [], profiles: [] };
+  const state = { platform: '', order: null, items: [], destination: '', returnId: 0, requestKey: '', reports: [], profiles: [], partners: [], partnerOrders: [], fault: '', partnerCode: '' };
   let searchTimer = 0;
   let searchController = null;
 
@@ -58,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
     button.disabled = busy;
     button.textContent = busy ? busyLabel : (button.dataset.idleLabel || button.textContent || 'Continue');
   };
-  const sourcePlatform = (order) => String(order?.source?.platform || order?.source?.key || order?.source_platform || '').toLowerCase();
+  const sourcePlatform = (order) => String(order?.source?.platform || order?.source?.key || order?.source_platform || order?.platform || '').toLowerCase();
   const customerLabel = (customer) => String(customer?.username || customer?.name || customer?.phone || 'Customer').trim();
 
   const showStep = (step) => {
@@ -92,6 +98,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }).join('')}`;
   };
 
+  const catalogOrder = (order) => ({
+    order_id: String(order.id || order.sourceOrderId || ''),
+    source: { platform: 'partner', key: 'partner', label: 'Partner', account: String(order.partnerCode || '') },
+    customer: { name: String(order.customerName || ''), username: '' },
+    timestamps: { ordered_at: order.orderTimestamp || order.createdAt || '' },
+    items: (order.items || []).map((item) => ({ sku: item.sku, name: item.productName, quantity: item.quantity, unit_price: item.unitRevenue })),
+    partnerCode: String(order.partnerCode || ''), partnerName: String(order.partnerName || order.account || ''), raw: order
+  });
+
+  const loadPartnerCatalog = async (partnerCode = '') => {
+    if (partnerOrders) partnerOrders.innerHTML = '<p>Loading Partner orders…</p>';
+    const params = new URLSearchParams({ action: 'partner_catalog' });
+    if (partnerCode) params.set('partner_code', partnerCode);
+    const response = await fetch(`${returnsEndpoint}?${params}`, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' } });
+    const payload = await readJson(response, 'Partner orders could not be loaded.');
+    if (!partnerCode) {
+      state.partners = payload.partners || [];
+      if (partnerSelect) partnerSelect.innerHTML = '<option value="">Select a Partner</option>' + state.partners.map((partner) => `<option value="${escapeHtml(partner.code)}">${escapeHtml(partner.name)} · ${Number(partner.order_count || 0)} orders</option>`).join('');
+      if (partnerOrders) partnerOrders.innerHTML = '<p>Select a Partner to see all of their orders.</p>';
+      return;
+    }
+    state.partnerOrders = (payload.orders || []).map(catalogOrder);
+    if (!partnerOrders) return;
+    if (!state.partnerOrders.length) { partnerOrders.innerHTML = '<p>No orders were found for this Partner.</p>'; return; }
+    partnerOrders.innerHTML = `<header><strong>${state.partnerOrders.length} orders</strong><small>Most recent first</small></header>${state.partnerOrders.map((order, index) => `<button type="button" data-return-partner-order="${index}"><span><strong>${escapeHtml(order.order_id)}</strong><small>${escapeHtml(order.customer.name || 'Partner customer')} · ${(order.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0)} units</small></span><time>${escapeHtml(formatDate(order.timestamps.ordered_at))}</time></button>`).join('')}`;
+  };
+
   const searchProfiles = async (query) => {
     searchController?.abort();
     searchController = new AbortController();
@@ -117,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const sku = String(item.sku || '').trim().toUpperCase();
       const ordered = Math.max(0, Math.floor(Number(item.quantity || item.qty || 0)));
       if (!sku || ordered < 1) return;
-      const current = grouped.get(sku) || { sku, product_name: String(item.name || item.product_name || sku), ordered_qty: 0, returned_qty: 0 };
+      const current = grouped.get(sku) || { sku, product_name: String(item.name || item.product_name || sku), ordered_qty: 0, returned_qty: 0, unit_price: Number(item.unit_price || item.unitRevenue || item.partner_price || 0) };
       current.ordered_qty += ordered;
       current.returned_qty += ordered;
       grouped.set(sku, current);
@@ -155,7 +188,10 @@ document.addEventListener('DOMContentLoaded', () => {
     source_account: String(state.order?.source?.account || ''),
     customer_name: String(state.order?.customer?.name || ''),
     customer_username: String(state.order?.customer?.username || ''), destination: state.destination,
-    quote_amount: String(quoteInput?.value || '').replace(/[^0-9]/g, ''), items: state.items
+    quote_amount: String(quoteInput?.value || '').replace(/[^0-9]/g, ''), items: state.items,
+    fault_party: state.platform === 'partner' ? state.fault : '',
+    condition_code: state.platform === 'partner' ? ({ stock: 'restock', production: 'damaged', unrecoverable: 'unrecoverable' }[state.destination] || '') : '',
+    partner_code: state.platform === 'partner' ? state.partnerCode : ''
   });
   const saveDraft = async () => {
     const response = await fetch(returnsEndpoint, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(reportPayload()) });
@@ -172,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!state.reports.length) { historyNode.innerHTML = '<p>No return reports yet.</p>'; return; }
     historyNode.innerHTML = state.reports.map((report) => {
       const draft = report.status === 'draft';
-      const status = draft ? 'Draft' : (report.status === 'completed_stock' ? 'Back in stock' : 'Production PO created');
+      const status = draft ? 'Draft' : (report.status === 'completed_stock' ? 'Back in stock' : (report.status === 'completed_unrecoverable' ? 'Unrecoverable · billed' : 'Production PO created'));
       const units = (report.items || []).reduce((sum, item) => sum + Number(item.returned_qty || 0), 0);
       return `<button type="button" data-return-report="${Number(report.id)}" ${draft ? '' : 'disabled'}><span><strong>${escapeHtml(report.return_number)}</strong><small>${escapeHtml(report.order_id)} · ${units} units</small></span><em class="${draft ? 'is-draft' : 'is-complete'}">${escapeHtml(status)}</em><time>${escapeHtml(formatDate(report.updated_at))}</time></button>`;
     }).join('');
@@ -187,9 +223,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const resumeReport = (report) => {
     state.platform = String(report.source_platform || ''); state.returnId = Number(report.id || 0);
     state.requestKey = String(report.request_key || ''); state.destination = String(report.destination || '');
+    state.fault = String(report.fault_party || ''); state.partnerCode = String(report.partner_code || '');
     state.items = (report.items || []).map((item) => ({ sku: item.sku, product_name: item.product_name, ordered_qty: Number(item.ordered_qty), returned_qty: Number(item.returned_qty) }));
     state.order = { order_id: report.order_id, source: { platform: report.source_platform, label: report.source_label, account: report.source_account }, customer: { name: report.customer_name, username: report.customer_username }, timestamps: { ordered_at: report.created_at } };
     document.querySelector(`input[name="return_platform"][value="${CSS.escape(state.platform)}"]`)?.click();
+    state.fault = String(report.fault_party || ''); state.partnerCode = String(report.partner_code || '');
+    document.querySelectorAll('input[name="return_fault"]').forEach((input) => { input.checked = input.value === state.fault; });
     orderSummary.innerHTML = `<div><span>${escapeHtml(platformLabel(state.platform))}</span><h3>${escapeHtml(report.order_id)}</h3><p>${escapeHtml(report.customer_username || report.customer_name || 'Customer')}</p></div><b>Draft</b>`;
     renderProducts();
     document.querySelectorAll('input[name="return_destination"]').forEach((input) => { input.checked = input.value === state.destination; });
@@ -201,21 +240,67 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const updateDestination = () => {
     state.destination = String(document.querySelector('input[name="return_destination"]:checked')?.value || '');
+    const choices = state.platform === 'partner' ? {
+        stock: state.fault === 'us' ? ['Straight back to stock', 'Refunds 100% and restores inventory immediately.'] : ['Restockable', 'Adds a 15% restock fee and restores inventory.'],
+        production: state.fault === 'us' ? ['Damaged · send to production', 'Refunds 100% and creates a quoted replacement PO.'] : ['Damaged', 'Adds a 40% damaged-goods fee and creates a quoted replacement PO.'],
+        unrecoverable: state.fault === 'us' ? ['Unrecoverable', 'Refunds 100%. No inventory or PO is created.'] : ['Unrecoverable', 'Adds a 100% product-loss fee. No inventory or PO is created.']
+      } : {
+        stock: ['Put straight back into stock', 'Available inventory increases as soon as this report is completed.'],
+        production: ['Send back to production', 'Creates a normal production PO. Stock increases only after delivery is confirmed in Inventory.']
+      };
+    Object.entries(choices).forEach(([value, copy]) => {
+      const label = document.querySelector(`input[name="return_destination"][value="${value}"]`)?.closest('label');
+      const text = label?.querySelector('span:last-child');
+      if (text) text.innerHTML = `<strong>${escapeHtml(copy[0])}</strong><small>${escapeHtml(copy[1])}</small>`;
+    });
     if (quoteWrap) quoteWrap.hidden = state.destination !== 'production';
+    if (state.platform === 'partner' && partnerSummary) {
+      const selectedValue = state.items.reduce((sum, item) => sum + Number(item.returned_qty || 0) * Number(item.unit_price || 0), 0);
+      const rate = state.fault === 'us' ? 1 : ({ stock: .15, production: .4, unrecoverable: 1 }[state.destination] || 0);
+      const amount = Math.round(selectedValue * rate);
+      partnerSummary.hidden = !state.destination;
+      partnerSummary.innerHTML = state.destination ? `<span>${state.fault === 'us' ? 'Credit to Partner' : 'Fee on open bill'}</span><strong>${state.fault === 'us' ? '−' : '+'}Rp ${formatMoney(amount)}</strong><small>Based on Rp ${formatMoney(selectedValue)} selected purchase value${state.fault === 'partner' ? ` at ${Math.round(rate * 100)}%` : ''}.</small>` : '';
+    }
     if (!(completeButton instanceof HTMLButtonElement)) return;
     const hasQuote = Boolean(String(quoteInput?.value || '').replace(/[^0-9]/g, ''));
     completeButton.disabled = !state.destination || (state.destination === 'production' && !hasQuote);
     completeButton.textContent = state.destination === 'stock'
       ? 'Add products back to stock'
-      : (state.destination === 'production' ? (hasQuote ? 'Create production PO' : 'Enter quote to create PO') : 'Choose a destination');
+      : (state.destination === 'production' ? (hasQuote ? 'Create production PO' : 'Enter quote to create PO') : (state.destination === 'unrecoverable' ? 'Complete return and update bill' : 'Choose a destination'));
   };
 
   document.querySelectorAll('input[name="return_platform"]').forEach((input) => input.addEventListener('change', () => {
     state.platform = input.value;
+    const isPartner = state.platform === 'partner';
+    if (standardSearch) standardSearch.hidden = isPartner;
+    if (partnerFlow) partnerFlow.hidden = !isPartner;
+    if (unrecoverableChoice) unrecoverableChoice.hidden = !isPartner;
+    if (isPartner) {
+      state.fault = ''; state.partnerCode = '';
+      document.querySelectorAll('input[name="return_fault"]').forEach((fault) => { fault.checked = false; });
+      if (partnerSelect) { partnerSelect.disabled = true; partnerSelect.innerHTML = '<option value="">Choose who was at fault first</option>'; }
+      if (partnerOrders) partnerOrders.innerHTML = '<p>Choose fault and a Partner to see their orders.</p>';
+      return;
+    }
     if (searchInput) { searchInput.disabled = false; searchInput.placeholder = 'Order ID, username, or customer name'; searchInput.focus(); }
     if (searchButton) searchButton.disabled = false;
     renderSearchPrompt(`Search ${platformLabel(state.platform)} by Order ID or customer.`);
   }));
+  document.querySelectorAll('input[name="return_fault"]').forEach((input) => input.addEventListener('change', async () => {
+    state.fault = input.value; state.partnerCode = '';
+    if (partnerSelect) partnerSelect.disabled = false;
+    try { await loadPartnerCatalog(); } catch (error) { showError(error instanceof Error ? error.message : 'Partner orders could not be loaded.'); }
+  }));
+  partnerSelect?.addEventListener('change', async () => {
+    state.partnerCode = partnerSelect.value;
+    if (!state.partnerCode) return;
+    try { await loadPartnerCatalog(state.partnerCode); } catch (error) { showError(error instanceof Error ? error.message : 'Partner orders could not be loaded.'); }
+  });
+  partnerOrders?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-return-partner-order]');
+    if (!button) return;
+    try { selectOrder(state.partnerOrders[Number(button.dataset.returnPartnerOrder)]); } catch (error) { showError(error instanceof Error ? error.message : 'Partner order could not be opened.'); }
+  });
   searchInput?.addEventListener('input', () => {
     window.clearTimeout(searchTimer);
     const query = searchInput.value.trim();
@@ -251,6 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.querySelector('[data-return-products-next]')?.addEventListener('click', () => {
     if (!state.items.some((item) => item.returned_qty > 0)) return showError('Select at least one returned product.');
+    if (state.platform === 'partner' && (!state.fault || !state.partnerCode)) return showError('Choose fault and a Partner first.');
     showError(''); showStep(3); updateDestination();
   });
   document.querySelector('[data-return-change-order]')?.addEventListener('click', () => { resetReport(); showStep(1); });
@@ -270,14 +356,15 @@ document.addEventListener('DOMContentLoaded', () => {
   completeButton?.addEventListener('click', async () => {
     if (!state.destination) return;
     if (state.destination === 'production' && !String(quoteInput?.value || '').replace(/[^0-9]/g, '')) return showError('Enter the production quote before creating the purchase order.');
-    showError(''); setBusy(completeButton, true, state.destination === 'stock' ? 'Updating stock…' : 'Creating PO…');
+    showError(''); setBusy(completeButton, true, state.destination === 'stock' ? 'Updating stock…' : (state.destination === 'production' ? 'Creating PO…' : 'Updating bill…'));
     try {
       const draft = await saveDraft();
       const response = await fetch(returnsEndpoint, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ action: 'complete', return_id: draft.id, destination: state.destination }) });
       const payload = await readJson(response, 'The return could not be completed.');
       state.reports = payload.reports || []; renderHistory();
       const production = payload.report?.status === 'production_po_created';
-      showFeedback(production ? `${payload.report.return_number} completed. The production PO is ready in Executive and Inventory.` : `${payload.report.return_number} completed. Returned products are back in stock.`);
+      const unrecoverable = payload.report?.status === 'completed_unrecoverable';
+      showFeedback(production ? `${payload.report.return_number} completed. The production PO is ready in Executive and Inventory.` : (unrecoverable ? `${payload.report.return_number} completed. The open Partner bill has been updated; no stock was changed.` : `${payload.report.return_number} completed. Returned products are back in stock.`));
       resetReport(); showStep(1); if (searchInput) searchInput.value = '';
     } catch (error) { showError(error instanceof Error ? error.message : 'The return could not be completed.'); }
     finally { setBusy(completeButton, false); updateDestination(); }

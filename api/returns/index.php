@@ -60,6 +60,7 @@ function jg_store_ops_returns_api_canonical_payload(array $payload): array
     }
     $customer = is_array($order['customer'] ?? null) ? $order['customer'] : [];
     $source = is_array($order['source'] ?? null) ? $order['source'] : [];
+    $raw = is_array($order['raw'] ?? null) ? $order['raw'] : [];
     return array_merge($payload, [
         'order_id' => (string) ($order['order_id'] ?? $orderId),
         'source_platform' => $platform,
@@ -67,6 +68,7 @@ function jg_store_ops_returns_api_canonical_payload(array $payload): array
         'source_account' => (string) ($source['account'] ?? ''),
         'customer_name' => (string) ($customer['name'] ?? ''),
         'customer_username' => (string) ($customer['username'] ?? ''),
+        'partner_code' => $platform === 'partner' ? strtoupper(trim((string) ($raw['partnerCode'] ?? $raw['partner_code'] ?? $payload['partner_code'] ?? ''))) : '',
         'items' => array_values($canonical),
     ]);
 }
@@ -75,6 +77,10 @@ try {
     $pdo = jg_store_ops_sku_db();
     $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
     if ($method === 'GET') {
+        if (trim((string) ($_GET['action'] ?? '')) === 'partner_catalog') {
+            echo json_encode(['ok' => true] + jg_store_ops_partner_returns_catalog((string) ($_GET['partner_code'] ?? '')), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
         echo json_encode(['ok' => true, 'reports' => jg_store_ops_returns_fetch($pdo)], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         exit;
     }
@@ -90,10 +96,26 @@ try {
             function_exists('jg_admin_current_employee_name') ? jg_admin_current_employee_name() : 'Store Ops'
         );
     } elseif ($action === 'complete') {
+        $returnId = (int) ($payload['return_id'] ?? 0);
+        $draft = jg_store_ops_returns_find($pdo, $returnId);
+        $partnerAdjustment = null;
+        if ((string) ($draft['source_platform'] ?? '') === 'partner' && (string) ($draft['status'] ?? '') === 'draft') {
+            $expectedDestination = match ((string) ($draft['condition_code'] ?? '')) {
+                'restock' => 'stock',
+                'damaged' => 'production',
+                'unrecoverable' => 'unrecoverable',
+                default => '',
+            };
+            if ($expectedDestination === '' || $expectedDestination !== strtolower(trim((string) ($payload['destination'] ?? '')))) {
+                throw new InvalidArgumentException('The Partner return condition no longer matches its destination.');
+            }
+            $partnerAdjustment = jg_store_ops_partner_returns_apply_adjustment($draft);
+        }
         $report = jg_store_ops_returns_complete(
             $pdo,
-            (int) ($payload['return_id'] ?? 0),
-            (string) ($payload['destination'] ?? '')
+            $returnId,
+            (string) ($payload['destination'] ?? ''),
+            $partnerAdjustment
         );
     } else {
         jg_store_ops_returns_api_fail('Unknown return action.', 400);
