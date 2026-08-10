@@ -2349,7 +2349,7 @@ document.addEventListener('DOMContentLoaded', () => {
               ? 'Preparing label…'
               : (shopeeState === 'label_failed'
                 ? 'Retry label'
-                : (shopeeState === 'failed' ? 'Retry arrange' : 'Manual arrange'))))));
+                : 'Manual arrange')))));
         const shopeeTitle = automaticShopeePending
           ? 'Automatic Shopee arrangement is healthy and still owns this order.'
           : (order.shopeeArrangementError || 'Arrange this Shopee order from Store Ops.');

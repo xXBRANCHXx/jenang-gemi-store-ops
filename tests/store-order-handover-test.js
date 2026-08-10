@@ -191,10 +191,11 @@ assert(
     && storeHome.includes('Auto-arranging…')
     && storeHome.includes('Manual arrange')
     && storeHome.includes('Retry label')
+    && !storeHome.includes("shopeeState === 'failed' ? 'Retry arrange'")
     && storeHome.includes("order.instant && instantState === 'failed'")
     && storeHome.includes("order.weekendDependentCutoff || '12:00'")
     && storeHome.includes("isWeekendDependent ? 'is-weekend-dependent' : ''"),
-  'Instant orders must sort first, while every regular Shopee order retains a visible arrangement lifecycle and Weekend Dependent badge.'
+  'Instant orders must sort first, while server-authorized Shopee fallbacks are clearly labeled as manual arrangement.'
 );
 assert(
   ordersApi.includes("'/fulfillment/arrange-shopee'")
