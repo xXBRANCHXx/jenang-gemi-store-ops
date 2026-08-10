@@ -154,9 +154,27 @@ website_ops_expect(
     str_contains($websiteApi, "\$action === 'cancel'")
         && str_contains($websiteApi, 'jg_store_ops_whatsapp_cancel_unclaimed')
         && str_contains($websiteApi, "\$action === 'whatsapp_status'")
-        && str_contains($websiteApi, 'jg_store_ops_whatsapp_cancellation_state'),
-    'The authenticated website-order API must expose atomic WhatsApp cancellation.'
+        && str_contains($websiteApi, 'jg_store_ops_whatsapp_cancellation_state')
+        && str_contains($websiteApi, "\$action === 'whatsapp_statuses'")
+        && str_contains($websiteApi, 'jg_store_ops_whatsapp_lifecycle_states'),
+    'The authenticated website-order API must expose atomic WhatsApp cancellation and batched lifecycle reads.'
 );
+$websiteBootstrapSource = (string) file_get_contents(dirname(__DIR__) . '/website-orders-bootstrap.php');
+website_ops_expect(
+    true,
+    str_contains($websiteBootstrapSource, 'function jg_store_ops_whatsapp_lifecycle_states')
+        && str_contains($websiteBootstrapSource, 'count($normalized) >= 100')
+        && str_contains($websiteBootstrapSource, 'jg_store_ops_whatsapp_cancellation_state($pdo, $orderId)'),
+    'Batched WhatsApp lifecycle reads must be bounded and reuse the authoritative single-order state.'
+);
+foreach (['api/orders/index.php', 'api/orders-v2/index.php'] as $ordersEndpoint) {
+    $ordersSource = (string) file_get_contents(dirname(__DIR__) . '/' . $ordersEndpoint);
+    website_ops_expect(
+        true,
+        preg_match('/action === \'claim_order\'[\s\S]*?source_platform\'] === \'whatsapp\'[\s\S]*?IS_BEING_FULFILLED[\s\S]*?jg_store_ops_orders_fulfillment_response/', $ordersSource) === 1,
+        $ordersEndpoint . ' must report a WhatsApp claim as Processing before responding.'
+    );
+}
 $fulfillmentRuntime = (string) file_get_contents(dirname(__DIR__) . '/store-ops-fulfillment-runtime.php');
 website_ops_expect(
     true,

@@ -75,6 +75,18 @@ try {
             ),
         ]);
     }
+    if ($action === 'whatsapp_statuses') {
+        if ($method !== 'POST') {
+            jg_store_ops_website_json(['ok' => false, 'error' => 'Method not allowed.'], 405);
+        }
+        jg_store_ops_website_json([
+            'ok' => true,
+            'orders' => jg_store_ops_whatsapp_lifecycle_states(
+                $pdo,
+                is_array($body['order_ids'] ?? null) ? $body['order_ids'] : []
+            ),
+        ]);
+    }
     if ($action === 'state') {
         if ($method !== 'GET') {
             jg_store_ops_website_json(['ok' => false, 'error' => 'Method not allowed.'], 405);

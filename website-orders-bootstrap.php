@@ -962,6 +962,28 @@ function jg_store_ops_whatsapp_cancellation_state(PDO $pdo, string $orderId): ar
     ];
 }
 
+/** @return array<int,array<string,mixed>> */
+function jg_store_ops_whatsapp_lifecycle_states(PDO $pdo, array $orderIds): array
+{
+    $normalized = [];
+    foreach ($orderIds as $orderId) {
+        $orderId = trim((string) $orderId);
+        if ($orderId === '' || isset($normalized[$orderId])) continue;
+        $normalized[$orderId] = true;
+        if (count($normalized) >= 100) break;
+    }
+
+    $states = [];
+    foreach (array_keys($normalized) as $orderId) {
+        try {
+            $states[] = jg_store_ops_whatsapp_cancellation_state($pdo, $orderId);
+        } catch (RuntimeException $error) {
+            if (!str_contains($error->getMessage(), 'missing from Store Ops')) throw $error;
+        }
+    }
+    return $states;
+}
+
 function jg_store_ops_website_proxy_label(array $order): never
 {
     $url = trim((string) ($order['label_url'] ?? ''));

@@ -1057,11 +1057,25 @@ if ($method === 'POST') {
 
         if ($action === 'claim_order') {
             $row = jg_store_ops_fulfillment_claim($pdo, $key, $employeeId, $employeeName);
+            if ($key['source_platform'] === 'whatsapp') {
+                try {
+                    jg_store_ops_website_callback($pdo, 'whatsapp', $key['order_id'], 'IS_BEING_FULFILLED');
+                } catch (Throwable $callbackError) {
+                    error_log('WhatsApp order claim callback failed: ' . $callbackError->getMessage());
+                }
+            }
             jg_store_ops_orders_fulfillment_response($pdo, $row);
         }
 
         if ($action === 'begin_fulfillment') {
             $row = jg_store_ops_fulfillment_claim($pdo, $key, $employeeId, $employeeName);
+            if ($key['source_platform'] === 'whatsapp') {
+                try {
+                    jg_store_ops_website_callback($pdo, 'whatsapp', $key['order_id'], 'IS_BEING_FULFILLED');
+                } catch (Throwable $callbackError) {
+                    error_log('WhatsApp order claim callback failed: ' . $callbackError->getMessage());
+                }
+            }
             if ($key['source_platform'] === 'partner'
                 && !jg_store_ops_orders_partner_update_status($key['order_id'], 'IS_BEING_FULFILLED')) {
                 throw new RuntimeException('Unable to start this Partner order. It may have been cancelled; refresh the board and try again.');
