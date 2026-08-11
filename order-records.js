@@ -19,7 +19,17 @@
     if (required <= 0) return 'No scan required';
     return `${completed}/${required} units`;
   };
-  global.JGOrderRecordsPresentation = Object.freeze({ eventLabel, scanLabel });
+  const elapsedDurationLabel = (value) => {
+    const seconds = Math.max(0, Math.round(Number(value) || 0));
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m${seconds % 60 ? ` ${seconds % 60}s` : ''}`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h${minutes % 60 ? ` ${minutes % 60}m` : ''}`;
+    const days = Math.floor(hours / 24);
+    return `${days}d${hours % 24 ? ` ${hours % 24}h` : ''}`;
+  };
+  global.JGOrderRecordsPresentation = Object.freeze({ eventLabel, scanLabel, elapsedDurationLabel });
 })(typeof window !== 'undefined' ? window : globalThis);
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -84,9 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const end = parseTime(to).getTime();
     if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return '';
     const seconds = Math.round((end - start) / 1000);
-    if (seconds < 60) return `+${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    return `+${minutes}m${seconds % 60 ? ` ${seconds % 60}s` : ''}`;
+    return `+${presentation.elapsedDurationLabel(seconds)}`;
   };
 
   const eventIcon = (eventType) => {

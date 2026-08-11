@@ -20,6 +20,8 @@ const resolver = fs.readFileSync(path.join(root, 'order-resolver.php'), 'utf8');
 assert.equal(global.JGOrderRecordsPresentation.scanLabel({ scan_completed: 5, scan_required: 5 }), '5/5 units');
 assert.equal(global.JGOrderRecordsPresentation.scanLabel({ scan_completed: 0, scan_required: 0 }), 'No scan required');
 assert.equal(global.JGOrderRecordsPresentation.eventLabel('fulfill'), 'Order processed');
+assert.equal(global.JGOrderRecordsPresentation.elapsedDurationLabel(3300 * 60 + 30), '2d 7h');
+assert.equal(global.JGOrderRecordsPresentation.elapsedDurationLabel(2 * 60 * 60 + 17 * 60), '2h 17m');
 
 assert.match(shell, /'order-records'.*?'Order Records'/s, 'Store Ops navigation must expose Order Records.');
 assert.match(dashboard, /jg_store_ops_shell_nav_items\('\.\.\/'\)/, 'The live Orders dashboard must render the shared navigation containing Order Records.');
