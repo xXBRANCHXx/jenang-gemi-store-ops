@@ -59,14 +59,17 @@ function jg_store_ops_shell_nav_items(string $rootPrefix): array
     return [
         ['key' => 'orders', 'label' => 'Orders', 'href' => $rootPrefix . 'dashboard/', 'title' => 'Orders'],
         ['key' => 'order-records', 'label' => 'Order Records', 'href' => $rootPrefix . 'order-records/', 'title' => 'Processed Order Records'],
+        ['type' => 'separator', 'label' => 'Inventory tools'],
         ['key' => 'inventory', 'label' => 'Inventory', 'href' => $rootPrefix . 'inventory/', 'title' => 'Inventory'],
         ['key' => 'returns', 'label' => 'Returns', 'href' => $rootPrefix . 'returns/', 'title' => 'Returns'],
         ['key' => 'stock-adjust', 'label' => 'Stock Adjust', 'href' => $rootPrefix . 'stock-adjust/', 'title' => 'Stock Adjust'],
+        ['key' => 'sku-db', 'label' => 'SKU catalog', 'href' => $rootPrefix . 'sku-db/', 'title' => 'SKU catalog'],
+        ['type' => 'separator', 'label' => 'Counter sales and documents'],
         ['key' => 'walk-ins', 'label' => 'Walk Ins', 'href' => $rootPrefix . 'walk-ins/', 'title' => 'Walk Ins'],
         ['key' => 'invoice-printer', 'label' => 'Invoice Printer', 'href' => $rootPrefix . 'invoice-printer/', 'title' => 'Invoice Printer'],
         ['key' => 'invoice-records', 'label' => 'Invoice Records', 'href' => $rootPrefix . 'invoice-records/', 'title' => 'Invoice Records'],
+        ['type' => 'separator', 'label' => 'System tools'],
         ['key' => 'integrations', 'label' => 'Integrations', 'href' => $rootPrefix . 'integrations/', 'title' => 'Integrations'],
-        ['key' => 'sku-db', 'label' => 'SKU catalog', 'href' => $rootPrefix . 'sku-db/', 'title' => 'SKU catalog'],
     ];
 }
 
@@ -106,7 +109,7 @@ function jg_store_ops_shell_open(array $options = []): void
         'data-scan-serial-endpoint' => $rootPrefix . 'api/scan-serial/',
     ], $appAttributes);
     ?>
-    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.38</div>
+    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.39</div>
     <div<?php echo jg_store_ops_shell_attr($attributes); ?>>
         <div class="admin-backdrop admin-backdrop-a"></div>
         <div class="admin-backdrop admin-backdrop-b"></div>
@@ -125,6 +128,10 @@ function jg_store_ops_shell_open(array $options = []): void
 
             <nav class="admin-store-sidebar-nav" aria-label="Store Ops navigation">
                 <?php foreach (jg_store_ops_shell_nav_items($rootPrefix) as $item): ?>
+                    <?php if (($item['type'] ?? '') === 'separator'): ?>
+                        <span class="admin-store-nav-divider" role="separator" aria-label="<?php echo htmlspecialchars((string) $item['label'], ENT_QUOTES, 'UTF-8'); ?>"></span>
+                        <?php continue; ?>
+                    <?php endif; ?>
                     <?php $isActive = $active === $item['key']; ?>
                     <a class="admin-store-nav-item<?php echo $isActive ? ' is-active' : ''; ?>" href="<?php echo htmlspecialchars($item['href'], ENT_QUOTES, 'UTF-8'); ?>"<?php echo $isActive ? ' aria-current="page"' : ''; ?> title="<?php echo htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8'); ?>">
                         <?php echo jg_store_ops_shell_svg($item['key']); ?>

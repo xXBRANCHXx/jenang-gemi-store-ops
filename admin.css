@@ -6887,6 +6887,14 @@ button, input {
   overflow-y: auto;
 }
 
+.admin-store-nav-divider {
+  display: block;
+  width: calc(100% - 20px);
+  height: 1px;
+  margin: 5px 10px;
+  background: rgba(255, 255, 255, 0.11);
+}
+
 .admin-store-sidebar-tools {
   margin-top: auto;
   padding-top: 10px;
@@ -7024,6 +7032,11 @@ button.admin-store-sidebar-profile:hover {
 
 .admin-store-home:not(.is-sidebar-expanded) .admin-store-sidebar .admin-store-profile-copy {
   display: none;
+}
+
+.admin-store-home:not(.is-sidebar-expanded) .admin-store-nav-divider {
+  width: 26px;
+  margin-inline: auto;
 }
 
 .admin-store-home:not(.is-sidebar-expanded) :is(.admin-store-nav-item, .admin-store-sidebar-profile, .admin-store-settings-launch) {

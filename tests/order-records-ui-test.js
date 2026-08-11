@@ -20,7 +20,7 @@ assert.equal(global.JGOrderRecordsPresentation.scanLabel({ scan_completed: 0, sc
 assert.equal(global.JGOrderRecordsPresentation.eventLabel('fulfill'), 'Order processed');
 
 assert.match(shell, /'order-records'.*?'Order Records'/s, 'Store Ops navigation must expose Order Records.');
-assert.match(dashboard, /href="\.\.\/order-records\/"[\s\S]*?>Order Records</, 'The live Orders dashboard must link directly to Order Records.');
+assert.match(dashboard, /jg_store_ops_shell_nav_items\('\.\.\/'\)/, 'The live Orders dashboard must render the shared navigation containing Order Records.');
 assert.match(page, /data-order-records-endpoint.*?api\/order-records/s, 'Order Records must use its read-only API.');
 assert.match(page, /data-order-records-date-from[\s\S]*?data-order-records-date-to[\s\S]*?data-order-records-source[\s\S]*?data-order-records-operator[\s\S]*?data-order-records-query/, 'Order Records must provide operational filters.');
 assert.match(page, /Completed order history[\s\S]*?data-order-records-body/, 'Order Records must render a completed-order table.');

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require dirname(__DIR__) . '/auth-runtime.php';
+require dirname(__DIR__) . '/store-ops-shell.php';
 
 if (!jg_admin_is_authenticated()) {
     header('Location: ../');
@@ -35,7 +35,7 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
     <link rel="stylesheet" href="../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
 <body class="admin-body is-dashboard is-store-home">
-    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.38</div>
+    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.39</div>
     <div
         class="admin-app admin-store-home"
         data-store-home
@@ -58,38 +58,17 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
             </header>
 
             <nav class="admin-store-sidebar-nav" aria-label="Store Ops navigation">
-                <a class="admin-store-nav-item is-active" href="./" aria-current="page" title="Orders">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h6"/></svg>
-                    <span>Orders</span>
-                </a>
-                <a class="admin-store-nav-item" href="../order-records/" title="Processed Order Records">
-                    <span class="admin-store-nav-internet-icon" style="--admin-store-nav-icon: url(https://api.iconify.design/material-symbols:history.svg);" aria-hidden="true"></span>
-                    <span>Order Records</span>
-                </a>
-                <a class="admin-store-nav-item" href="../inventory/" title="Inventory">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM4.4 7.7 12 12l7.6-4.3M12 12v9"/></svg>
-                    <span>Inventory</span>
-                </a>
-                <a class="admin-store-nav-item" href="../walk-ins/" title="Walk Ins">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3"/></svg>
-                    <span>Walk Ins</span>
-                </a>
-                <a class="admin-store-nav-item" href="../invoice-printer/" title="Invoice Printer">
-                    <span class="admin-store-nav-internet-icon" style="--admin-store-nav-icon: url(https://api.iconify.design/material-symbols:print-outline.svg);" aria-hidden="true"></span>
-                    <span>Invoice Printer</span>
-                </a>
-                <a class="admin-store-nav-item" href="../invoice-records/" title="Invoice Records">
-                    <span class="admin-store-nav-internet-icon" style="--admin-store-nav-icon: url(https://api.iconify.design/material-symbols:receipt-long-outline.svg);" aria-hidden="true"></span>
-                    <span>Invoice Records</span>
-                </a>
-                <a class="admin-store-nav-item" href="../integrations/" title="Integrations">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12h8M9 7V3M15 7V3M7 7h10v3a5 5 0 0 1-10 0zM12 15v6"/></svg>
-                    <span>Integrations</span>
-                </a>
-                <a class="admin-store-nav-item" href="../sku-db/" title="SKU catalog">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>
-                    <span>SKU catalog</span>
-                </a>
+                <?php foreach (jg_store_ops_shell_nav_items('../') as $item): ?>
+                    <?php if (($item['type'] ?? '') === 'separator'): ?>
+                        <span class="admin-store-nav-divider" role="separator" aria-label="<?php echo htmlspecialchars((string) $item['label'], ENT_QUOTES, 'UTF-8'); ?>"></span>
+                        <?php continue; ?>
+                    <?php endif; ?>
+                    <?php $isActive = $item['key'] === 'orders'; ?>
+                    <a class="admin-store-nav-item<?php echo $isActive ? ' is-active' : ''; ?>" href="<?php echo htmlspecialchars($item['href'], ENT_QUOTES, 'UTF-8'); ?>"<?php echo $isActive ? ' aria-current="page"' : ''; ?> title="<?php echo htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8'); ?>">
+                        <?php echo jg_store_ops_shell_svg($item['key']); ?>
+                        <span><?php echo htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8'); ?></span>
+                    </a>
+                <?php endforeach; ?>
             </nav>
 
             <div class="admin-store-sidebar-tools">
