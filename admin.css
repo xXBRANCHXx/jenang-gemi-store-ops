@@ -9842,6 +9842,32 @@ button.admin-store-sidebar-profile:hover {
   stroke-linejoin: round;
 }
 
+.admin-order-record-event.is-complete .admin-order-record-event-marker {
+  background: color-mix(in srgb, var(--admin-success) 13%, var(--admin-surface));
+  color: var(--admin-success);
+}
+
+.admin-order-record-event.is-scheduled .admin-order-record-event-marker {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--admin-warning) 11%, var(--admin-surface));
+  color: var(--admin-warning);
+}
+
+.admin-order-record-event.is-future {
+  color: var(--admin-muted);
+}
+
+.admin-order-record-event.is-future .admin-order-record-event-marker {
+  background: var(--admin-surface-soft);
+  color: var(--admin-muted);
+}
+
+.admin-order-record-event.is-future > div > header strong,
+.admin-order-record-event.is-future > div > header time,
+.admin-order-record-event.is-future > div > span {
+  color: var(--admin-muted);
+}
+
 .admin-order-record-event.is-error .admin-order-record-event-marker {
   background: color-mix(in srgb, var(--admin-danger) 12%, var(--admin-surface));
   color: var(--admin-danger);

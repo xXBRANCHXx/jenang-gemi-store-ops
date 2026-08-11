@@ -57,9 +57,16 @@ document.addEventListener('DOMContentLoaded', () => {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 
+  const parseTime = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return new Date(NaN);
+    const normalized = raw.replace(' ', 'T');
+    return new Date(/[zZ]$|[+-]\d{2}:?\d{2}$/.test(normalized) ? normalized : `${normalized}Z`);
+  };
+
   const formatTime = (value) => {
     if (!value) return '-';
-    const date = new Date(`${String(value).replace(' ', 'T')}Z`);
+    const date = parseTime(value);
     if (Number.isNaN(date.getTime())) return String(value);
     return new Intl.DateTimeFormat('en-GB', {
       day: '2-digit',
@@ -73,8 +80,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const elapsedLabel = (from, to) => {
-    const start = Date.parse(`${String(from || '').replace(' ', 'T')}Z`);
-    const end = Date.parse(`${String(to || '').replace(' ', 'T')}Z`);
+    const start = parseTime(from).getTime();
+    const end = parseTime(to).getTime();
     if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return '';
     const seconds = Math.round((end - start) / 1000);
     if (seconds < 60) return `+${seconds}s`;
@@ -84,9 +91,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const eventIcon = (eventType) => {
     const type = String(eventType || '').toLowerCase();
-    if (type === 'fulfill') return '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 10 3 3 7-7"/></svg>';
+    if (type === 'delivered') return '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 9.5 10 4l6 5.5V17H4zM8 17v-5h4v5"/></svg>';
+    if (type === 'pickup') return '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 5h9v9h-9zM11.5 8h3l3 3v3h-6z"/><circle cx="6" cy="15" r="1.5"/><circle cx="15" cy="15" r="1.5"/></svg>';
+    if (type === 'label_print') return '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3h6l3 3v11H6zM12 3v4h4M8.5 11h4M8.5 14h4"/></svg>';
     if (type.includes('scan')) return '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 7V4h3M13 4h3v3M16 13v3h-3M7 16H4v-3M7 10h6"/></svg>';
-    if (type.includes('label') || type === 'reprint') return '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3h6l3 3v11H6zM12 3v4h4M8.5 11h4M8.5 14h4"/></svg>';
     if (type === 'claim' || type === 'reclaim' || type === 'release') return '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="7" r="3"/><path d="M4.5 17c.7-3.1 2.5-4.7 5.5-4.7s4.8 1.6 5.5 4.7"/></svg>';
     return '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3"/></svg>';
   };
@@ -198,30 +206,69 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   };
 
-  const renderEvents = (events = []) => {
+  const renderEvents = (events = [], lifecycle = {}) => {
     if (!refs.events) return;
-    if (!events.length) {
-      refs.events.innerHTML = '<p class="admin-empty">No processing events were recorded.</p>';
-      return;
-    }
-    const uniqueEvents = events.filter((event, index, list) => {
-      if (index === 0) return true;
-      const signature = (item) => [item.event_type, item.created_at, item.employee_id, item.sku, item.message].map((value) => String(value || '')).join('|');
-      return signature(event) !== signature(list[index - 1]);
-    });
-    refs.events.innerHTML = `<div class="admin-order-record-timeline">${uniqueEvents.map((event, index) => {
-      const progress = event.progress_required > 0 ? `${event.progress_scanned}/${event.progress_required}` : '';
-      const details = [event.employee_name, event.sku, progress].filter(Boolean).join(' · ');
-      const elapsed = index > 0 ? elapsedLabel(uniqueEvents[index - 1].created_at, event.created_at) : 'Start';
+    const lastReleaseIndex = events.reduce((found, event, index) => event.event_type === 'release' ? index : found, -1);
+    const claim = events.find((event, index) => index > lastReleaseIndex && ['claim', 'reclaim'].includes(event.event_type))
+      || events.find((event) => ['claim', 'reclaim'].includes(event.event_type));
+    const printed = events.find((event) => event.event_type === 'label_print')
+      || events.find((event) => event.event_type === 'fulfill');
+    const pickupComplete = Boolean(lifecycle.pickup_complete);
+    const delivered = Boolean(lifecycle.delivered);
+    const scheduledPickup = lifecycle.scheduled_pickup_start_at || '';
+    const pickupAt = pickupComplete ? lifecycle.picked_up_at || '' : '';
+    const deliveredAt = delivered ? lifecycle.delivered_at || '' : '';
+    const stages = [
+      {
+        kind: 'claim',
+        label: 'Order claimed',
+        at: claim?.created_at || '',
+        note: claim?.employee_name || claim?.employee_id || 'Waiting for an operator',
+        complete: Boolean(claim?.created_at),
+        badge: 'Start'
+      },
+      {
+        kind: 'label_print',
+        label: 'Label printed',
+        at: printed?.created_at || '',
+        note: printed?.employee_name || printed?.employee_id || 'Waiting for print confirmation',
+        complete: Boolean(printed?.created_at),
+        badge: printed?.created_at && claim?.created_at ? elapsedLabel(claim.created_at, printed.created_at) : 'Waiting'
+      },
+      {
+        kind: 'pickup',
+        label: 'Pickup',
+        at: pickupAt || scheduledPickup,
+        note: pickupComplete
+          ? 'Actual courier pickup'
+          : (lifecycle.scheduled_pickup_label || (scheduledPickup ? 'Scheduled pickup window' : 'Waiting for marketplace pickup')),
+        complete: pickupComplete,
+        scheduled: !pickupComplete && Boolean(scheduledPickup),
+        badge: pickupComplete
+          ? (printed?.created_at && pickupAt ? elapsedLabel(printed.created_at, pickupAt) : 'Picked up')
+          : (scheduledPickup ? 'Scheduled' : 'Waiting')
+      },
+      {
+        kind: 'delivered',
+        label: 'Delivered',
+        at: deliveredAt,
+        note: delivered ? 'Marketplace delivery confirmed' : 'Waiting for delivery confirmation',
+        complete: delivered,
+        badge: delivered
+          ? (pickupAt && deliveredAt ? elapsedLabel(pickupAt, deliveredAt) : 'Delivered')
+          : 'Waiting'
+      }
+    ];
+    refs.events.innerHTML = `<div class="admin-order-record-timeline">${stages.map((stage) => {
+      const stateClass = stage.complete ? 'is-complete' : (stage.scheduled ? 'is-scheduled' : 'is-future');
       return `
-        <article class="admin-event-item admin-order-record-event ${['scan_error', 'error'].includes(event.event_type) ? 'is-error' : ''}">
-          <span class="admin-order-record-event-marker">${eventIcon(event.event_type)}</span>
+        <article class="admin-event-item admin-order-record-event ${stateClass}">
+          <span class="admin-order-record-event-marker">${eventIcon(stage.kind)}</span>
           <div>
-            <header><strong>${escapeHtml(presentation.eventLabel(event.event_type))}</strong><time>${escapeHtml(formatTime(event.created_at))}</time></header>
-            ${details ? `<span>${escapeHtml(details)}</span>` : ''}
-            ${event.message ? `<small>${escapeHtml(event.message)}</small>` : ''}
+            <header><strong>${escapeHtml(stage.label)}</strong><time>${stage.at ? escapeHtml(formatTime(stage.at)) : 'Not yet'}</time></header>
+            <span>${escapeHtml(stage.note)}</span>
           </div>
-          <em>${escapeHtml(elapsed)}</em>
+          <em>${escapeHtml(stage.badge)}</em>
         </article>
       `;
     }).join('')}</div>`;
@@ -267,7 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
         detail_source_account: record.source_account
       });
       renderItems(Array.isArray(payload.items) ? payload.items : []);
-      renderEvents(Array.isArray(payload.events) ? payload.events : []);
+      renderEvents(Array.isArray(payload.events) ? payload.events : [], payload.lifecycle || {});
     } catch (error) {
       renderEvents([]);
       if (refs.events) refs.events.innerHTML = `<p class="admin-empty">${escapeHtml(error instanceof Error ? error.message : 'Unable to load this timeline.')}</p>`;

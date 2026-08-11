@@ -28,24 +28,36 @@ try {
             (string) ($_GET['detail_source_account'] ?? ''),
             (string) ($_GET['detail_order_id'] ?? '')
         );
-        if ($detail['items'] === []) {
-            try {
-                $resolved = jg_store_ops_resolve_order_by_id((string) ($_GET['detail_order_id'] ?? ''));
-                if (is_array($resolved)) {
+        $lifecycle = [];
+        try {
+            $resolved = jg_store_ops_resolve_order_by_id((string) ($_GET['detail_order_id'] ?? ''));
+            $lifecyclePlatform = (string) ($_GET['detail_source_platform'] ?? '');
+            $lifecycleAccount = (string) ($_GET['detail_source_account'] ?? '');
+            if (is_array($resolved)) {
+                if ($detail['items'] === []) {
                     $detail['items'] = jg_store_ops_fulfillment_items_snapshot(
                         is_array($resolved['items'] ?? null) ? $resolved['items'] : []
                     );
                     if ($detail['items'] !== []) $detail['items_source'] = 'order_source';
                 }
-            } catch (Throwable $resolverError) {
-                error_log('Order Records product lookup failed: ' . $resolverError->getMessage());
+                $source = is_array($resolved['source'] ?? null) ? $resolved['source'] : [];
+                $lifecyclePlatform = (string) ($source['platform'] ?? $lifecyclePlatform);
+                $lifecycleAccount = (string) ($source['account'] ?? $lifecycleAccount);
             }
+            $lifecycle = jg_store_ops_order_resolver_shipment_lifecycle(
+                $lifecyclePlatform,
+                $lifecycleAccount,
+                (string) ($_GET['detail_order_id'] ?? '')
+            );
+        } catch (Throwable $resolverError) {
+            error_log('Order Records lifecycle lookup failed: ' . $resolverError->getMessage());
         }
         echo json_encode([
             'ok' => true,
             'events' => $detail['events'],
             'items' => $detail['items'],
             'items_source' => $detail['items_source'],
+            'lifecycle' => $lifecycle,
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         exit;
     }

@@ -15,6 +15,7 @@ const dashboard = fs.readFileSync(path.join(root, 'dashboard', 'index.php'), 'ut
 const printLabel = fs.readFileSync(path.join(root, 'print-label.js'), 'utf8');
 const fulfillment = fs.readFileSync(path.join(root, 'store-ops-fulfillment-runtime.php'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'admin.css'), 'utf8');
+const resolver = fs.readFileSync(path.join(root, 'order-resolver.php'), 'utf8');
 
 assert.equal(global.JGOrderRecordsPresentation.scanLabel({ scan_completed: 5, scan_required: 5 }), '5/5 units');
 assert.equal(global.JGOrderRecordsPresentation.scanLabel({ scan_completed: 0, scan_required: 0 }), 'No scan required');
@@ -29,11 +30,16 @@ assert.match(page, /Completed order history[\s\S]*?admin-order-records-filter-pa
 assert.match(page, /Processing timeline[\s\S]*?data-order-records-events/, 'Processed orders must expose a read-only timeline.');
 assert.match(page, /Products processed[\s\S]*?data-order-records-items-body/, 'Order details must always include their processed products section.');
 assert.match(orderRecordsScript(), /admin-order-record-products-list[\s\S]*admin-order-record-timeline/, 'Products must share one manifest and processing events must render as a visual timeline.');
-assert.match(orderRecordsScript(), /uniqueEvents[\s\S]*signature/, 'Consecutive duplicate processing events must be collapsed in the drawer.');
+assert.match(orderRecordsScript(), /Order claimed[\s\S]*Label printed[\s\S]*Pickup[\s\S]*Delivered/, 'The drawer must render one fixed shipment journey instead of exposing duplicate raw events.');
+assert.match(orderRecordsScript(), /pickup_complete[\s\S]*scheduled_pickup_start_at[\s\S]*picked_up_at/, 'Pickup must show its schedule until an actual marketplace timestamp replaces it.');
+assert.match(orderRecordsScript(), /delivered[\s\S]*delivered_at/, 'Delivery must remain pending until the marketplace supplies its actual timestamp.');
 assert.match(page, /data-order-records-average-context/, 'Average time must disclose its timed-order coverage.');
 assert.match(api, /REQUEST_METHOD[\s\S]*?Order Records is read-only/, 'Order Records API must reject writes.');
 assert.match(api, /jg_store_ops_order_records_summary_from_db/, 'Summary metrics must cover the full filtered result instead of only the visible rows.');
+assert.match(api, /jg_store_ops_order_resolver_shipment_lifecycle[\s\S]*'lifecycle'/, 'Order detail must include the authoritative marketplace shipment lifecycle.');
 assert.match(api, /jg_store_ops_resolve_order_by_id[\s\S]*?items_source.*?order_source/, 'Existing processed records must resolve products from the authoritative order source.');
+assert.match(resolver, /function jg_store_ops_order_resolver_shipment_lifecycle[\s\S]*fulfillment\/order-lifecycle/, 'Shipment lifecycle reads must use the marketplace service.');
+assert.match(resolver, /function jg_store_ops_order_resolver_marketplace_request[\s\S]*setup_token/, 'Marketplace lifecycle reads must use the configured service credential.');
 assert.match(bootstrap, /f\.status = \"FULFILLED\"[\s\S]*?event_type = \"fulfill\"/, 'The records query must require completed state and a real fulfill event.');
 assert.match(bootstrap, /processing_started_at[\s\S]*TIMESTAMPDIFF/, 'Average time must use a recovered processing start timestamp.');
 assert.doesNotMatch(bootstrap, /event_type = \"remove_from_listed\"/, 'Removed queue rows must not be included as processed records.');

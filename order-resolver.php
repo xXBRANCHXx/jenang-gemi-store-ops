@@ -565,7 +565,8 @@ function jg_store_ops_order_resolver_fetch_json(string $url, array $headers = []
 function jg_store_ops_order_resolver_marketplace_request(string $path, array $query): ?array
 {
     $baseUrl = rtrim(jg_store_ops_order_resolver_config('JG_SHOPEE_INGEST_BASE_URL', 'shopee_ingest_base_url', 'https://api.jenanggemi.com'), '/');
-    $platform = str_starts_with($path, '/tiktok/') ? 'tiktok' : 'shopee';
+    $requestedPlatform = jg_store_ops_order_resolver_platform_key((string) ($query['platform'] ?? ''));
+    $platform = $requestedPlatform === 'tiktok' || str_starts_with($path, '/tiktok/') ? 'tiktok' : 'shopee';
     $setupToken = $platform === 'tiktok'
         ? jg_store_ops_order_resolver_config(
             'JG_TIKTOK_INGEST_SETUP_TOKEN',
@@ -578,6 +579,23 @@ function jg_store_ops_order_resolver_marketplace_request(string $path, array $qu
     }
     $query['setup_token'] = $setupToken;
     return jg_store_ops_order_resolver_fetch_json($baseUrl . $path . '?' . http_build_query($query));
+}
+
+/** @return array<string,mixed> */
+function jg_store_ops_order_resolver_shipment_lifecycle(string $platform, string $account, string $orderId): array
+{
+    $platform = jg_store_ops_order_resolver_platform_key($platform);
+    $account = strtolower(trim($account));
+    $orderId = trim($orderId);
+    if (!in_array($platform, ['shopee', 'tiktok'], true) || $account === '' || $orderId === '') {
+        return [];
+    }
+    $payload = jg_store_ops_order_resolver_marketplace_request('/fulfillment/order-lifecycle', [
+        'platform' => $platform,
+        'account_key' => $account,
+        'order_id' => $orderId,
+    ]);
+    return is_array($payload['lifecycle'] ?? null) ? $payload['lifecycle'] : [];
 }
 
 function jg_store_ops_order_resolver_order_from_marketplace_rows(array $rows): ?array
