@@ -224,13 +224,19 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
             <div class="admin-modal-backdrop" data-close-shopee-arrangement></div>
             <form class="admin-modal-card admin-shopee-arrangement-card" data-shopee-arrangement-form role="dialog" aria-modal="true" aria-labelledby="shopee-arrangement-title">
                 <div class="admin-modal-head">
-                    <div>
-                        <span class="admin-panel-kicker">Shopee shipping</span>
-                        <h3 id="shopee-arrangement-title">Arrange <span data-shopee-arrangement-order></span></h3>
+                    <div class="admin-shopee-arrangement-heading">
+                        <span class="admin-shopee-arrangement-hero-icon" aria-hidden="true">
+                            <svg viewBox="0 0 32 32"><path d="M5 9.5 16 4l11 5.5v13L16 28 5 22.5z"/><path d="m5 9.5 11 5.7 11-5.7M16 15.2V28"/><path d="m11.3 12.7 11-5.6"/></svg>
+                        </span>
+                        <div>
+                            <span class="admin-panel-kicker">Shopee shipping</span>
+                            <h3 id="shopee-arrangement-title">Choose the handover</h3>
+                            <span class="admin-shopee-arrangement-order">Order <strong data-shopee-arrangement-order></strong></span>
+                        </div>
                     </div>
                     <button type="button" class="admin-ghost-btn" data-close-shopee-arrangement>Close</button>
                 </div>
-                <p class="admin-reprint-intro">Choose exactly how this order should be handed over. Options are loaded live from Shopee.</p>
+                <p class="admin-shopee-arrangement-intro">These options are live from Shopee. Pick one and we’ll arrange the shipment, prepare the label, and return the order to the normal queue.</p>
                 <div class="admin-shopee-arrangement-options" data-shopee-arrangement-options>
                     <p class="admin-preview-empty">Loading Shopee options…</p>
                 </div>

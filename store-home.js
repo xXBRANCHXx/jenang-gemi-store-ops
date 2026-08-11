@@ -2640,26 +2640,44 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!shopeeArrangementOptions) return;
     const pickupOptions = Array.isArray(options?.pickup?.options) ? options.pickup.options : [];
     const dropoffOffered = Boolean(options?.dropoff?.offered);
+    const pickupIcon = '<svg viewBox="0 0 28 28" aria-hidden="true"><path d="M4 8.5h13v11H4zM17 12h4.2l3 3.3v4.2H17z"/><circle cx="8" cy="21" r="2.2"/><circle cx="20.5" cy="21" r="2.2"/><path d="M8 5v7m-3-3 3 3 3-3"/></svg>';
+    const dropoffIcon = '<svg viewBox="0 0 28 28" aria-hidden="true"><path d="M6 10.5h16v13H6zM4.5 10.5 7 5h14l2.5 5.5"/><path d="M10 23.5v-7h8v7M4.5 10.5c0 2 3.5 2.4 4.7.5 1.2 1.9 4.4 1.9 5.6 0 1.2 1.9 4.4 1.9 5.6 0 1.2 1.9 3.1 1.5 3.1-.5"/></svg>';
+    const checkIcon = '<span class="admin-shopee-option-check" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="m5 10 3.2 3.2L15.5 6"/></svg></span>';
     const choices = [];
     pickupOptions.forEach((option, index) => {
       const slotLabel = String(option?.label || '').trim();
       const start = String(option?.start_at || '').trim();
       const end = String(option?.end_at || '').trim();
       const fallbackLabel = [start, end].filter(Boolean).join(' – ') || `Pickup time ${index + 1}`;
+      const labelParts = (slotLabel || fallbackLabel).split(' · ').map((part) => part.trim()).filter(Boolean);
+      const pickupDate = labelParts[0] || `Pickup option ${index + 1}`;
+      const pickupTime = labelParts.slice(1).join(' · ') || 'Pickup schedule offered by Shopee';
       choices.push(`
         <label class="admin-shopee-arrangement-option">
           <input type="radio" name="shopee_arrangement" value="pickup-${index}"
             data-handover-method="PICKUP"
             data-pickup-address-id="${escapeHtml(String(option?.address_id || ''))}"
             data-pickup-time-id="${escapeHtml(String(option?.pickup_time_id || ''))}">
-          <span><strong>Pickup</strong><small>${escapeHtml(slotLabel || fallbackLabel)}</small></span>
+          <span class="admin-shopee-option-icon is-pickup">${pickupIcon}</span>
+          <span class="admin-shopee-option-copy">
+            <span class="admin-shopee-option-type">Courier pickup</span>
+            <strong>${escapeHtml(pickupDate)}</strong>
+            <small>${escapeHtml(pickupTime)}</small>
+          </span>
+          ${checkIcon}
         </label>`);
     });
     if (dropoffOffered) {
       choices.push(`
         <label class="admin-shopee-arrangement-option">
           <input type="radio" name="shopee_arrangement" value="dropoff" data-handover-method="DROP_OFF">
-          <span><strong>Drop-off</strong><small>Take the parcel to a Shopee drop-off point.</small></span>
+          <span class="admin-shopee-option-icon is-dropoff">${dropoffIcon}</span>
+          <span class="admin-shopee-option-copy">
+            <span class="admin-shopee-option-type">Self drop-off</span>
+            <strong>Bring it to a Shopee point</strong>
+            <small>No courier wait—hand the parcel over yourself.</small>
+          </span>
+          ${checkIcon}
         </label>`);
     }
     if (!choices.length) {
@@ -2669,7 +2687,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     shopeeArrangementOptions.innerHTML = `
       <fieldset class="admin-shopee-arrangement-group">
-        <legend>Pickup or drop-off</legend>
+        <legend><span>1</span> Select one shipping method</legend>
         ${choices.join('')}
       </fieldset>`;
     if (shopeeArrangementSubmit instanceof HTMLButtonElement) shopeeArrangementSubmit.disabled = true;

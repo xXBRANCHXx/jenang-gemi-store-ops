@@ -219,12 +219,16 @@ assert(
 assert(
   dashboardTemplate.includes('data-shopee-arrangement-modal')
     && dashboardTemplate.includes('data-shopee-arrangement-options')
+    && dashboardTemplate.includes('admin-shopee-arrangement-hero-icon')
     && storeHome.includes('openShopeeArrangementModal(shopeeButton.dataset.arrangeShopee')
     && storeHome.includes('data-handover-method="PICKUP"')
     && storeHome.includes('data-handover-method="DROP_OFF"')
+    && storeHome.includes('admin-shopee-option-icon is-pickup')
+    && storeHome.includes('admin-shopee-option-icon is-dropoff')
+    && adminCss.includes('.admin-shopee-option-check')
     && storeHome.includes('shopee_manual_required: Boolean(order?.shopeeManualRequired)')
     && !storeHome.includes('showBoardAlert(order.shopeeArrangementError)'),
-  'Manual arrange must open a live pickup/drop-off chooser, preserve authorization, and keep errors inside the modal.'
+  'Manual arrange must open a visual live pickup/drop-off chooser, preserve authorization, and keep errors inside the modal.'
 );
 assert(
   adminCss.includes('.admin-order-card.is-weekend-dependent')
