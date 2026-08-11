@@ -923,31 +923,39 @@ input[type='radio'] {
 }
 
 .admin-shopee-arrangement-card {
-  width: min(720px, 100%);
-  gap: 18px;
+  display: grid;
+  width: min(700px, 100%);
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border-radius: 24px;
   overflow: hidden;
+}
+
+.admin-shopee-arrangement-head {
+  padding: 26px 30px 20px;
 }
 
 .admin-shopee-arrangement-heading {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
+  min-width: 0;
 }
 
 .admin-shopee-arrangement-hero-icon {
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
-  flex: 0 0 52px;
-  border-radius: 17px;
+  width: 54px;
+  height: 54px;
+  flex: 0 0 54px;
+  border-radius: 16px;
   color: #fff;
-  background: linear-gradient(145deg, #0ea5e9, #2563eb);
-  box-shadow: 0 10px 24px color-mix(in srgb, #0284c7 28%, transparent);
+  background: linear-gradient(145deg, #0ea5e9 0%, #2563eb 100%);
+  box-shadow: 0 10px 26px color-mix(in srgb, #0284c7 24%, transparent);
 }
 
 .admin-shopee-arrangement-hero-icon svg {
-  width: 31px;
+  width: 29px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
@@ -956,42 +964,121 @@ input[type='radio'] {
 }
 
 .admin-shopee-arrangement-heading h3 {
-  margin-top: 2px;
+  margin: 3px 0 6px;
+  font-size: 22px;
+  line-height: 1.05;
 }
 
 .admin-shopee-arrangement-order {
-  display: block;
-  margin-top: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: var(--admin-muted);
   font-size: 12px;
 }
 
+.admin-shopee-arrangement-order svg {
+  width: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .admin-shopee-arrangement-order strong {
   color: var(--admin-text);
-  letter-spacing: .02em;
+  font-weight: 750;
+  letter-spacing: .025em;
+}
+
+.admin-shopee-close-btn {
+  display: grid;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  color: var(--admin-muted);
+  background: transparent;
+  cursor: pointer;
+  transition: color .16s ease, background .16s ease, transform .16s ease;
+}
+
+.admin-shopee-close-btn:hover {
+  color: var(--admin-text);
+  background: var(--admin-surface-soft);
+  transform: translateY(-1px);
+}
+
+.admin-shopee-close-btn svg {
+  width: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
 }
 
 .admin-shopee-arrangement-intro {
-  margin: -4px 0 0;
-  padding: 12px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 30px;
+  padding: 14px 16px;
   border: 1px solid color-mix(in srgb, #38bdf8 30%, var(--admin-border));
-  border-radius: 14px;
-  color: var(--admin-muted);
+  border-radius: 15px;
   background: color-mix(in srgb, #38bdf8 8%, var(--admin-surface-soft));
+}
+
+.admin-shopee-intro-icon {
+  display: grid;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 10px;
+  color: #0369a1;
+  background: color-mix(in srgb, #38bdf8 20%, var(--admin-surface));
+}
+
+.admin-shopee-intro-icon svg {
+  width: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.admin-shopee-arrangement-intro > span:last-child {
+  display: grid;
+  gap: 3px;
+}
+
+.admin-shopee-arrangement-intro strong {
+  color: var(--admin-text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.admin-shopee-arrangement-intro small {
+  color: var(--admin-muted);
   font-size: 12px;
   line-height: 1.45;
 }
 
 .admin-shopee-arrangement-options {
   display: grid;
-  max-height: min(52vh, 440px);
-  gap: 10px;
+  max-height: min(50vh, 420px);
+  padding: 24px 30px 4px;
   overflow: auto;
 }
 
 .admin-shopee-arrangement-group {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -1001,35 +1088,32 @@ input[type='radio'] {
 .admin-shopee-arrangement-group > legend {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 0 3px;
-  color: var(--admin-text);
-  font-size: 12px;
-  letter-spacing: .06em;
-  text-transform: uppercase;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 0 2px;
 }
 
-.admin-shopee-arrangement-group > legend span {
-  display: inline-grid;
-  place-items: center;
-  width: 21px;
-  height: 21px;
-  border-radius: 50%;
-  color: #fff;
-  background: #0284c7;
+.admin-shopee-arrangement-group > legend strong {
+  color: var(--admin-text);
+  font-size: 13px;
+  letter-spacing: -.01em;
+}
+
+.admin-shopee-arrangement-group > legend small {
+  color: var(--admin-muted);
   font-size: 11px;
 }
 
 .admin-shopee-arrangement-option {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) 28px;
+  grid-template-columns: 50px minmax(0, 1fr) 28px;
   align-items: center;
-  gap: 13px;
-  min-height: 80px;
-  padding: 13px 15px;
+  gap: 15px;
+  min-height: 88px;
+  padding: 15px 17px;
   border: 1px solid var(--admin-border);
-  border-radius: 16px;
-  background: var(--admin-surface-soft);
+  border-radius: 17px;
+  background: color-mix(in srgb, var(--admin-surface-soft) 76%, var(--admin-surface));
   cursor: pointer;
   transition: border-color .16s ease, background .16s ease, transform .16s ease, box-shadow .16s ease;
 }
@@ -1037,12 +1121,13 @@ input[type='radio'] {
 .admin-shopee-arrangement-option:hover {
   transform: translateY(-1px);
   border-color: color-mix(in srgb, #38bdf8 52%, var(--admin-border));
+  box-shadow: 0 8px 22px color-mix(in srgb, #0f172a 7%, transparent);
 }
 
 .admin-shopee-arrangement-option:has(input:checked) {
-  border-color: #38bdf8;
-  background: color-mix(in srgb, #38bdf8 12%, var(--admin-surface-soft));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #38bdf8 44%, transparent);
+  border-color: #0ea5e9;
+  background: color-mix(in srgb, #38bdf8 11%, var(--admin-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #0ea5e9 42%, transparent), 0 8px 24px color-mix(in srgb, #0284c7 10%, transparent);
 }
 
 .admin-shopee-arrangement-option input {
@@ -1055,9 +1140,9 @@ input[type='radio'] {
 .admin-shopee-option-icon {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 15px;
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
 }
 
 .admin-shopee-option-icon.is-pickup {
@@ -1071,23 +1156,23 @@ input[type='radio'] {
 }
 
 .admin-shopee-option-icon svg {
-  width: 29px;
+  width: 26px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.7;
+  stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .admin-shopee-option-copy {
   display: grid;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
 }
 
 .admin-shopee-option-type {
   color: #0284c7;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 800;
   letter-spacing: .07em;
   text-transform: uppercase;
@@ -1095,20 +1180,37 @@ input[type='radio'] {
 
 .admin-shopee-option-copy strong {
   color: var(--admin-text);
-  font-size: 14px;
+  font-size: 14.5px;
+  line-height: 1.25;
 }
 
 .admin-shopee-option-copy small {
   color: var(--admin-muted);
-  font-size: 11px;
+  font-size: 11.5px;
   line-height: 1.35;
+}
+
+.admin-shopee-option-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.admin-shopee-option-meta svg {
+  width: 13px;
+  flex: 0 0 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .admin-shopee-option-check {
   display: grid;
   place-items: center;
-  width: 25px;
-  height: 25px;
+  width: 26px;
+  height: 26px;
   border: 1px solid var(--admin-border);
   border-radius: 50%;
   color: transparent;
@@ -1116,7 +1218,7 @@ input[type='radio'] {
 }
 
 .admin-shopee-option-check svg {
-  width: 16px;
+  width: 15px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2.4;
@@ -1125,9 +1227,61 @@ input[type='radio'] {
 }
 
 .admin-shopee-arrangement-option:has(input:checked) .admin-shopee-option-check {
-  border-color: #0284c7;
+  border-color: #0ea5e9;
   color: #fff;
   background: #0284c7;
+  box-shadow: 0 4px 12px color-mix(in srgb, #0284c7 28%, transparent);
+}
+
+.admin-shopee-arrangement-actions {
+  margin-top: 20px;
+  padding: 18px 30px 24px;
+  border-top: 1px solid var(--admin-border);
+  background: color-mix(in srgb, var(--admin-surface-soft) 42%, var(--admin-surface));
+}
+
+.admin-shopee-arrangement-card > .admin-form-error {
+  margin: 12px 30px 0;
+}
+
+.admin-shopee-arrangement-actions > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-shopee-secure-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--admin-muted);
+  font-size: 11px;
+}
+
+.admin-shopee-secure-note svg {
+  width: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.admin-shopee-arrangement-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 174px;
+  justify-content: center;
+}
+
+.admin-shopee-arrangement-submit svg {
+  width: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .admin-shopee-demo-success {
@@ -1168,7 +1322,7 @@ input[type='radio'] {
 }
 
 .admin-shopee-demo-success strong {
-  color: var(--admin-ink);
+  color: var(--admin-text);
   font-size: 18px;
 }
 
@@ -1184,6 +1338,15 @@ input[type='radio'] {
 }
 
 @media (max-width: 620px) {
+  .admin-shopee-arrangement-card {
+    max-height: calc(100vh - 24px);
+    border-radius: 20px;
+  }
+
+  .admin-shopee-arrangement-head {
+    padding: 20px 18px 16px;
+  }
+
   .admin-shopee-arrangement-heading {
     align-items: flex-start;
   }
@@ -1196,12 +1359,43 @@ input[type='radio'] {
 
   .admin-shopee-arrangement-option {
     grid-template-columns: 42px minmax(0, 1fr) 24px;
-    padding: 11px;
+    gap: 11px;
+    min-height: 78px;
+    padding: 12px;
   }
 
   .admin-shopee-option-icon {
     width: 42px;
     height: 42px;
+  }
+
+  .admin-shopee-arrangement-intro {
+    margin: 0 18px;
+  }
+
+  .admin-shopee-arrangement-options {
+    padding: 20px 18px 2px;
+  }
+
+  .admin-shopee-arrangement-actions {
+    align-items: stretch;
+    padding: 16px 18px 18px;
+  }
+
+  .admin-shopee-arrangement-card > .admin-form-error {
+    margin-inline: 18px;
+  }
+
+  .admin-shopee-secure-note {
+    display: none;
+  }
+
+  .admin-shopee-arrangement-actions > div {
+    width: 100%;
+  }
+
+  .admin-shopee-arrangement-actions > div > button {
+    flex: 1;
   }
 }
 

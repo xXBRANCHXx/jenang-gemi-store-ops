@@ -223,27 +223,49 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
         <div class="admin-modal-shell admin-shopee-arrangement-modal" data-shopee-arrangement-modal hidden>
             <div class="admin-modal-backdrop" data-close-shopee-arrangement></div>
             <form class="admin-modal-card admin-shopee-arrangement-card" data-shopee-arrangement-form role="dialog" aria-modal="true" aria-labelledby="shopee-arrangement-title">
-                <div class="admin-modal-head">
+                <header class="admin-modal-head admin-shopee-arrangement-head">
                     <div class="admin-shopee-arrangement-heading">
                         <span class="admin-shopee-arrangement-hero-icon" aria-hidden="true">
-                            <svg viewBox="0 0 32 32"><path d="M5 9.5 16 4l11 5.5v13L16 28 5 22.5z"/><path d="m5 9.5 11 5.7 11-5.7M16 15.2V28"/><path d="m11.3 12.7 11-5.6"/></svg>
+                            <svg viewBox="0 0 24 24"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l3-1.72"/><path d="M3.29 7 12 12l8.71-5"/><path d="M12 22V12"/><path d="m17 19 2 2 4-4"/></svg>
                         </span>
                         <div>
                             <span class="admin-panel-kicker">Shopee shipping</span>
-                            <h3 id="shopee-arrangement-title">Choose the handover</h3>
-                            <span class="admin-shopee-arrangement-order">Order <strong data-shopee-arrangement-order></strong></span>
+                            <h3 id="shopee-arrangement-title">Arrange shipment</h3>
+                            <span class="admin-shopee-arrangement-order">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></svg>
+                                Order <strong data-shopee-arrangement-order></strong>
+                            </span>
                         </div>
                     </div>
-                    <button type="button" class="admin-ghost-btn" data-close-shopee-arrangement>Close</button>
+                    <button type="button" class="admin-shopee-close-btn" data-close-shopee-arrangement aria-label="Close shipping options" title="Close">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12"/></svg>
+                    </button>
+                </header>
+                <div class="admin-shopee-arrangement-intro">
+                    <span class="admin-shopee-intro-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+                    </span>
+                    <span>
+                        <strong>Choose how to hand over this parcel</strong>
+                        <small>Options come directly from Shopee. After confirmation, we’ll prepare the label and return the order to the normal queue.</small>
+                    </span>
                 </div>
-                <p class="admin-shopee-arrangement-intro">These options are live from Shopee. Pick one and we’ll arrange the shipment, prepare the label, and return the order to the normal queue.</p>
                 <div class="admin-shopee-arrangement-options" data-shopee-arrangement-options>
                     <p class="admin-preview-empty">Loading Shopee options…</p>
                 </div>
                 <p class="admin-form-error" data-shopee-arrangement-error hidden></p>
-                <div class="admin-modal-actions">
-                    <button type="button" class="admin-ghost-btn" data-close-shopee-arrangement>Cancel</button>
-                    <button type="submit" class="admin-primary-btn" data-shopee-arrangement-submit disabled>Arrange shipment</button>
+                <div class="admin-modal-actions admin-shopee-arrangement-actions">
+                    <span class="admin-shopee-secure-note">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+                        No changes until you confirm
+                    </span>
+                    <div>
+                        <button type="button" class="admin-ghost-btn" data-close-shopee-arrangement>Cancel</button>
+                        <button type="submit" class="admin-primary-btn admin-shopee-arrangement-submit" data-shopee-arrangement-submit disabled>
+                            <span>Arrange shipment</span>
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>

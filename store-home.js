@@ -279,6 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const shopeeArrangementOptions = document.querySelector('[data-shopee-arrangement-options]');
   const shopeeArrangementError = document.querySelector('[data-shopee-arrangement-error]');
   const shopeeArrangementSubmit = document.querySelector('[data-shopee-arrangement-submit]');
+  const shopeeArrangementSubmitLabel = shopeeArrangementSubmit?.querySelector('span');
   const shopeeArrangementDemoMode = new URLSearchParams(window.location.search).get('shipping-ux-demo') === '1';
   const reprintModal = document.querySelector('[data-reprint-modal]');
   const reprintForm = document.querySelector('[data-reprint-form]');
@@ -2673,9 +2674,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!shopeeArrangementOptions) return;
     const pickupOptions = Array.isArray(options?.pickup?.options) ? options.pickup.options : [];
     const dropoffOffered = Boolean(options?.dropoff?.offered);
-    const pickupIcon = '<svg viewBox="0 0 28 28" aria-hidden="true"><path d="M4 8.5h13v11H4zM17 12h4.2l3 3.3v4.2H17z"/><circle cx="8" cy="21" r="2.2"/><circle cx="20.5" cy="21" r="2.2"/><path d="M8 5v7m-3-3 3 3 3-3"/></svg>';
-    const dropoffIcon = '<svg viewBox="0 0 28 28" aria-hidden="true"><path d="M6 10.5h16v13H6zM4.5 10.5 7 5h14l2.5 5.5"/><path d="M10 23.5v-7h8v7M4.5 10.5c0 2 3.5 2.4 4.7.5 1.2 1.9 4.4 1.9 5.6 0 1.2 1.9 4.4 1.9 5.6 0 1.2 1.9 3.1 1.5 3.1-.5"/></svg>';
-    const checkIcon = '<span class="admin-shopee-option-check" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="m5 10 3.2 3.2L15.5 6"/></svg></span>';
+    const pickupIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l4 4v4h-3"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg>';
+    const dropoffIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 7h20l-2.4-4H4.4z"/><path d="M5 13v8h14v-8M9 21v-5h6v5"/><path d="M2 7v3a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 2-2.83V7"/></svg>';
+    const checkIcon = '<span class="admin-shopee-option-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg></span>';
+    const clockIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+    const pinIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>';
     const choices = [];
     pickupOptions.forEach((option, index) => {
       const slotLabel = String(option?.label || '').trim();
@@ -2695,7 +2698,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <span class="admin-shopee-option-copy">
             <span class="admin-shopee-option-type">Courier pickup</span>
             <strong>${escapeHtml(pickupDate)}</strong>
-            <small>${escapeHtml(pickupTime)}</small>
+            <small class="admin-shopee-option-meta">${clockIcon}${escapeHtml(pickupTime)}</small>
           </span>
           ${checkIcon}
         </label>`);
@@ -2707,8 +2710,8 @@ document.addEventListener('DOMContentLoaded', () => {
           <span class="admin-shopee-option-icon is-dropoff">${dropoffIcon}</span>
           <span class="admin-shopee-option-copy">
             <span class="admin-shopee-option-type">Self drop-off</span>
-            <strong>Bring it to a Shopee point</strong>
-            <small>No courier wait—hand the parcel over yourself.</small>
+            <strong>Drop off at a Shopee point</strong>
+            <small class="admin-shopee-option-meta">${pinIcon}No pickup window required</small>
           </span>
           ${checkIcon}
         </label>`);
@@ -2720,7 +2723,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     shopeeArrangementOptions.innerHTML = `
       <fieldset class="admin-shopee-arrangement-group">
-        <legend><span>1</span> Select one shipping method</legend>
+        <legend><strong>Shipping method</strong><small>Choose one option</small></legend>
         ${choices.join('')}
       </fieldset>`;
     if (shopeeArrangementSubmit instanceof HTMLButtonElement) shopeeArrangementSubmit.disabled = true;
@@ -3084,13 +3087,13 @@ document.addEventListener('DOMContentLoaded', () => {
             <em>Demo only—no order or shipment was changed.</em>
           </span>
         </div>`;
-      shopeeArrangementSubmit.textContent = 'Demo complete';
+      if (shopeeArrangementSubmitLabel) shopeeArrangementSubmitLabel.textContent = 'Demo complete';
       shopeeArrangementSubmit.disabled = true;
       return;
     }
-    const originalLabel = shopeeArrangementSubmit.textContent || 'Arrange shipment';
+    const originalLabel = shopeeArrangementSubmitLabel?.textContent || 'Arrange shipment';
     shopeeArrangementSubmit.disabled = true;
-    shopeeArrangementSubmit.textContent = 'Arranging…';
+    if (shopeeArrangementSubmitLabel) shopeeArrangementSubmitLabel.textContent = 'Arranging…';
     if (shopeeArrangementError) shopeeArrangementError.hidden = true;
     try {
       await arrangeShopeeShipment({
@@ -3101,7 +3104,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (_error) {
       // The modal keeps the actionable Shopee error next to the selected option.
     } finally {
-      shopeeArrangementSubmit.textContent = originalLabel;
+      if (shopeeArrangementSubmitLabel) shopeeArrangementSubmitLabel.textContent = originalLabel;
       if (shopeeArrangementModal && !shopeeArrangementModal.hidden) shopeeArrangementSubmit.disabled = false;
     }
   });

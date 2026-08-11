@@ -254,5 +254,16 @@ assert(
     && adminCss.includes('.admin-shopee-demo-success'),
   'The shipping UX demo must use sample choices, clearly identify itself, and stop before any order API action.'
 );
+assert(
+  dashboardTemplate.includes('admin-shopee-close-btn')
+    && dashboardTemplate.includes('admin-shopee-intro-icon')
+    && dashboardTemplate.includes('admin-shopee-secure-note')
+    && dashboardTemplate.includes('admin-shopee-arrangement-submit')
+    && storeHome.includes('admin-shopee-option-meta')
+    && storeHome.includes('No pickup window required')
+    && adminCss.includes('.admin-shopee-arrangement-card {\n  display: grid;')
+    && adminCss.includes('.admin-shopee-arrangement-actions'),
+  'The arrangement modal must use polished icon-led controls, intentional spacing, and a stable grid layout.'
+);
 
 console.log('store-order-handover-test: ok');
