@@ -50,6 +50,7 @@ function jg_store_ops_fulfillment_ensure_schema(PDO $pdo): void
             scan_required INT UNSIGNED NOT NULL DEFAULT 0,
             scan_completed INT UNSIGNED NOT NULL DEFAULT 0,
             items_json LONGTEXT NULL DEFAULT NULL,
+            customer_name VARCHAR(160) NOT NULL DEFAULT "",
             created_at DATETIME NOT NULL,
             updated_at DATETIME NOT NULL,
             UNIQUE KEY uniq_store_ops_order (source_platform, source_account, order_id),
@@ -96,7 +97,8 @@ function jg_store_ops_fulfillment_ensure_schema(PDO $pdo): void
     jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment_v2', 'scan_required', 'INT UNSIGNED NOT NULL DEFAULT 0 AFTER fulfilled_at');
     jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment_v2', 'scan_completed', 'INT UNSIGNED NOT NULL DEFAULT 0 AFTER scan_required');
     jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment_v2', 'items_json', 'LONGTEXT NULL DEFAULT NULL AFTER scan_completed');
-    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment_v2', 'created_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER items_json');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment_v2', 'customer_name', 'VARCHAR(160) NOT NULL DEFAULT "" AFTER items_json');
+    jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment_v2', 'created_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER customer_name');
     jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_fulfillment_v2', 'updated_at', 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER created_at');
 
     jg_store_ops_fulfillment_ensure_column($pdo, 'store_ops_order_events_v2', 'source_account', 'VARCHAR(96) NOT NULL DEFAULT "" AFTER source_platform');
@@ -748,17 +750,33 @@ function jg_store_ops_fulfillment_mark_label_printed(PDO $pdo, array $key, strin
     }
 }
 
-function jg_store_ops_fulfillment_mark_fulfilled(PDO $pdo, array $key, string $employeeId, string $employeeName, array $items = []): array
+function jg_store_ops_fulfillment_mark_fulfilled(PDO $pdo, array $key, string $employeeId, string $employeeName, array $items = [], string $customerName = ''): array
 {
     $pdo->beginTransaction();
     try {
         $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, true);
         $snapshot = jg_store_ops_fulfillment_items_snapshot($items);
         $itemsJson = $snapshot !== [] ? json_encode($snapshot, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : null;
+        $customerName = mb_substr(trim((string) preg_replace('/\s+/', ' ', $customerName)), 0, 160);
         if (is_array($row) && strtoupper((string) ($row['status'] ?? '')) === 'FULFILLED') {
-            if (is_string($itemsJson) && trim((string) ($row['items_json'] ?? '')) === '') {
-                $stmt = $pdo->prepare('UPDATE store_ops_order_fulfillment_v2 SET items_json = :items_json, updated_at = :updated_at WHERE id = :id');
-                $stmt->execute([':items_json' => $itemsJson, ':updated_at' => jg_store_ops_fulfillment_now(), ':id' => (int) $row['id']]);
+            $needsItems = is_string($itemsJson) && trim((string) ($row['items_json'] ?? '')) === '';
+            $needsCustomer = $customerName !== '' && trim((string) ($row['customer_name'] ?? '')) === '';
+            if ($needsItems || $needsCustomer) {
+                $stmt = $pdo->prepare(
+                    'UPDATE store_ops_order_fulfillment_v2
+                     SET items_json = CASE WHEN :items_json_present = 1 THEN :items_json ELSE items_json END,
+                         customer_name = CASE WHEN :customer_name_present = 1 THEN :customer_name ELSE customer_name END,
+                         updated_at = :updated_at
+                     WHERE id = :id'
+                );
+                $stmt->execute([
+                    ':items_json_present' => $needsItems ? 1 : 0,
+                    ':items_json' => $itemsJson,
+                    ':customer_name_present' => $needsCustomer ? 1 : 0,
+                    ':customer_name' => $customerName,
+                    ':updated_at' => jg_store_ops_fulfillment_now(),
+                    ':id' => (int) $row['id'],
+                ]);
                 $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
             }
             $pdo->commit();
@@ -771,6 +789,7 @@ function jg_store_ops_fulfillment_mark_fulfilled(PDO $pdo, array $key, string $e
              SET status = "FULFILLED",
                  fulfilled_at = COALESCE(fulfilled_at, :fulfilled_at),
                  items_json = CASE WHEN :items_json_present = 1 THEN :items_json ELSE items_json END,
+                 customer_name = CASE WHEN :customer_name_present = 1 THEN :customer_name ELSE customer_name END,
                  last_activity_at = :last_activity_at,
                  updated_at = :updated_at
              WHERE id = :id'
@@ -779,6 +798,8 @@ function jg_store_ops_fulfillment_mark_fulfilled(PDO $pdo, array $key, string $e
             ':fulfilled_at' => $now,
             ':items_json_present' => is_string($itemsJson) ? 1 : 0,
             ':items_json' => $itemsJson,
+            ':customer_name_present' => $customerName !== '' ? 1 : 0,
+            ':customer_name' => $customerName,
             ':last_activity_at' => $now,
             ':updated_at' => $now,
             ':id' => (int) $row['id'],

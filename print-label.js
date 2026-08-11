@@ -190,7 +190,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const timestamp = new Date().toISOString();
     const payload = isReprint
       ? orderActionPayload('reprint_label', { printed_at: timestamp })
-      : orderActionPayload('fulfill_order', { fulfilled_at: timestamp, items: completionItems() });
+      : orderActionPayload('fulfill_order', {
+        fulfilled_at: timestamp,
+        items: completionItems(),
+        customer_name: String(order?.customerName || order?.customer_name || order?.username || order?.customer?.username || order?.customer?.name || '').trim()
+      });
     if (!persistPendingCompletion(payload)) {
       throw new Error('Store Ops could not save the completion for retry.');
     }

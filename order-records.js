@@ -19,6 +19,9 @@
     if (required <= 0) return 'No scan required';
     return `${completed}/${required} units`;
   };
+  const customerLabel = (record) => {
+    return String(record?.customer_name || '').trim();
+  };
   const elapsedDurationLabel = (value) => {
     const seconds = Math.max(0, Math.round(Number(value) || 0));
     if (seconds < 60) return `${seconds}s`;
@@ -29,7 +32,7 @@
     const days = Math.floor(hours / 24);
     return `${days}d${hours % 24 ? ` ${hours % 24}h` : ''}`;
   };
-  global.JGOrderRecordsPresentation = Object.freeze({ eventLabel, scanLabel, elapsedDurationLabel });
+  global.JGOrderRecordsPresentation = Object.freeze({ eventLabel, scanLabel, customerLabel, elapsedDurationLabel });
 })(typeof window !== 'undefined' ? window : globalThis);
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -172,7 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!refs.body) return;
     if (refs.status) refs.status.textContent = `${state.records.length} processed order${state.records.length === 1 ? '' : 's'} shown`;
     if (!state.records.length) {
-      refs.body.innerHTML = '<tr><td colspan="6" class="admin-empty">No processed orders match these filters.</td></tr>';
+      refs.body.innerHTML = '<tr><td colspan="7" class="admin-empty">No processed orders match these filters.</td></tr>';
       return;
     }
     refs.body.innerHTML = state.records.map((record) => `
@@ -183,6 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
         aria-label="View processed order ${escapeHtml(record.order_id)}">
         <td><strong>${escapeHtml(record.order_id)}</strong><small><span class="admin-status-badge">Processed</span></small></td>
         <td><strong>${escapeHtml(record.source_label || record.source_platform)}</strong><small>${escapeHtml(record.source_account === 'default' ? '' : record.source_account)}</small></td>
+        <td><strong class="admin-order-record-customer">${escapeHtml(presentation.customerLabel(record) || '—')}</strong></td>
         <td><span class="admin-order-record-operator">${escapeHtml(record.processed_by_name || record.processed_by || '-')}</span></td>
         <td><span class="admin-order-record-scan${record.scan_error_count ? ' is-error' : ''}">${escapeHtml(presentation.scanLabel(record))}</span>${record.scan_error_count ? `<small class="is-error">${escapeHtml(record.scan_error_count)} scan issue${record.scan_error_count === 1 ? '' : 's'}</small>` : ''}</td>
         <td>${escapeHtml(formatTime(record.fulfilled_at))}</td>
@@ -308,6 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (refs.drawerTitle) refs.drawerTitle.textContent = orderId;
     if (refs.drawerMeta) refs.drawerMeta.innerHTML = `
       <span>${escapeHtml(record.source_label)}</span>
+      ${record.customer_name ? `<span>${escapeHtml(record.customer_name)}</span>` : ''}
       <span>${escapeHtml(record.processed_by_name || record.processed_by || 'Operator')}</span>
       <span>${escapeHtml(record.duration_label && record.duration_label !== '-' ? `${record.duration_label} processing` : 'Timing unavailable')}</span>
       <time>${escapeHtml(formatTime(record.fulfilled_at))}</time>

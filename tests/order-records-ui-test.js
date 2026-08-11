@@ -19,6 +19,8 @@ const resolver = fs.readFileSync(path.join(root, 'order-resolver.php'), 'utf8');
 
 assert.equal(global.JGOrderRecordsPresentation.scanLabel({ scan_completed: 5, scan_required: 5 }), '5/5 units');
 assert.equal(global.JGOrderRecordsPresentation.scanLabel({ scan_completed: 0, scan_required: 0 }), 'No scan required');
+assert.equal(global.JGOrderRecordsPresentation.customerLabel({ customer_name: 'ayu_store', source_account: 'jenang-gemi-shopee' }), 'ayu_store');
+assert.equal(global.JGOrderRecordsPresentation.customerLabel({ customer_name: '', source_account: 'jenang-gemi-shopee' }), '');
 assert.equal(global.JGOrderRecordsPresentation.eventLabel('fulfill'), 'Order processed');
 assert.equal(global.JGOrderRecordsPresentation.elapsedDurationLabel(3300 * 60 + 30), '2d 7h');
 assert.equal(global.JGOrderRecordsPresentation.elapsedDurationLabel(2 * 60 * 60 + 17 * 60), '2h 17m');
@@ -28,6 +30,7 @@ assert.match(dashboard, /jg_store_ops_shell_nav_items\('\.\.\/'\)/, 'The live Or
 assert.match(page, /data-order-records-endpoint.*?api\/order-records/s, 'Order Records must use its read-only API.');
 assert.match(page, /data-order-records-date-from[\s\S]*?data-order-records-date-to[\s\S]*?data-order-records-source[\s\S]*?data-order-records-operator[\s\S]*?data-order-records-query/, 'Order Records must provide operational filters.');
 assert.match(page, /Completed order history[\s\S]*?data-order-records-body/, 'Order Records must render a completed-order table.');
+assert.match(page, /<th>Source<\/th>[\s\S]*?<th>Customer<\/th>[\s\S]*?<th>Processed by<\/th>/, 'Customer identifiers must have their own column without replacing source or operator data.');
 assert.match(page, /Completed order history[\s\S]*?admin-order-records-filter-panel[\s\S]*?data-order-records-body/, 'Filters and results must share one cohesive records workspace.');
 assert.match(page, /Processing timeline[\s\S]*?data-order-records-events/, 'Processed orders must expose a read-only timeline.');
 assert.match(page, /Products processed[\s\S]*?data-order-records-items-body/, 'Order details must always include their processed products section.');
@@ -44,11 +47,13 @@ assert.match(resolver, /function jg_store_ops_order_resolver_shipment_lifecycle[
 assert.match(resolver, /function jg_store_ops_order_resolver_marketplace_request[\s\S]*setup_token/, 'Marketplace lifecycle reads must use the configured service credential.');
 assert.match(bootstrap, /f\.status = \"FULFILLED\"[\s\S]*?event_type = \"fulfill\"/, 'The records query must require completed state and a real fulfill event.');
 assert.match(bootstrap, /processing_started_at[\s\S]*TIMESTAMPDIFF/, 'Average time must use a recovered processing start timestamp.');
+assert.match(bootstrap, /f\.customer_name[\s\S]*jg_store_ops_order_records_historical_customer_names/, 'Processed records must use saved customer identifiers and recover historical direct-order names.');
+assert.match(orderRecordsScript(), /record\.source_account === 'default'[\s\S]*admin-order-record-customer[\s\S]*presentation\.customerLabel\(record\)/, 'The Source column must retain the account while the Customer column shows the customer identifier.');
 assert.doesNotMatch(bootstrap, /event_type = \"remove_from_listed\"/, 'Removed queue rows must not be included as processed records.');
 assert.doesNotMatch(page + orderRecordsScript(), /gradient/i, 'The Order Records experience must not introduce gradients.');
 assert.match(css, /\.admin-order-records-events::before,[\s\S]*?\.admin-order-records-events::after\s*\{[\s\S]*?display:\s*none;[\s\S]*?background:\s*none;/, 'Order Records must disable inherited timeline fade gradients.');
 assert.match(fulfillment, /items_json LONGTEXT[\s\S]*?jg_store_ops_fulfillment_items_snapshot[\s\S]*?items_json = CASE/, 'Future processed orders must persist their complete product snapshot.');
-assert.match(printLabel, /const completionItems[\s\S]*?product_name:[\s\S]*?quantity:[\s\S]*?orderActionPayload\('fulfill_order',[\s\S]*?fulfilled_at:[\s\S]*?items: completionItems\(\)/, 'Print completion must send every ordered product, including Skip Scan items.');
+assert.match(printLabel, /const completionItems[\s\S]*?product_name:[\s\S]*?quantity:[\s\S]*?orderActionPayload\('fulfill_order',[\s\S]*?fulfilled_at:[\s\S]*?items: completionItems\(\)[\s\S]*?customer_name:/, 'Print completion must send every ordered product and the customer identifier.');
 
 console.log('order-records-ui-test: ok');
 

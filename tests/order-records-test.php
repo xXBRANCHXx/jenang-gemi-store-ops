@@ -24,6 +24,13 @@ order_records_expect('2026-06-29', $defaults['date_from'], 'Order Records must d
 order_records_expect('2026-07-28', $defaults['date_to'], 'The default range must end today.');
 order_records_expect('Whatsapp', jg_store_ops_order_records_source_label('whatsapp', 'jenang-gemi'), 'WhatsApp must override generic account labels.');
 order_records_expect('JG Shopee', jg_store_ops_order_records_source_label('shopee', 'jenang-gemi-shopee'), 'Known marketplace accounts must keep their friendly labels.');
+order_records_expect('ayu_store', jg_store_ops_order_records_customer_name_from_payload([
+    'username' => 'ayu_store',
+    'customerName' => 'Ayu Store',
+]), 'Marketplace usernames must take priority over customer names.');
+order_records_expect('Ayu WhatsApp', jg_store_ops_order_records_customer_name_from_payload([
+    'customerName' => '  Ayu   WhatsApp  ',
+]), 'WhatsApp customer names must be recovered from saved order payloads.');
 order_records_expect('1h 2m', jg_store_ops_order_records_duration_label(3725), 'Fulfillment duration must use a compact readable label.');
 order_records_expect(95, jg_store_ops_order_records_elapsed_seconds('2026-07-28 01:00:00', '2026-07-28 01:01:35'), 'Processing duration must be calculated from recovered start and completion timestamps.');
 order_records_expect(null, jg_store_ops_order_records_elapsed_seconds('', '2026-07-28 01:01:35'), 'Missing legacy start times must remain excluded from the average.');

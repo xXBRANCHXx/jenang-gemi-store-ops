@@ -102,6 +102,126 @@ function jg_store_ops_order_records_source_label(string $platform, string $accou
     };
 }
 
+function jg_store_ops_order_records_customer_name(mixed $value): string
+{
+    if (!is_scalar($value)) return '';
+    return mb_substr(trim((string) preg_replace('/\s+/', ' ', (string) $value)), 0, 160);
+}
+
+function jg_store_ops_order_records_customer_name_from_payload(array $payload): string
+{
+    $customer = is_array($payload['customer'] ?? null) ? $payload['customer'] : [];
+    $buyer = is_array($payload['buyer'] ?? null) ? $payload['buyer'] : [];
+    $candidates = [
+        $payload['username'] ?? null,
+        $payload['buyer_username'] ?? null,
+        $payload['buyerUserName'] ?? null,
+        $customer['username'] ?? null,
+        $customer['user_name'] ?? null,
+        $buyer['username'] ?? null,
+        $payload['customerName'] ?? null,
+        $payload['customer_name'] ?? null,
+        $payload['buyerName'] ?? null,
+        $payload['buyer_name'] ?? null,
+        $customer['name'] ?? null,
+        $customer['full_name'] ?? null,
+        $customer['fullName'] ?? null,
+        $buyer['name'] ?? null,
+    ];
+    foreach ($candidates as $candidate) {
+        $name = jg_store_ops_order_records_customer_name($candidate);
+        if ($name !== '') return $name;
+    }
+    return '';
+}
+
+function jg_store_ops_order_records_customer_key(string $platform, string $orderId): string
+{
+    return strtolower(trim($platform)) . "\0" . strtoupper(trim($orderId));
+}
+
+/**
+ * Recover customer names for historical direct orders saved before fulfillment
+ * began snapshotting the customer identifier.
+ *
+ * @param array<int,array<string,mixed>> $records
+ * @return array<string,string>
+ */
+function jg_store_ops_order_records_historical_customer_names(PDO $pdo, array $records): array
+{
+    $orderIds = [];
+    $whatsappIds = [];
+    foreach ($records as $record) {
+        if (trim((string) ($record['customer_name'] ?? '')) !== '') continue;
+        $platform = strtolower(trim((string) ($record['source_platform'] ?? '')));
+        $orderId = trim((string) ($record['order_id'] ?? ''));
+        if ($orderId === '') continue;
+        if (in_array($platform, ['whatsapp', 'zero_website', 'jenang_gemi_website'], true)) {
+            $orderIds[strtoupper($orderId)] = $orderId;
+        }
+        if ($platform === 'whatsapp') $whatsappIds[strtoupper($orderId)] = $orderId;
+    }
+    if ($orderIds === []) return [];
+
+    $names = [];
+    $placeholders = [];
+    $params = [];
+    foreach (array_values($orderIds) as $index => $orderId) {
+        $placeholder = ':customer_order_' . $index;
+        $placeholders[] = $placeholder;
+        $params[$placeholder] = $orderId;
+    }
+    try {
+        $stmt = $pdo->prepare(
+            'SELECT source_platform, order_id, payload_json
+             FROM store_ops_website_orders
+             WHERE order_id IN (' . implode(', ', $placeholders) . ')'
+        );
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll() as $row) {
+            if (!is_array($row)) continue;
+            $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
+            $name = is_array($payload) ? jg_store_ops_order_records_customer_name_from_payload($payload) : '';
+            if ($name === '') continue;
+            $names[jg_store_ops_order_records_customer_key(
+                (string) ($row['source_platform'] ?? ''),
+                (string) ($row['order_id'] ?? '')
+            )] = $name;
+        }
+    } catch (Throwable) {
+        // Older installations may not have the website-order history table.
+    }
+
+    if ($whatsappIds !== []) {
+        $walkinPlaceholders = [];
+        $walkinParams = [];
+        foreach (array_values($whatsappIds) as $index => $orderId) {
+            $placeholder = ':whatsapp_invoice_' . $index;
+            $walkinPlaceholders[] = $placeholder;
+            $walkinParams[$placeholder] = $orderId;
+        }
+        try {
+            $stmt = $pdo->prepare(
+                'SELECT invoice_number, customer_name
+                 FROM store_ops_walkin_invoices
+                 WHERE invoice_type = "whatsapp"
+                   AND invoice_number IN (' . implode(', ', $walkinPlaceholders) . ')'
+            );
+            $stmt->execute($walkinParams);
+            foreach ($stmt->fetchAll() as $row) {
+                if (!is_array($row)) continue;
+                $key = jg_store_ops_order_records_customer_key('whatsapp', (string) ($row['invoice_number'] ?? ''));
+                if (isset($names[$key])) continue;
+                $name = jg_store_ops_order_records_customer_name($row['customer_name'] ?? '');
+                if ($name !== '') $names[$key] = $name;
+            }
+        } catch (Throwable) {
+            // Direct WhatsApp invoices are optional on installations using only Executive orders.
+        }
+    }
+    return $names;
+}
+
 function jg_store_ops_order_records_processed_join_sql(): string
 {
     return 'INNER JOIN store_ops_order_events_v2 done
@@ -191,6 +311,7 @@ function jg_store_ops_order_records(PDO $pdo, array $filters): array
             f.fulfilled_at,
             f.scan_required,
             f.scan_completed,
+            f.customer_name,
             ' . $durationStartSql . ' AS processing_started_at,
             COALESCE(NULLIF(done.employee_id, ""), f.claimed_by, "") AS processed_by,
             COALESCE(NULLIF(done.employee_name, ""), employee.display_name, f.claimed_by, "") AS processed_by_name,
@@ -223,6 +344,7 @@ function jg_store_ops_order_records(PDO $pdo, array $filters): array
             'order_id' => (string) ($row['order_id'] ?? ''),
             'processed_by' => (string) ($row['processed_by'] ?? ''),
             'processed_by_name' => (string) ($row['processed_by_name'] ?? ''),
+            'customer_name' => jg_store_ops_order_records_customer_name($row['customer_name'] ?? ''),
             'claimed_at' => $row['claimed_at'] ?? null,
             'processing_started_at' => $row['processing_started_at'] ?? null,
             'scan_completed_at' => $row['scan_completed_at'] ?? null,
@@ -235,6 +357,13 @@ function jg_store_ops_order_records(PDO $pdo, array $filters): array
             'duration_label' => jg_store_ops_order_records_duration_label($duration),
         ];
     }
+    $historicalCustomerNames = jg_store_ops_order_records_historical_customer_names($pdo, $records);
+    foreach ($records as &$record) {
+        if ($record['customer_name'] !== '') continue;
+        $key = jg_store_ops_order_records_customer_key($record['source_platform'], $record['order_id']);
+        $record['customer_name'] = $historicalCustomerNames[$key] ?? '';
+    }
+    unset($record);
     return $records;
 }
 

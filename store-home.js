@@ -1374,7 +1374,7 @@ document.addEventListener('DOMContentLoaded', () => {
       sourceAccountKey: String(order.sourceAccountKey || order.account_key || ''),
       partnerCode: String(order.partnerCode || order.partner_code || ''),
       partnerName: String(order.partnerName || order.partner_name || ''),
-      customerName: String(order.customerName || order.customer_name || order.customer?.name || order.buyerName || order.buyer_name || ''),
+      customerName: String(order.username || order.buyer_username || order.customer?.username || order.customerName || order.customer_name || order.customer?.name || order.buyerName || order.buyer_name || ''),
       status: String(order.status || 'IS_LISTED'),
       marketplaceStatus: String(order.marketplaceStatus || order.marketplace_status || 'READY_TO_SHIP'),
       labelBacked: Boolean(order.labelBacked || order.label_backed),

@@ -119,6 +119,7 @@ $orderRecordsJsVersion = (string) @filemtime(dirname(__DIR__) . '/order-records.
                                 <tr>
                                     <th>Order ID</th>
                                     <th>Source</th>
+                                    <th>Customer</th>
                                     <th>Processed by</th>
                                     <th>Scan</th>
                                     <th>Completed</th>
@@ -126,7 +127,7 @@ $orderRecordsJsVersion = (string) @filemtime(dirname(__DIR__) . '/order-records.
                                 </tr>
                             </thead>
                             <tbody data-order-records-body>
-                                <tr><td colspan="6" class="admin-empty">Loading processed orders.</td></tr>
+                                <tr><td colspan="7" class="admin-empty">Loading processed orders.</td></tr>
                             </tbody>
                         </table>
                     </div>

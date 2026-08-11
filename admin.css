@@ -9725,6 +9725,7 @@ button.admin-store-sidebar-profile:hover {
 
 .admin-order-record-row td:first-child strong,
 .admin-order-record-row td:nth-child(2) strong,
+.admin-order-record-row td:nth-child(3) strong,
 .admin-order-record-row td small {
   display: block;
 }
@@ -10113,6 +10114,12 @@ button.admin-store-sidebar-profile:hover {
 .admin-order-record-row td:first-child strong {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 13px;
+}
+
+.admin-order-record-customer {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .admin-order-record-row .admin-status-badge,

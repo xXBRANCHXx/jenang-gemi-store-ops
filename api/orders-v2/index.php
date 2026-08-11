@@ -1473,6 +1473,7 @@ if ($method === 'POST') {
 
         if ($action === 'fulfill_order') {
             $items = is_array($payload['items'] ?? null) ? $payload['items'] : [];
+            $customerName = is_scalar($payload['customer_name'] ?? null) ? (string) $payload['customer_name'] : '';
             $existing = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
             $alreadyFulfilled = is_array($existing)
                 && strtoupper((string) ($existing['status'] ?? '')) === 'FULFILLED';
@@ -1486,7 +1487,7 @@ if ($method === 'POST') {
             } else {
                 jg_store_ops_order_stock_deduct($pdo, $key, $items);
             }
-            $row = jg_store_ops_fulfillment_mark_fulfilled($pdo, $key, $employeeId, $employeeName, $items);
+            $row = jg_store_ops_fulfillment_mark_fulfilled($pdo, $key, $employeeId, $employeeName, $items, $customerName);
             if ($key['source_platform'] === 'partner') {
                 jg_store_ops_orders_partner_update_status($key['order_id'], 'FULFILLED');
             }
