@@ -1130,6 +1130,59 @@ input[type='radio'] {
   background: #0284c7;
 }
 
+.admin-shopee-demo-success {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 132px;
+  padding: 24px;
+  border: 1px solid rgba(22, 163, 74, 0.32);
+  border-radius: 20px;
+  background: rgba(22, 163, 74, 0.1);
+}
+
+.admin-shopee-demo-success-icon {
+  display: grid;
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #16a34a;
+  box-shadow: 0 8px 22px rgba(22, 163, 74, 0.24);
+}
+
+.admin-shopee-demo-success-icon svg {
+  width: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.admin-shopee-demo-success > span:last-child {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-shopee-demo-success strong {
+  color: var(--admin-ink);
+  font-size: 18px;
+}
+
+.admin-shopee-demo-success small,
+.admin-shopee-demo-success em {
+  color: var(--admin-muted);
+  font-size: 13px;
+  font-style: normal;
+}
+
+.admin-shopee-demo-success em {
+  margin-top: 6px;
+}
+
 @media (max-width: 620px) {
   .admin-shopee-arrangement-heading {
     align-items: flex-start;

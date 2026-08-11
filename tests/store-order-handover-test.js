@@ -247,5 +247,12 @@ assert(
     && storeHome.includes("manualArrangementVisual ? 'is-manual-arrangement' : ''"),
   'Only manual Shopee work must pulse cyan; Weekend Dependent status alone remains an amber badge and border.'
 );
+assert(
+  storeHome.includes("get('shipping-ux-demo') === '1'")
+    && storeHome.includes("shopeeArrangementOrder.textContent = '260812SAMPLE'")
+    && storeHome.includes('Demo only—no order or shipment was changed.')
+    && adminCss.includes('.admin-shopee-demo-success'),
+  'The shipping UX demo must use sample choices, clearly identify itself, and stop before any order API action.'
+);
 
 console.log('store-order-handover-test: ok');

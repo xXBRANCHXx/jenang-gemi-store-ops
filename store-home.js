@@ -279,6 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const shopeeArrangementOptions = document.querySelector('[data-shopee-arrangement-options]');
   const shopeeArrangementError = document.querySelector('[data-shopee-arrangement-error]');
   const shopeeArrangementSubmit = document.querySelector('[data-shopee-arrangement-submit]');
+  const shopeeArrangementDemoMode = new URLSearchParams(window.location.search).get('shipping-ux-demo') === '1';
   const reprintModal = document.querySelector('[data-reprint-modal]');
   const reprintForm = document.querySelector('[data-reprint-form]');
   const reprintError = document.querySelector('[data-reprint-error]');
@@ -3068,6 +3069,25 @@ document.addEventListener('DOMContentLoaded', () => {
     event.preventDefault();
     const selected = shopeeArrangementOptions?.querySelector('input[name="shopee_arrangement"]:checked');
     if (!(selected instanceof HTMLInputElement) || !(shopeeArrangementSubmit instanceof HTMLButtonElement)) return;
+    if (shopeeArrangementDemoMode) {
+      const selectedCard = selected.closest('.admin-shopee-arrangement-option');
+      const selectedTitle = selectedCard?.querySelector('strong')?.textContent?.trim() || 'Shipping method selected';
+      const selectedType = selectedCard?.querySelector('.admin-shopee-option-type')?.textContent?.trim() || 'Shipping method';
+      shopeeArrangementOptions.innerHTML = `
+        <div class="admin-shopee-demo-success" role="status">
+          <span class="admin-shopee-demo-success-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="m5 12.5 4.2 4.2L19 7"/></svg>
+          </span>
+          <span>
+            <strong>That’s the complete interaction</strong>
+            <small>${escapeHtml(selectedType)} · ${escapeHtml(selectedTitle)}</small>
+            <em>Demo only—no order or shipment was changed.</em>
+          </span>
+        </div>`;
+      shopeeArrangementSubmit.textContent = 'Demo complete';
+      shopeeArrangementSubmit.disabled = true;
+      return;
+    }
     const originalLabel = shopeeArrangementSubmit.textContent || 'Arrange shipment';
     shopeeArrangementSubmit.disabled = true;
     shopeeArrangementSubmit.textContent = 'Arranging…';
@@ -3466,6 +3486,28 @@ document.addEventListener('DOMContentLoaded', () => {
     formatClock();
     loadScannerSettings().catch(() => {});
     loadSourceColorMap().catch(reportSourceColorError);
+
+    if (shopeeArrangementDemoMode) {
+      if (shopeeArrangementOrder) shopeeArrangementOrder.textContent = '260812SAMPLE';
+      renderShopeeArrangementOptions({
+        pickup: {
+          options: [
+            {
+              label: 'Wednesday, 12 August · 10:00–12:00 WIB',
+              address_id: 'demo-address',
+              pickup_time_id: 'demo-morning'
+            },
+            {
+              label: 'Wednesday, 12 August · 13:00–15:00 WIB',
+              address_id: 'demo-address',
+              pickup_time_id: 'demo-afternoon'
+            }
+          ]
+        },
+        dropoff: { offered: true }
+      });
+      if (shopeeArrangementModal) shopeeArrangementModal.hidden = false;
+    }
 
     window.setTimeout(() => {
       flushPendingOrderCompletions()
