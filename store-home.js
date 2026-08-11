@@ -273,6 +273,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const removeOrderStockAudit = document.querySelector('[data-remove-order-stock-audit]');
   const removeOrderError = document.querySelector('[data-remove-order-error]');
   const removeOrderSubmit = document.querySelector('[data-remove-order-submit]');
+  const shopeeArrangementModal = document.querySelector('[data-shopee-arrangement-modal]');
+  const shopeeArrangementForm = document.querySelector('[data-shopee-arrangement-form]');
+  const shopeeArrangementOrder = document.querySelector('[data-shopee-arrangement-order]');
+  const shopeeArrangementOptions = document.querySelector('[data-shopee-arrangement-options]');
+  const shopeeArrangementError = document.querySelector('[data-shopee-arrangement-error]');
+  const shopeeArrangementSubmit = document.querySelector('[data-shopee-arrangement-submit]');
   const reprintModal = document.querySelector('[data-reprint-modal]');
   const reprintForm = document.querySelector('[data-reprint-form]');
   const reprintError = document.querySelector('[data-reprint-error]');
@@ -364,6 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let completionQueueFlushPromise = null;
   let reprintProfiles = [];
   let selectedReprintProfile = null;
+  let shopeeArrangementOrderId = '';
 
   const sourceColorOptions = [
     { value: 'none', label: 'No color' },
@@ -1756,6 +1763,8 @@ document.addEventListener('DOMContentLoaded', () => {
     manual_arrangement_required: Boolean(order?.manualArrangementRequired),
     arrangement_retry_required: Boolean(order?.arrangementRetryRequired),
     arrangement_retry_state: String(order?.arrangementRetryState || ''),
+    shopee_manual_required: Boolean(order?.shopeeManualRequired),
+    shopee_arrangement_state: String(order?.shopeeArrangementState || ''),
     cancellation_requested: orderPresentation.isCancellationRequested(order),
     label_backed: Boolean(order?.labelBacked),
     ...extra
@@ -2612,20 +2621,104 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const arrangeShopeeShipment = async (orderId) => {
+  const showShopeeArrangementError = (message) => {
+    if (!shopeeArrangementError) return;
+    shopeeArrangementError.textContent = String(message || 'Unable to arrange this Shopee shipment.');
+    shopeeArrangementError.hidden = false;
+  };
+
+  const closeShopeeArrangementModal = () => {
+    shopeeArrangementOrderId = '';
+    if (shopeeArrangementModal) shopeeArrangementModal.hidden = true;
+    if (shopeeArrangementError) {
+      shopeeArrangementError.textContent = '';
+      shopeeArrangementError.hidden = true;
+    }
+  };
+
+  const renderShopeeArrangementOptions = (options) => {
+    if (!shopeeArrangementOptions) return;
+    const pickupOptions = Array.isArray(options?.pickup?.options) ? options.pickup.options : [];
+    const dropoffOffered = Boolean(options?.dropoff?.offered);
+    const choices = [];
+    pickupOptions.forEach((option, index) => {
+      const slotLabel = String(option?.label || '').trim();
+      const start = String(option?.start_at || '').trim();
+      const end = String(option?.end_at || '').trim();
+      const fallbackLabel = [start, end].filter(Boolean).join(' – ') || `Pickup time ${index + 1}`;
+      choices.push(`
+        <label class="admin-shopee-arrangement-option">
+          <input type="radio" name="shopee_arrangement" value="pickup-${index}"
+            data-handover-method="PICKUP"
+            data-pickup-address-id="${escapeHtml(String(option?.address_id || ''))}"
+            data-pickup-time-id="${escapeHtml(String(option?.pickup_time_id || ''))}">
+          <span><strong>Pickup</strong><small>${escapeHtml(slotLabel || fallbackLabel)}</small></span>
+        </label>`);
+    });
+    if (dropoffOffered) {
+      choices.push(`
+        <label class="admin-shopee-arrangement-option">
+          <input type="radio" name="shopee_arrangement" value="dropoff" data-handover-method="DROP_OFF">
+          <span><strong>Drop-off</strong><small>Take the parcel to a Shopee drop-off point.</small></span>
+        </label>`);
+    }
+    if (!choices.length) {
+      shopeeArrangementOptions.innerHTML = '<p class="admin-preview-empty">Shopee is not currently offering a pickup time or drop-off for this order. Close this window and try again shortly.</p>';
+      if (shopeeArrangementSubmit instanceof HTMLButtonElement) shopeeArrangementSubmit.disabled = true;
+      return;
+    }
+    shopeeArrangementOptions.innerHTML = `
+      <fieldset class="admin-shopee-arrangement-group">
+        <legend>Pickup or drop-off</legend>
+        ${choices.join('')}
+      </fieldset>`;
+    if (shopeeArrangementSubmit instanceof HTMLButtonElement) shopeeArrangementSubmit.disabled = true;
+  };
+
+  const openShopeeArrangementModal = async (orderId) => {
     const order = state.orders.find((item) => item.id === orderId);
     if (!order?.shopeeManualRequired || order.instant || orderPresentation.isCancellationRequested(order) || !bigSetEnabled) return;
+    shopeeArrangementOrderId = order.id;
+    if (shopeeArrangementOrder) shopeeArrangementOrder.textContent = order.id;
+    if (shopeeArrangementOptions) shopeeArrangementOptions.innerHTML = '<p class="admin-preview-empty">Loading live Shopee options…</p>';
+    if (shopeeArrangementError) {
+      shopeeArrangementError.textContent = '';
+      shopeeArrangementError.hidden = true;
+    }
+    if (shopeeArrangementSubmit instanceof HTMLButtonElement) shopeeArrangementSubmit.disabled = true;
+    if (shopeeArrangementModal) shopeeArrangementModal.hidden = false;
+    try {
+      const payload = await postOrderAction('get_shopee_arrangement_options', order);
+      if (shopeeArrangementOrderId !== order.id) return;
+      renderShopeeArrangementOptions(payload.options || {});
+    } catch (error) {
+      if (error instanceof StoreOpsAuthenticationRequiredError) {
+        redirectToStoreOpsLogin();
+        return;
+      }
+      if (shopeeArrangementOptions) shopeeArrangementOptions.innerHTML = '';
+      showShopeeArrangementError(error instanceof Error ? error.message : 'Unable to load Shopee shipping options.');
+    }
+  };
+
+  const arrangeShopeeShipment = async (selection) => {
+    const order = state.orders.find((item) => item.id === shopeeArrangementOrderId);
+    if (!order?.shopeeManualRequired || !selection?.handover_method) return;
     order.shopeeArrangementState = 'requested';
     order.shopeeArrangementError = '';
     saveOrders();
     renderBoard();
     try {
-      const payload = await postOrderAction('arrange_shopee_shipment', order);
+      const payload = await postOrderAction('arrange_shopee_shipment', order, selection);
       const arrangement = payload.arrangement && typeof payload.arrangement === 'object' ? payload.arrangement : {};
       order.shopeeArrangementState = String(arrangement.state || 'requested');
       order.shopeeArrangementError = String(arrangement.error || '');
+      if (order.shopeeArrangementState === 'failed' || arrangement.immediate_succeeded === false) {
+        throw new Error(order.shopeeArrangementError || 'Shopee did not accept that shipping option. Choose again.');
+      }
       saveOrders();
       renderBoard();
+      closeShopeeArrangementModal();
       await refreshOrders(false, { force: true });
     } catch (error) {
       if (error instanceof StoreOpsAuthenticationRequiredError) {
@@ -2636,7 +2729,8 @@ document.addEventListener('DOMContentLoaded', () => {
       order.shopeeArrangementError = error instanceof Error ? error.message : 'Unable to arrange this Shopee shipment.';
       saveOrders();
       renderBoard();
-      showBoardAlert(order.shopeeArrangementError);
+      showShopeeArrangementError(order.shopeeArrangementError);
+      throw error;
     }
   };
 
@@ -2862,7 +2956,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const shopeeButton = target?.closest('[data-arrange-shopee]');
     if (shopeeButton instanceof HTMLButtonElement) {
-      if (!shopeeButton.disabled) arrangeShopeeShipment(shopeeButton.dataset.arrangeShopee || '');
+      if (!shopeeButton.disabled) openShopeeArrangementModal(shopeeButton.dataset.arrangeShopee || '');
       return;
     }
     const button = target?.closest('[data-start-order]');
@@ -2912,6 +3006,34 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-close-remove-order]').forEach((button) => {
     button.addEventListener('click', closeRemoveOrderModal);
   });
+  document.querySelectorAll('[data-close-shopee-arrangement]').forEach((button) => {
+    button.addEventListener('click', closeShopeeArrangementModal);
+  });
+  shopeeArrangementOptions?.addEventListener('change', () => {
+    if (!(shopeeArrangementSubmit instanceof HTMLButtonElement)) return;
+    shopeeArrangementSubmit.disabled = !shopeeArrangementOptions.querySelector('input[name="shopee_arrangement"]:checked');
+  });
+  shopeeArrangementForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const selected = shopeeArrangementOptions?.querySelector('input[name="shopee_arrangement"]:checked');
+    if (!(selected instanceof HTMLInputElement) || !(shopeeArrangementSubmit instanceof HTMLButtonElement)) return;
+    const originalLabel = shopeeArrangementSubmit.textContent || 'Arrange shipment';
+    shopeeArrangementSubmit.disabled = true;
+    shopeeArrangementSubmit.textContent = 'Arranging…';
+    if (shopeeArrangementError) shopeeArrangementError.hidden = true;
+    try {
+      await arrangeShopeeShipment({
+        handover_method: String(selected.dataset.handoverMethod || ''),
+        pickup_address_id: String(selected.dataset.pickupAddressId || ''),
+        pickup_time_id: String(selected.dataset.pickupTimeId || '')
+      });
+    } catch (_error) {
+      // The modal keeps the actionable Shopee error next to the selected option.
+    } finally {
+      shopeeArrangementSubmit.textContent = originalLabel;
+      if (shopeeArrangementModal && !shopeeArrangementModal.hidden) shopeeArrangementSubmit.disabled = false;
+    }
+  });
 
   document.addEventListener('pointerdown', (event) => {
     if (orderContextMenu?.hidden || orderContextMenu?.contains(event.target)) return;
@@ -2921,6 +3043,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (event.key === 'Escape') {
       closeOrderContextMenu();
       closeRemoveOrderModal();
+      closeShopeeArrangementModal();
     }
   });
   window.addEventListener('blur', closeOrderContextMenu);

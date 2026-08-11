@@ -220,6 +220,28 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
             </div>
         <?php endif; ?>
 
+        <div class="admin-modal-shell admin-shopee-arrangement-modal" data-shopee-arrangement-modal hidden>
+            <div class="admin-modal-backdrop" data-close-shopee-arrangement></div>
+            <form class="admin-modal-card admin-shopee-arrangement-card" data-shopee-arrangement-form role="dialog" aria-modal="true" aria-labelledby="shopee-arrangement-title">
+                <div class="admin-modal-head">
+                    <div>
+                        <span class="admin-panel-kicker">Shopee shipping</span>
+                        <h3 id="shopee-arrangement-title">Arrange <span data-shopee-arrangement-order></span></h3>
+                    </div>
+                    <button type="button" class="admin-ghost-btn" data-close-shopee-arrangement>Close</button>
+                </div>
+                <p class="admin-reprint-intro">Choose exactly how this order should be handed over. Options are loaded live from Shopee.</p>
+                <div class="admin-shopee-arrangement-options" data-shopee-arrangement-options>
+                    <p class="admin-preview-empty">Loading Shopee options…</p>
+                </div>
+                <p class="admin-form-error" data-shopee-arrangement-error hidden></p>
+                <div class="admin-modal-actions">
+                    <button type="button" class="admin-ghost-btn" data-close-shopee-arrangement>Cancel</button>
+                    <button type="submit" class="admin-primary-btn" data-shopee-arrangement-submit disabled>Arrange shipment</button>
+                </div>
+            </form>
+        </div>
+
         <div class="admin-modal-shell admin-fulfillment-modal" data-fulfillment-modal hidden>
             <div class="admin-modal-backdrop" data-close-fulfillment-modal></div>
             <div class="admin-modal-card admin-fulfillment-card" data-fulfillment-card role="dialog" aria-modal="true" aria-labelledby="store-order-modal-title">

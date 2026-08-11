@@ -184,7 +184,8 @@ assert(
     && storeHome.includes("Number(Boolean(b?.weekendDependent)) - Number(Boolean(a?.weekendDependent))")
     && storeHome.includes('Weekend Dependent')
     && storeHome.includes('data-arrange-shopee')
-    && storeHome.includes("postOrderAction('arrange_shopee_shipment', order)")
+    && storeHome.includes("postOrderAction('get_shopee_arrangement_options', order)")
+    && storeHome.includes("postOrderAction('arrange_shopee_shipment', order, selection)")
     && storeHome.includes('shopeeManualRequired')
     && storeHome.includes('manualArrangementNeeded')
     && storeHome.includes("shopeeState === 'automatic' && !automaticArrangementPaused")
@@ -207,9 +208,23 @@ assert(
 assert(
   ordersApi.includes("'/fulfillment/arrange-shopee'")
     && ordersV2Api.includes("'/fulfillment/arrange-shopee'")
+    && ordersApi.includes("'/fulfillment/shipping-options?'")
+    && ordersV2Api.includes("'/fulfillment/shipping-options?'")
     && ordersApi.includes("'arrange_shopee_shipment'")
-    && ordersV2Api.includes("'arrange_shopee_shipment'"),
-  'Both Store Ops order APIs must proxy the explicit regular Shopee fallback.'
+    && ordersV2Api.includes("'arrange_shopee_shipment'")
+    && ordersApi.includes("'handover_method'")
+    && ordersV2Api.includes("'pickup_time_id'"),
+  'Both Store Ops order APIs must load live Shopee choices and submit the selected handover method and pickup time.'
+);
+assert(
+  dashboardTemplate.includes('data-shopee-arrangement-modal')
+    && dashboardTemplate.includes('data-shopee-arrangement-options')
+    && storeHome.includes('openShopeeArrangementModal(shopeeButton.dataset.arrangeShopee')
+    && storeHome.includes('data-handover-method="PICKUP"')
+    && storeHome.includes('data-handover-method="DROP_OFF"')
+    && storeHome.includes('shopee_manual_required: Boolean(order?.shopeeManualRequired)')
+    && !storeHome.includes('showBoardAlert(order.shopeeArrangementError)'),
+  'Manual arrange must open a live pickup/drop-off chooser, preserve authorization, and keep errors inside the modal.'
 );
 assert(
   adminCss.includes('.admin-order-card.is-weekend-dependent')

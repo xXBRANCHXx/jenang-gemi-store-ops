@@ -160,7 +160,11 @@ function jg_store_ops_marketplace_action_enabled(array $key, bool $localHardSetE
     }
     if (
         jg_store_ops_marketplace_shopee_manual_order($key)
-        && strtolower(trim((string) ($key['action'] ?? ''))) === 'arrange_shopee_shipment'
+        && in_array(
+            strtolower(trim((string) ($key['action'] ?? ''))),
+            ['get_shopee_arrangement_options', 'arrange_shopee_shipment'],
+            true
+        )
     ) {
         return true;
     }

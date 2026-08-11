@@ -922,6 +922,76 @@ input[type='radio'] {
   color: var(--admin-danger);
 }
 
+.admin-shopee-arrangement-card {
+  width: min(680px, 100%);
+}
+
+.admin-shopee-arrangement-options {
+  display: grid;
+  max-height: min(52vh, 440px);
+  gap: 10px;
+  overflow: auto;
+}
+
+.admin-shopee-arrangement-group {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.admin-shopee-arrangement-group > legend {
+  padding: 0;
+  color: var(--admin-text);
+  font-size: 12px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.admin-shopee-arrangement-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  padding: 12px 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  background: var(--admin-surface-soft);
+  cursor: pointer;
+}
+
+.admin-shopee-arrangement-option:has(input:checked) {
+  border-color: #38bdf8;
+  background: color-mix(in srgb, #38bdf8 12%, var(--admin-surface-soft));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #38bdf8 44%, transparent);
+}
+
+.admin-shopee-arrangement-option input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #0284c7;
+}
+
+.admin-shopee-arrangement-option span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-shopee-arrangement-option strong {
+  color: var(--admin-text);
+  font-size: 13px;
+}
+
+.admin-shopee-arrangement-option small {
+  color: var(--admin-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .admin-sheet-wrap {
   border: 1px solid var(--admin-border);
   border-radius: 22px;
