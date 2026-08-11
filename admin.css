@@ -6892,7 +6892,8 @@ button, input {
   width: calc(100% - 20px);
   height: 1px;
   margin: 5px 10px;
-  background: rgba(255, 255, 255, 0.11);
+  background: currentColor;
+  opacity: 0.16;
 }
 
 .admin-store-sidebar-tools {
