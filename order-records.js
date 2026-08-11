@@ -72,6 +72,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }).format(date);
   };
 
+  const elapsedLabel = (from, to) => {
+    const start = Date.parse(`${String(from || '').replace(' ', 'T')}Z`);
+    const end = Date.parse(`${String(to || '').replace(' ', 'T')}Z`);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return '';
+    const seconds = Math.round((end - start) / 1000);
+    if (seconds < 60) return `+${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    return `+${minutes}m${seconds % 60 ? ` ${seconds % 60}s` : ''}`;
+  };
+
+  const eventIcon = (eventType) => {
+    const type = String(eventType || '').toLowerCase();
+    if (type === 'fulfill') return '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 10 3 3 7-7"/></svg>';
+    if (type.includes('scan')) return '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 7V4h3M13 4h3v3M16 13v3h-3M7 16H4v-3M7 10h6"/></svg>';
+    if (type.includes('label') || type === 'reprint') return '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3h6l3 3v11H6zM12 3v4h4M8.5 11h4M8.5 14h4"/></svg>';
+    if (type === 'claim' || type === 'reclaim' || type === 'release') return '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="7" r="3"/><path d="M4.5 17c.7-3.1 2.5-4.7 5.5-4.7s4.8 1.6 5.5 4.7"/></svg>';
+    return '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3"/></svg>';
+  };
+
   const setError = (message = '') => {
     if (!refs.error) return;
     refs.error.hidden = message === '';
@@ -165,12 +184,18 @@ document.addEventListener('DOMContentLoaded', () => {
         : '<p class="admin-form-error">Product details could not be loaded for this processed order.</p>';
       return;
     }
-    refs.itemsBody.innerHTML = items.map((item) => `
-      <div class="admin-order-record-item">
-        <span><strong>${escapeHtml(item.product_name || item.name || item.sku || 'Order item')}</strong><small>${escapeHtml(item.sku || 'SKU unavailable')}</small></span>
-        <em>x${escapeHtml(item.quantity)}</em>
+    const units = items.reduce((total, item) => total + Math.max(0, Number(item.quantity || 0)), 0);
+    refs.itemsBody.innerHTML = `
+      <div class="admin-order-record-products-list">
+        <header><span>${items.length} product line${items.length === 1 ? '' : 's'}</span><strong>${escapeHtml(units)} unit${units === 1 ? '' : 's'} total</strong></header>
+        ${items.map((item) => `
+          <div class="admin-order-record-item">
+            <span><strong>${escapeHtml(item.product_name || item.name || item.sku || 'Order item')}</strong><small>${escapeHtml(item.sku || 'SKU unavailable')}</small></span>
+            <em>${escapeHtml(item.quantity)}×</em>
+          </div>
+        `).join('')}
       </div>
-    `).join('');
+    `;
   };
 
   const renderEvents = (events = []) => {
@@ -179,17 +204,27 @@ document.addEventListener('DOMContentLoaded', () => {
       refs.events.innerHTML = '<p class="admin-empty">No processing events were recorded.</p>';
       return;
     }
-    refs.events.innerHTML = events.map((event) => {
+    const uniqueEvents = events.filter((event, index, list) => {
+      if (index === 0) return true;
+      const signature = (item) => [item.event_type, item.created_at, item.employee_id, item.sku, item.message].map((value) => String(value || '')).join('|');
+      return signature(event) !== signature(list[index - 1]);
+    });
+    refs.events.innerHTML = `<div class="admin-order-record-timeline">${uniqueEvents.map((event, index) => {
       const progress = event.progress_required > 0 ? `${event.progress_scanned}/${event.progress_required}` : '';
       const details = [event.employee_name, event.sku, progress].filter(Boolean).join(' · ');
+      const elapsed = index > 0 ? elapsedLabel(uniqueEvents[index - 1].created_at, event.created_at) : 'Start';
       return `
         <article class="admin-event-item admin-order-record-event ${['scan_error', 'error'].includes(event.event_type) ? 'is-error' : ''}">
-          <strong>${escapeHtml(presentation.eventLabel(event.event_type))}</strong>
-          <span>${escapeHtml(formatTime(event.created_at))}${details ? ` · ${escapeHtml(details)}` : ''}</span>
-          ${event.message ? `<small>${escapeHtml(event.message)}</small>` : ''}
+          <span class="admin-order-record-event-marker">${eventIcon(event.event_type)}</span>
+          <div>
+            <header><strong>${escapeHtml(presentation.eventLabel(event.event_type))}</strong><time>${escapeHtml(formatTime(event.created_at))}</time></header>
+            ${details ? `<span>${escapeHtml(details)}</span>` : ''}
+            ${event.message ? `<small>${escapeHtml(event.message)}</small>` : ''}
+          </div>
+          <em>${escapeHtml(elapsed)}</em>
         </article>
       `;
-    }).join('');
+    }).join('')}</div>`;
   };
 
   const load = async () => {
@@ -216,7 +251,12 @@ document.addEventListener('DOMContentLoaded', () => {
       && item.source_account === row.dataset.sourceAccount);
     if (!orderId || !record) return;
     if (refs.drawerTitle) refs.drawerTitle.textContent = orderId;
-    if (refs.drawerMeta) refs.drawerMeta.textContent = `${record.source_label} · ${record.processed_by_name || record.processed_by || 'Operator'} · ${formatTime(record.fulfilled_at)}`;
+    if (refs.drawerMeta) refs.drawerMeta.innerHTML = `
+      <span>${escapeHtml(record.source_label)}</span>
+      <span>${escapeHtml(record.processed_by_name || record.processed_by || 'Operator')}</span>
+      <span>${escapeHtml(record.duration_label && record.duration_label !== '-' ? `${record.duration_label} processing` : 'Timing unavailable')}</span>
+      <time>${escapeHtml(formatTime(record.fulfilled_at))}</time>
+    `;
     if (refs.events) refs.events.innerHTML = '<p class="admin-empty">Loading processing timeline.</p>';
     renderItems([], true);
     if (refs.drawer) refs.drawer.hidden = false;

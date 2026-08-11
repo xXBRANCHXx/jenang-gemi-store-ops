@@ -25,8 +25,11 @@ assert.match(dashboard, /jg_store_ops_shell_nav_items\('\.\.\/'\)/, 'The live Or
 assert.match(page, /data-order-records-endpoint.*?api\/order-records/s, 'Order Records must use its read-only API.');
 assert.match(page, /data-order-records-date-from[\s\S]*?data-order-records-date-to[\s\S]*?data-order-records-source[\s\S]*?data-order-records-operator[\s\S]*?data-order-records-query/, 'Order Records must provide operational filters.');
 assert.match(page, /Completed order history[\s\S]*?data-order-records-body/, 'Order Records must render a completed-order table.');
+assert.match(page, /Completed order history[\s\S]*?admin-order-records-filter-panel[\s\S]*?data-order-records-body/, 'Filters and results must share one cohesive records workspace.');
 assert.match(page, /Processing timeline[\s\S]*?data-order-records-events/, 'Processed orders must expose a read-only timeline.');
 assert.match(page, /Products processed[\s\S]*?data-order-records-items-body/, 'Order details must always include their processed products section.');
+assert.match(orderRecordsScript(), /admin-order-record-products-list[\s\S]*admin-order-record-timeline/, 'Products must share one manifest and processing events must render as a visual timeline.');
+assert.match(orderRecordsScript(), /uniqueEvents[\s\S]*signature/, 'Consecutive duplicate processing events must be collapsed in the drawer.');
 assert.match(page, /data-order-records-average-context/, 'Average time must disclose its timed-order coverage.');
 assert.match(api, /REQUEST_METHOD[\s\S]*?Order Records is read-only/, 'Order Records API must reject writes.');
 assert.match(api, /jg_store_ops_order_records_summary_from_db/, 'Summary metrics must cover the full filtered result instead of only the visible rows.');

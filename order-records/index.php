@@ -44,61 +44,26 @@ $orderRecordsJsVersion = (string) @filemtime(dirname(__DIR__) . '/order-records.
 
             <main class="admin-layout admin-order-records-layout">
                 <section class="admin-order-records-metrics" aria-label="Processed order summary">
+                    <header>
+                        <span>Range snapshot</span>
+                        <small>Processed-order activity</small>
+                    </header>
                     <article class="admin-order-record-stat">
-                        <span><small>Processed</small><strong data-order-records-summary="processed">0</strong></span>
-                        <p>In selected range</p>
+                        <small>Processed</small>
+                        <strong data-order-records-summary="processed">0</strong>
                     </article>
                     <article class="admin-order-record-stat">
-                        <span><small>Today</small><strong data-order-records-summary="processed_today">0</strong></span>
-                        <p>Jakarta business day</p>
+                        <small>Today</small>
+                        <strong data-order-records-summary="processed_today">0</strong>
                     </article>
                     <article class="admin-order-record-stat">
-                        <span><small>Operators</small><strong data-order-records-summary="operators">0</strong></span>
-                        <p>Active in this range</p>
+                        <small>Operators</small>
+                        <strong data-order-records-summary="operators">0</strong>
                     </article>
                     <article class="admin-order-record-stat is-duration">
                         <span><small>Average time</small><strong data-order-records-summary="average_label">—</strong></span>
                         <p data-order-records-average-context>Processing start to completion</p>
                     </article>
-                </section>
-
-                <section class="admin-order-records-filter-panel">
-                    <header class="admin-order-records-section-head">
-                        <div>
-                            <span>Filters</span>
-                            <h2>Find processed orders</h2>
-                        </div>
-                        <small>Up to 367 days per search</small>
-                    </header>
-                    <form class="admin-order-records-filters" data-order-records-filters>
-                        <label>
-                            <span>Date from</span>
-                            <input type="date" name="date_from" data-order-records-date-from>
-                        </label>
-                        <label>
-                            <span>Date to</span>
-                            <input type="date" name="date_to" data-order-records-date-to>
-                        </label>
-                        <label>
-                            <span>Source</span>
-                            <input type="search" name="source" placeholder="WhatsApp, Shopee, TikTok…" data-order-records-source>
-                        </label>
-                        <label>
-                            <span>Operator</span>
-                            <select name="operator" data-order-records-operator>
-                                <option value="">All operators</option>
-                            </select>
-                        </label>
-                        <label>
-                            <span>Order ID</span>
-                            <input type="search" name="q" placeholder="Search order ID" data-order-records-query>
-                        </label>
-                        <div class="admin-order-records-filter-actions">
-                            <button type="submit" class="admin-primary-btn">Apply filters</button>
-                            <button type="button" class="admin-ghost-btn" data-order-records-reset>Reset</button>
-                        </div>
-                    </form>
-                    <p class="admin-form-error" data-order-records-error hidden></p>
                 </section>
 
                 <section class="admin-order-records-panel">
@@ -109,6 +74,45 @@ $orderRecordsJsVersion = (string) @filemtime(dirname(__DIR__) . '/order-records.
                         </div>
                         <small data-order-records-status>Loading records.</small>
                     </header>
+                    <div class="admin-order-records-filter-panel">
+                        <form class="admin-order-records-filters" data-order-records-filters>
+                            <div class="admin-order-records-filter-intro">
+                                <span>Filter view</span>
+                                <small>Up to 367 days</small>
+                            </div>
+                            <fieldset class="admin-order-records-date-range">
+                                <legend>Date window</legend>
+                                <label>
+                                    <span>From</span>
+                                    <input type="date" name="date_from" aria-label="Date from" data-order-records-date-from>
+                                </label>
+                                <i aria-hidden="true">→</i>
+                                <label>
+                                    <span>To</span>
+                                    <input type="date" name="date_to" aria-label="Date to" data-order-records-date-to>
+                                </label>
+                            </fieldset>
+                            <label>
+                                <span>Source</span>
+                                <input type="search" name="source" placeholder="WhatsApp, Shopee, TikTok…" data-order-records-source>
+                            </label>
+                            <label>
+                                <span>Operator</span>
+                                <select name="operator" data-order-records-operator>
+                                    <option value="">All operators</option>
+                                </select>
+                            </label>
+                            <label>
+                                <span>Order ID</span>
+                                <input type="search" name="q" placeholder="Search order ID" data-order-records-query>
+                            </label>
+                            <div class="admin-order-records-filter-actions">
+                                <button type="submit" class="admin-primary-btn">Apply filters</button>
+                                <button type="button" class="admin-ghost-btn" data-order-records-reset>Reset</button>
+                            </div>
+                        </form>
+                        <p class="admin-form-error" data-order-records-error hidden></p>
+                    </div>
                     <div class="admin-table-wrap admin-order-records-table-wrap">
                         <table class="admin-table admin-order-records-table">
                             <thead>
@@ -138,7 +142,9 @@ $orderRecordsJsVersion = (string) @filemtime(dirname(__DIR__) . '/order-records.
                             <h3 id="order-records-drawer-title" data-order-records-drawer-title>Order</h3>
                             <small data-order-records-drawer-meta></small>
                         </div>
-                        <button type="button" class="admin-ghost-btn" data-order-records-drawer-close>Close</button>
+                        <button type="button" class="admin-order-records-drawer-close-btn" aria-label="Close order details" data-order-records-drawer-close>
+                            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
+                        </button>
                     </div>
                     <section class="admin-order-records-detail-section" data-order-records-items>
                         <h4>Products processed</h4>
