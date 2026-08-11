@@ -148,6 +148,13 @@ website_ops_expect(['zero_website', 'jenang_gemi_website', 'whatsapp'], JG_STORE
 website_ops_expect(true, jg_store_ops_fulfillment_is_terminal_status('CANCELLED'), 'A cancelled WhatsApp order must be terminal in Store Ops.');
 website_ops_expect(true, jg_store_ops_fulfillment_is_terminal_status('FULFILLED'), 'A fulfilled order must remain terminal in Store Ops.');
 website_ops_expect(false, jg_store_ops_fulfillment_is_terminal_status('UNCLAIMED'), 'An unclaimed order must remain available to work.');
+$unclaimedCompletionRejected = false;
+try {
+    jg_store_ops_fulfillment_assert_can_work(['status' => 'UNCLAIMED', 'claimed_by' => ''], 'shared-admin');
+} catch (RuntimeException $error) {
+    $unclaimedCompletionRejected = str_contains($error->getMessage(), 'Claim this order');
+}
+website_ops_expect(true, $unclaimedCompletionRejected, 'A durable completion retry must not fulfill an unclaimed order, even for an admin profile.');
 $websiteApi = (string) file_get_contents(dirname(__DIR__) . '/api/website-orders/index.php');
 website_ops_expect(
     true,

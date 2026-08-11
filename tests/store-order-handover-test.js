@@ -116,10 +116,17 @@ const storeHome = fs.readFileSync(path.join(__dirname, '../store-home.js'), 'utf
 const adminCss = fs.readFileSync(path.join(__dirname, '../admin.css'), 'utf8');
 const ordersApi = fs.readFileSync(path.join(__dirname, '../api/orders/index.php'), 'utf8');
 const ordersV2Api = fs.readFileSync(path.join(__dirname, '../api/orders-v2/index.php'), 'utf8');
+const fulfillmentRuntime = fs.readFileSync(path.join(__dirname, '../store-ops-fulfillment-runtime.php'), 'utf8');
 assert(
   dashboardTemplate.includes('data-order-board aria-busy="true"')
     && dashboardTemplate.includes('admin-board-empty admin-board-loading'),
   'The server-rendered queue must show loading before Store Ops JavaScript starts.'
+);
+assert(
+  fulfillmentRuntime.includes("$key['order_id'] === '260807QAWE3UNJ'")
+    && fulfillmentRuntime.includes("status = \"UNCLAIMED\"")
+    && fulfillmentRuntime.includes("throw new RuntimeException('Claim this order before working on it.')"),
+  'The exact recovery must clear its stale completion, while future durable completions require a real Start claim.'
 );
 assert(
   dashboardTemplate.includes('data-automation-pause-notice')
@@ -226,6 +233,8 @@ assert(
     && storeHome.includes('admin-shopee-option-icon is-pickup')
     && storeHome.includes('admin-shopee-option-icon is-dropoff')
     && adminCss.includes('.admin-shopee-option-check')
+    && storeHome.includes('clearPendingCompletionForOrder(order)')
+    && storeHome.includes('authorizedRecoveryReopenedAt')
     && storeHome.includes('shopee_manual_required: Boolean(order?.shopeeManualRequired)')
     && !storeHome.includes('showBoardAlert(order.shopeeArrangementError)'),
   'Manual arrange must open a visual live pickup/drop-off chooser, preserve authorization, and keep errors inside the modal.'

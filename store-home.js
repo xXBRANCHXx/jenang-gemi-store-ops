@@ -1344,7 +1344,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const mergeLocalOrderState = (order, storedById) => {
     const stored = storedById.get(String(order.id || ''));
     if (!stored) return order;
-    const printedLabel = stored.printedLabel || order.printedLabel || null;
+    const recoveryTimestamp = Date.parse(String(order.authorizedRecoveryReopenedAt || ''));
+    const storedPrintedLabel = stored.printedLabel || order.printedLabel || null;
+    const acknowledgedTimestamp = Date.parse(String(storedPrintedLabel?.serverAcknowledgedAt || storedPrintedLabel?.printedAt || ''));
+    const recoverySupersedesLocalCompletion = Number.isFinite(recoveryTimestamp)
+      && (!Number.isFinite(acknowledgedTimestamp) || recoveryTimestamp > acknowledgedTimestamp);
+    const printedLabel = recoverySupersedesLocalCompletion ? null : storedPrintedLabel;
     const serverAcknowledged = Boolean(printedLabel && printedLabel.serverAcknowledgedAt);
     return {
       ...order,
@@ -1387,6 +1392,7 @@ document.addEventListener('DOMContentLoaded', () => {
       shopeeManualRequired: Boolean(order.shopeeManualRequired || order.shopee_manual_required),
       shopeeArrangementState: String(order.shopeeArrangementState || order.shopee_arrangement_state || ''),
       shopeeArrangementError: String(order.shopeeArrangementError || order.shopee_arrangement_error || ''),
+      authorizedRecoveryReopenedAt: String(order.authorizedRecoveryReopenedAt || order.authorized_recovery_reopened_at || ''),
       handoverMethod: orderPresentation.normalizeHandoverMethod(order),
       shippingProviderName: String(order.shippingProviderName || order.shipping_provider_name || ''),
       handoverScheduledStartAt: String(order.handoverScheduledStartAt || order.handover_scheduled_start_at || ''),
@@ -1805,6 +1811,32 @@ document.addEventListener('DOMContentLoaded', () => {
       window.localStorage.setItem(pendingCompletionQueueStorageKey, JSON.stringify(queue));
     } catch (_error) {
       // Keep retrying the acknowledged action if local persistence is temporarily unavailable.
+    }
+  };
+
+  const clearPendingCompletionForOrder = (order) => {
+    try {
+      const queue = readPendingCompletionQueue();
+      const orderId = String(order?.id || '').trim();
+      const platform = normalizeSourceKey(order?.platform || '');
+      const account = sourceKeyFromOrder(order || {});
+      let changed = false;
+      Object.entries(queue).forEach(([key, entry]) => {
+        const payload = entry && typeof entry === 'object' && entry.payload && typeof entry.payload === 'object'
+          ? entry.payload
+          : {};
+        if (
+          String(payload.order_id || '').trim() === orderId
+          && normalizeSourceKey(payload.source_platform || '') === platform
+          && normalizeSourceKey(payload.source_account || '') === normalizeSourceKey(account)
+        ) {
+          delete queue[key];
+          changed = true;
+        }
+      });
+      if (changed) window.localStorage.setItem(pendingCompletionQueueStorageKey, JSON.stringify(queue));
+    } catch (_error) {
+      // The server-side claim requirement still blocks stale completion retries.
     }
   };
 
@@ -2696,6 +2728,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const openShopeeArrangementModal = async (orderId) => {
     const order = state.orders.find((item) => item.id === orderId);
     if (!order?.shopeeManualRequired || order.instant || orderPresentation.isCancellationRequested(order) || !bigSetEnabled) return;
+    clearPendingCompletionForOrder(order);
     shopeeArrangementOrderId = order.id;
     if (shopeeArrangementOrder) shopeeArrangementOrder.textContent = order.id;
     if (shopeeArrangementOptions) shopeeArrangementOptions.innerHTML = '<p class="admin-preview-empty">Loading live Shopee options…</p>';

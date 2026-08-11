@@ -471,7 +471,10 @@ function jg_store_ops_fulfillment_assert_can_work(?array $row, string $employeeI
     }
 
     $claimedBy = trim((string) ($row['claimed_by'] ?? ''));
-    if ($claimedBy === '' || hash_equals($claimedBy, $employeeId) || jg_store_ops_fulfillment_is_admin_employee($employeeId)) {
+    if ($claimedBy === '') {
+        throw new RuntimeException('Claim this order before working on it.');
+    }
+    if (hash_equals($claimedBy, $employeeId) || jg_store_ops_fulfillment_is_admin_employee($employeeId)) {
         return;
     }
 
@@ -904,7 +907,38 @@ function jg_store_ops_fulfillment_merge_orders(PDO $pdo, array $orders, string $
         }
         $key = $keys[$index];
         $rowKey = $key['source_platform'] . "\0" . $key['source_account'] . "\0" . $key['order_id'];
-        $state = jg_store_ops_fulfillment_state_from_row($rowsByKey[$rowKey] ?? null, $currentEmployeeId, $employeeMap);
+        $row = $rowsByKey[$rowKey] ?? null;
+        $reopenedValue = trim((string) ($order['authorizedRecoveryReopenedAt'] ?? ''));
+        $fulfilledValue = is_array($row) ? trim((string) ($row['fulfilled_at'] ?? '')) : '';
+        $reopenedAt = $reopenedValue !== '' ? strtotime($reopenedValue) : false;
+        $fulfilledAt = $fulfilledValue !== '' ? strtotime($fulfilledValue . ' UTC') : false;
+        $authorizedRecovery = $key['source_platform'] === 'shopee'
+            && $key['source_account'] === 'jenang-gemi-shopee'
+            && $key['order_id'] === '260807QAWE3UNJ';
+        if (
+            $authorizedRecovery
+            && is_int($reopenedAt)
+            && $reopenedAt > 0
+            && is_array($row)
+            && strtoupper((string) ($row['status'] ?? '')) === 'FULFILLED'
+            && (!is_int($fulfilledAt) || $fulfilledAt < $reopenedAt)
+        ) {
+            $reset = $pdo->prepare(
+                'UPDATE store_ops_order_fulfillment_v2
+                 SET status = "UNCLAIMED", claimed_by = NULL, claimed_at = NULL,
+                     last_activity_at = NULL, scan_completed_at = NULL,
+                     label_printed_at = NULL, fulfilled_at = NULL,
+                     scan_required = 0, scan_completed = 0, items_json = NULL,
+                     updated_at = :updated_at
+                 WHERE id = :id AND status = "FULFILLED"'
+            );
+            $reset->execute([
+                ':updated_at' => jg_store_ops_fulfillment_now(),
+                ':id' => (int) $row['id'],
+            ]);
+            $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
+        }
+        $state = jg_store_ops_fulfillment_state_from_row($row, $currentEmployeeId, $employeeMap);
         $order = array_merge($order, $state);
     }
     unset($order);
