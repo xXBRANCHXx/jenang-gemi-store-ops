@@ -2395,8 +2395,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>${escapeHtml(sourceLabel)}</span>
             <span>${escapeHtml(claimLabel)}</span>
           </div>
-          ${order.instant && instantState === 'failed' && order.instantArrangementError ? `<div class="admin-instant-action-error">${escapeHtml(order.instantArrangementError)}</div>` : ''}
-          ${['failed', 'label_failed'].includes(shopeeState) && order.shopeeArrangementError ? `<div class="admin-shopee-action-error">${escapeHtml(order.shopeeArrangementError)}</div>` : ''}
           ${actionButton}
         </article>
       `;
@@ -2434,6 +2432,13 @@ document.addEventListener('DOMContentLoaded', () => {
       : 'Ready to claim';
     const customerName = String(order.customerName || '').trim();
     const packageNumber = String(order.packageNumber || '').trim();
+    const instantState = String(order.instantArrangementState || '').trim().toLowerCase();
+    const shopeeState = String(order.shopeeArrangementState || '').trim().toLowerCase();
+    const arrangementIssue = order.instant && instantState === 'failed'
+      ? String(order.instantArrangementError || '').trim()
+      : (['failed', 'label_failed'].includes(shopeeState)
+        ? String(order.shopeeArrangementError || '').trim()
+        : (order.arrangementRetryRequired ? String(order.arrangementRetryError || '').trim() : ''));
 
     if (modalTitle) modalTitle.textContent = order.id;
     if (modalStepLabel) modalStepLabel.textContent = 'Order preview';
@@ -2459,6 +2464,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div><span>Handover</span><strong>${escapeHtml(handoverLabel)}</strong></div>
         ${customerName ? `<div><span>Customer</span><strong>${escapeHtml(customerName)}</strong></div>` : ''}
         ${packageNumber ? `<div><span>Package</span><strong>${escapeHtml(packageNumber)}</strong></div>` : ''}
+        ${arrangementIssue ? `<div class="admin-preview-arrangement-issue"><span>Arrangement issue</span><strong>${escapeHtml(arrangementIssue)}</strong></div>` : ''}
       </div>
 
       <section class="admin-preview-products">

@@ -192,10 +192,17 @@ assert(
     && storeHome.includes('Manual arrange')
     && storeHome.includes('Retry label')
     && !storeHome.includes("shopeeState === 'failed' ? 'Retry arrange'")
-    && storeHome.includes("order.instant && instantState === 'failed'")
+    && storeHome.includes("const arrangementIssue = order.instant && instantState === 'failed'")
     && storeHome.includes("order.weekendDependentCutoff || '12:00'")
     && storeHome.includes("isWeekendDependent ? 'is-weekend-dependent' : ''"),
   'Instant orders must sort first, while server-authorized Shopee fallbacks are clearly labeled as manual arrangement.'
+);
+assert(
+  !storeHome.includes('admin-instant-action-error')
+    && !storeHome.includes('admin-shopee-action-error')
+    && storeHome.includes('admin-preview-arrangement-issue')
+    && adminCss.includes('.admin-preview-facts > .admin-preview-arrangement-issue'),
+  'Arrangement errors must stay off compact cards and appear only after an operator opens the order preview.'
 );
 assert(
   ordersApi.includes("'/fulfillment/arrange-shopee'")
