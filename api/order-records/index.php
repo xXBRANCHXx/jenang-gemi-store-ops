@@ -59,7 +59,7 @@ try {
             'date_from' => $bounds['date_from'],
             'date_to' => $bounds['date_to'],
         ],
-        'summary' => jg_store_ops_order_records_summary($records),
+        'summary' => jg_store_ops_order_records_summary_from_db($pdo, $_GET),
         'operators' => jg_store_ops_order_records_operators($pdo),
         'records' => $records,
         'events' => [],

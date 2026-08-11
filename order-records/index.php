@@ -44,43 +44,39 @@ $orderRecordsJsVersion = (string) @filemtime(dirname(__DIR__) . '/order-records.
 
             <main class="admin-layout admin-order-records-layout">
                 <section class="admin-order-records-metrics" aria-label="Processed order summary">
-                    <article class="admin-store-stat admin-order-record-stat">
-                        <span>Processed</span>
-                        <strong data-order-records-summary="processed">0</strong>
-                        <small>Completed in this date range</small>
+                    <article class="admin-order-record-stat">
+                        <span><small>Processed</small><strong data-order-records-summary="processed">0</strong></span>
+                        <p>In selected range</p>
                     </article>
-                    <article class="admin-store-stat admin-order-record-stat">
-                        <span>Today</span>
-                        <strong data-order-records-summary="processed_today">0</strong>
-                        <small>Completed today</small>
+                    <article class="admin-order-record-stat">
+                        <span><small>Today</small><strong data-order-records-summary="processed_today">0</strong></span>
+                        <p>Jakarta business day</p>
                     </article>
-                    <article class="admin-store-stat admin-order-record-stat">
-                        <span>Operators</span>
-                        <strong data-order-records-summary="operators">0</strong>
-                        <small>Profiles that processed orders</small>
+                    <article class="admin-order-record-stat">
+                        <span><small>Operators</small><strong data-order-records-summary="operators">0</strong></span>
+                        <p>Active in this range</p>
                     </article>
-                    <article class="admin-store-stat admin-order-record-stat">
-                        <span>Average Time</span>
-                        <strong data-order-records-summary="average_label">-</strong>
-                        <small>Claim to completion</small>
+                    <article class="admin-order-record-stat is-duration">
+                        <span><small>Average time</small><strong data-order-records-summary="average_label">—</strong></span>
+                        <p data-order-records-average-context>Processing start to completion</p>
                     </article>
                 </section>
 
-                <section class="admin-panel admin-panel-wide admin-order-records-filter-panel">
-                    <div class="admin-panel-head">
+                <section class="admin-order-records-filter-panel">
+                    <header class="admin-order-records-section-head">
                         <div>
-                            <span class="admin-panel-kicker">Filters</span>
-                            <h3>Find processed orders</h3>
+                            <span>Filters</span>
+                            <h2>Find processed orders</h2>
                         </div>
-                        <span class="admin-panel-meta">Up to 367 days per search</span>
-                    </div>
+                        <small>Up to 367 days per search</small>
+                    </header>
                     <form class="admin-order-records-filters" data-order-records-filters>
                         <label>
-                            <span>Date From</span>
+                            <span>Date from</span>
                             <input type="date" name="date_from" data-order-records-date-from>
                         </label>
                         <label>
-                            <span>Date To</span>
+                            <span>Date to</span>
                             <input type="date" name="date_to" data-order-records-date-to>
                         </label>
                         <label>
@@ -98,28 +94,28 @@ $orderRecordsJsVersion = (string) @filemtime(dirname(__DIR__) . '/order-records.
                             <input type="search" name="q" placeholder="Search order ID" data-order-records-query>
                         </label>
                         <div class="admin-order-records-filter-actions">
-                            <button type="submit" class="admin-primary-btn">Apply</button>
+                            <button type="submit" class="admin-primary-btn">Apply filters</button>
                             <button type="button" class="admin-ghost-btn" data-order-records-reset>Reset</button>
                         </div>
                     </form>
                     <p class="admin-form-error" data-order-records-error hidden></p>
                 </section>
 
-                <section class="admin-panel admin-panel-wide admin-order-records-panel">
-                    <div class="admin-panel-head">
+                <section class="admin-order-records-panel">
+                    <header class="admin-order-records-section-head admin-order-records-history-head">
                         <div>
-                            <span class="admin-panel-kicker">Processed only</span>
-                            <h3>Completed order history</h3>
+                            <span>Processed only</span>
+                            <h2>Completed order history</h2>
                         </div>
-                        <span class="admin-panel-meta" data-order-records-status>Loading records.</span>
-                    </div>
+                        <small data-order-records-status>Loading records.</small>
+                    </header>
                     <div class="admin-table-wrap admin-order-records-table-wrap">
                         <table class="admin-table admin-order-records-table">
                             <thead>
                                 <tr>
                                     <th>Order ID</th>
                                     <th>Source</th>
-                                    <th>Processed By</th>
+                                    <th>Processed by</th>
                                     <th>Scan</th>
                                     <th>Completed</th>
                                     <th>Duration</th>

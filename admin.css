@@ -11,6 +11,11 @@
   --admin-accent-secondary: #d9d9d9;
   --admin-accent-tertiary: #ff5252;
   --admin-accent-quaternary: #ffffff;
+  --admin-on-accent: #09090b;
+  --admin-success: #4ade80;
+  --admin-warning: #fbbf24;
+  --admin-danger: #fb7185;
+  --admin-info: #60a5fa;
 }
 
 :root[data-admin-theme='light'] {
@@ -26,6 +31,11 @@
   --admin-accent-secondary: #4b5563;
   --admin-accent-tertiary: #b42318;
   --admin-accent-quaternary: #1d4ed8;
+  --admin-on-accent: #ffffff;
+  --admin-success: #15803d;
+  --admin-warning: #9a5b00;
+  --admin-danger: #b42318;
+  --admin-info: #1d4ed8;
 }
 
 :root[data-admin-theme='dark'] {
@@ -41,6 +51,11 @@
   --admin-accent-secondary: #d9d9d9;
   --admin-accent-tertiary: #ffffff;
   --admin-accent-quaternary: #ffffff;
+  --admin-on-accent: #09090b;
+  --admin-success: #4ade80;
+  --admin-warning: #fbbf24;
+  --admin-danger: #fb7185;
+  --admin-info: #60a5fa;
 }
 
 :root[data-admin-theme='glass'] {
@@ -56,6 +71,11 @@
   --admin-accent-secondary: #217a3c;
   --admin-accent-tertiary: #b42318;
   --admin-accent-quaternary: #2563eb;
+  --admin-on-accent: #ffffff;
+  --admin-success: #15803d;
+  --admin-warning: #9a5b00;
+  --admin-danger: #b42318;
+  --admin-info: #1d4ed8;
 }
 
 :root[data-admin-theme='ivory'] {
@@ -71,6 +91,11 @@
   --admin-accent-secondary: #0e8f68;
   --admin-accent-tertiary: #b42318;
   --admin-accent-quaternary: #2563eb;
+  --admin-on-accent: #ffffff;
+  --admin-success: #15803d;
+  --admin-warning: #9a5b00;
+  --admin-danger: #b42318;
+  --admin-info: #1d4ed8;
 }
 
 :root[data-admin-theme='prism'] {
@@ -86,6 +111,23 @@
   --admin-accent-secondary: #7357e8;
   --admin-accent-tertiary: #ef7f63;
   --admin-accent-quaternary: #22b8cf;
+  --admin-on-accent: #1a0d18;
+  --admin-success: #4ade80;
+  --admin-warning: #fbbf24;
+  --admin-danger: #fb7185;
+  --admin-info: #67e8f9;
+}
+
+:root[data-admin-theme='light'],
+:root[data-admin-theme='glass'],
+:root[data-admin-theme='ivory'] {
+  color-scheme: light;
+}
+
+:root:not([data-admin-theme]),
+:root[data-admin-theme='dark'],
+:root[data-admin-theme='prism'] {
+  color-scheme: dark;
 }
 
 * {
@@ -158,6 +200,16 @@ a {
 
 button, input {
   font: inherit;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--admin-accent-primary);
+}
+
+:is(button, a, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--admin-accent-primary);
+  outline-offset: 2px;
 }
 
 .admin-body.is-loading {
@@ -456,7 +508,7 @@ button, input {
 
 .admin-primary-btn {
   background: var(--admin-accent-primary);
-  color: #091006;
+  color: var(--admin-on-accent);
   font-weight: 800;
 }
 
@@ -468,7 +520,16 @@ button, input {
 :root[data-admin-theme='ivory'] .admin-toggle-pill.is-active,
 :root[data-admin-theme='prism'] .admin-primary-btn,
 :root[data-admin-theme='prism'] .admin-toggle-pill.is-active {
-  color: #ffffff;
+  color: var(--admin-on-accent);
+}
+
+.admin-primary-btn:disabled {
+  border-color: var(--admin-border);
+  background: color-mix(in srgb, var(--admin-muted) 14%, var(--admin-surface));
+  color: var(--admin-muted);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 :root[data-admin-theme='prism'] .admin-primary-btn,
@@ -858,7 +919,7 @@ button, input {
 .admin-form-error {
   margin: 0;
   font-size: 14px;
-  color: #ff8e8e;
+  color: var(--admin-danger);
 }
 
 .admin-sheet-wrap {
@@ -1686,7 +1747,7 @@ button, input {
   border: 0;
   border-radius: 7px;
   background: var(--admin-accent-primary);
-  color: #091006;
+  color: var(--admin-on-accent);
   cursor: pointer;
   font-size: 10px;
   font-weight: 900;
@@ -1698,8 +1759,8 @@ button, input {
 
 .admin-start-order-btn:disabled {
   cursor: not-allowed;
-  background: rgba(148, 163, 184, 0.34);
-  color: rgba(255, 255, 255, 0.68);
+  background: color-mix(in srgb, var(--admin-muted) 16%, var(--admin-surface));
+  color: var(--admin-muted);
 }
 
 .admin-order-card.has-manual-action .admin-order-meta,
@@ -1767,7 +1828,7 @@ button, input {
 }
 
 :root[data-admin-theme='light'] .admin-start-order-btn:not(:disabled) {
-  color: #ffffff;
+  color: var(--admin-on-accent);
 }
 
 .admin-queue-notes {
@@ -1810,7 +1871,7 @@ button, input {
   height: 48px;
   border-radius: 16px;
   background: var(--admin-accent-primary);
-  color: var(--admin-bg);
+  color: var(--admin-on-accent);
   box-shadow: 0 10px 28px color-mix(in srgb, var(--admin-accent-primary) 20%, transparent);
 }
 
@@ -3110,7 +3171,7 @@ button, input {
 .admin-returns-progress > div.is-complete > b {
   border-color: var(--admin-accent-primary);
   background: var(--admin-accent-primary);
-  color: #fff;
+  color: var(--admin-on-accent);
 }
 
 .admin-returns-progress > div.is-complete > b {
@@ -4694,7 +4755,7 @@ button, input {
 .admin-toggle-pill.is-active {
   background: var(--admin-accent-primary);
   border-color: var(--admin-accent-primary);
-  color: #08120a;
+  color: var(--admin-on-accent);
   font-weight: 800;
 }
 
@@ -5726,6 +5787,37 @@ button, input {
     grid-column: 2;
     justify-self: start;
   }
+}
+
+.admin-order-records-drawer {
+  place-items: stretch end;
+  padding: 10px;
+}
+
+.admin-order-records-drawer-card {
+  width: min(560px, calc(100vw - 20px));
+  height: calc(100svh - 20px);
+  max-height: none;
+  padding: 20px;
+  border-radius: 22px !important;
+}
+
+.admin-order-records-detail-section {
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.admin-order-record-item,
+.admin-order-record-event {
+  border-radius: 12px;
+}
+
+.admin-order-record-event {
+  border-left: 3px solid var(--admin-info);
+}
+
+.admin-order-record-event.is-error {
+  border-left-color: var(--admin-danger);
 }
 
 @media (max-width: 820px) {
@@ -7214,7 +7306,7 @@ button.admin-store-sidebar-profile:hover {
   width: 32px;
   height: 32px;
   background: var(--admin-accent-primary);
-  color: var(--admin-bg);
+  color: var(--admin-on-accent);
 }
 
 .admin-store-header-profile .admin-store-profile-copy small {
@@ -8165,7 +8257,7 @@ button.admin-store-sidebar-profile:hover {
 
 .admin-walkins-row-icon.is-scanned {
   background: var(--admin-accent-primary);
-  color: var(--admin-bg);
+  color: var(--admin-on-accent);
 }
 
 .admin-walkins-row-main {
@@ -8567,7 +8659,7 @@ button.admin-store-sidebar-profile:hover {
 
 .admin-walkins-payment-grid button.is-active {
   background: var(--admin-accent-primary);
-  color: var(--admin-bg);
+  color: var(--admin-on-accent);
 }
 
 .admin-walkins-action-row {
@@ -8685,7 +8777,7 @@ button.admin-store-sidebar-profile:hover {
   height: 72px;
   border-radius: 50%;
   background: var(--admin-accent-primary);
-  color: var(--admin-bg);
+  color: var(--admin-on-accent);
 }
 
 .admin-walkins-complete-icon svg {
@@ -9240,6 +9332,12 @@ button.admin-store-sidebar-profile:hover {
   overflow: auto;
 }
 
+.admin-order-records-events::before,
+.admin-order-records-events::after {
+  display: none;
+  background: none;
+}
+
 .admin-order-record-event {
   padding: 12px;
   border: 1px solid var(--admin-border);
@@ -9255,6 +9353,267 @@ button.admin-store-sidebar-profile:hover {
 
 .admin-order-record-event small {
   margin-top: 5px;
+}
+
+/* Order Records workspace */
+.admin-store-shell .admin-order-records-layout {
+  width: min(1600px, 100%);
+  margin: 0 auto;
+  padding: 4px 18px 22px;
+  gap: 14px;
+}
+
+.admin-order-records-metrics {
+  gap: 12px;
+}
+
+.admin-order-record-stat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  min-width: 0;
+  min-height: 78px;
+  padding: 14px 16px;
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  background: var(--admin-surface);
+}
+
+.admin-order-record-stat > span {
+  display: grid;
+  gap: 5px;
+}
+
+.admin-order-record-stat small,
+.admin-order-record-stat p {
+  color: var(--admin-muted);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.admin-order-record-stat small {
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.admin-order-record-stat strong {
+  color: var(--admin-text);
+  font: 900 clamp(1.45rem, 2vw, 2rem)/1 'Space Grotesk', sans-serif;
+}
+
+.admin-order-record-stat p {
+  max-width: 150px;
+  margin: 0;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.admin-order-records-filter-panel,
+.admin-order-records-panel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--admin-border);
+  border-radius: 18px;
+  background: var(--admin-surface);
+}
+
+.admin-order-records-filter-panel {
+  padding: 16px;
+}
+
+.admin-order-records-section-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-order-records-section-head > div {
+  display: grid;
+  gap: 3px;
+}
+
+.admin-order-records-section-head span {
+  color: var(--admin-muted);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+
+.admin-order-records-section-head h2 {
+  margin: 0;
+  color: var(--admin-text);
+  font: 850 1.05rem/1.2 'Space Grotesk', sans-serif;
+}
+
+.admin-order-records-section-head > small {
+  color: var(--admin-muted);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.admin-order-records-filters {
+  grid-template-columns: minmax(132px, .65fr) minmax(132px, .65fr) minmax(170px, 1fr) minmax(160px, .8fr) minmax(190px, 1fr) auto;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.admin-order-records-filters label {
+  gap: 6px;
+}
+
+.admin-order-records-filters input,
+.admin-order-records-filters select {
+  min-height: 40px;
+  border-radius: 11px;
+  background: var(--admin-surface-soft);
+  font-size: 11px;
+}
+
+.admin-order-records-filters input:hover,
+.admin-order-records-filters select:hover {
+  border-color: color-mix(in srgb, var(--admin-text) 24%, var(--admin-border));
+}
+
+.admin-order-records-filters input:focus,
+.admin-order-records-filters select:focus {
+  border-color: var(--admin-accent-primary);
+}
+
+.admin-order-records-filter-actions {
+  align-items: center;
+}
+
+.admin-order-records-filter-actions button {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 11px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.admin-order-records-history-head {
+  padding: 15px 17px;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-order-records-table-wrap {
+  max-height: calc(100svh - 350px);
+  border: 0;
+  border-radius: 0;
+}
+
+.admin-order-records-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-order-records-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--admin-surface-strong);
+}
+
+.admin-order-records-table th {
+  height: 40px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--admin-border);
+  color: var(--admin-muted);
+  font-size: 9px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.admin-order-records-table td {
+  height: 68px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--admin-border);
+  color: var(--admin-text);
+  font-size: 12px;
+}
+
+.admin-order-records-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.admin-order-record-row:hover,
+.admin-order-record-row:focus-visible {
+  background: color-mix(in srgb, var(--admin-info) 5%, var(--admin-surface));
+}
+
+.admin-order-record-row td:first-child strong {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+}
+
+.admin-order-record-row .admin-status-badge,
+.admin-order-record-scan,
+.admin-order-record-duration,
+.admin-order-record-operator {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  min-height: 25px;
+  padding: 0 9px;
+  border: 1px solid var(--admin-border);
+  border-radius: 999px;
+  background: var(--admin-surface-soft);
+  color: var(--admin-text);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.admin-order-record-row .admin-status-badge {
+  min-height: 22px;
+  color: var(--admin-success);
+}
+
+.admin-order-record-scan.is-error {
+  border-color: color-mix(in srgb, var(--admin-danger) 38%, var(--admin-border));
+  color: var(--admin-danger);
+}
+
+.admin-order-record-duration {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--admin-info) 9%, var(--admin-surface));
+  color: var(--admin-info);
+}
+
+.admin-order-record-duration.is-missing {
+  background: var(--admin-surface-soft);
+  color: var(--admin-muted);
+}
+
+:root[data-admin-theme='light'] .admin-po-line-check i {
+  border-color: rgba(17, 24, 39, .22);
+  background: #fff;
+}
+
+:root[data-admin-theme='light'] .admin-po-line-check input:checked + i {
+  border-color: var(--admin-accent-primary);
+  background: var(--admin-accent-primary);
+}
+
+:root[data-admin-theme='light'] .admin-po-receive-card footer button:not(:disabled) {
+  box-shadow: 0 1px 2px rgba(17, 24, 39, .16);
+}
+
+:root[data-admin-theme='light'] .admin-po-receive-card footer button:disabled {
+  border-color: rgba(17, 24, 39, .12);
+  background: #eef0f2;
+  color: rgba(55, 62, 72, .62);
+}
+
+@media (max-width: 1180px) {
+  .admin-order-records-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .admin-order-records-filter-actions {
+    grid-column: auto;
+  }
 }
 
 .admin-invoice-records-layout {
@@ -10988,7 +11347,7 @@ button.admin-store-sidebar-profile:hover {
 }
 
 .admin-po-line-check input:checked + i::after {
-  color: #0b0d0f;
+  color: var(--admin-on-accent);
   content: "✓";
   font-size: 0.8rem;
   font-style: normal;
@@ -11095,14 +11454,14 @@ button.admin-store-sidebar-profile:hover {
   border: 1px solid var(--admin-accent-primary);
   border-radius: 12px;
   background: var(--admin-accent-primary);
-  color: #0b0d0f;
+  color: var(--admin-on-accent);
   font: 900 0.72rem/1 "Plus Jakarta Sans", sans-serif;
   cursor: pointer;
 }
 
 .admin-po-receive-card footer button:disabled {
   border-color: var(--admin-border);
-  background: color-mix(in srgb, var(--admin-text) 8%, transparent);
+  background: color-mix(in srgb, var(--admin-muted) 10%, var(--admin-surface));
   color: var(--admin-muted);
   cursor: not-allowed;
 }
@@ -11379,4 +11738,38 @@ button.admin-store-sidebar-profile:hover {
 .admin-start-order-btn.is-arrangement-retry {
   background: #ffb020;
   color: #15100a;
+}
+
+@media (max-width: 640px) {
+  .admin-order-records-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-order-record-stat {
+    min-height: 72px;
+    padding: 12px;
+  }
+
+  .admin-order-record-stat p {
+    display: none;
+  }
+
+  .admin-store-shell .admin-order-records-layout {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .admin-order-records-section-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-order-records-drawer {
+    padding: 6px;
+  }
+
+  .admin-order-records-drawer-card {
+    width: calc(100vw - 12px);
+    height: calc(100svh - 12px);
+  }
 }

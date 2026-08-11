@@ -44,7 +44,9 @@ document.addEventListener('DOMContentLoaded', () => {
     drawerMeta: document.querySelector('[data-order-records-drawer-meta]'),
     events: document.querySelector('[data-order-records-events]'),
     items: document.querySelector('[data-order-records-items]'),
-    itemsBody: document.querySelector('[data-order-records-items-body]')
+    itemsBody: document.querySelector('[data-order-records-items-body]'),
+    averageContext: document.querySelector('[data-order-records-average-context]'),
+    submit: document.querySelector('[data-order-records-filters] button[type="submit"]')
   };
   const state = { records: [], operatorsReady: false };
 
@@ -112,6 +114,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const key = node.dataset.orderRecordsSummary || '';
       node.textContent = String(summary[key] ?? (key === 'average_label' ? '-' : 0));
     });
+    if (refs.averageContext) {
+      const timed = Math.max(0, Number(summary.timed_orders || 0));
+      const processed = Math.max(0, Number(summary.processed || 0));
+      refs.averageContext.textContent = timed > 0
+        ? `Based on ${timed} of ${processed} timed order${timed === 1 ? '' : 's'}`
+        : 'No processing start data in this range';
+    }
   };
 
   const renderOperators = (operators = []) => {
@@ -126,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const renderRecords = () => {
     if (!refs.body) return;
-    if (refs.status) refs.status.textContent = `${state.records.length} processed order${state.records.length === 1 ? '' : 's'} shown.`;
+    if (refs.status) refs.status.textContent = `${state.records.length} processed order${state.records.length === 1 ? '' : 's'} shown`;
     if (!state.records.length) {
       refs.body.innerHTML = '<tr><td colspan="6" class="admin-empty">No processed orders match these filters.</td></tr>';
       return;
@@ -139,10 +148,10 @@ document.addEventListener('DOMContentLoaded', () => {
         aria-label="View processed order ${escapeHtml(record.order_id)}">
         <td><strong>${escapeHtml(record.order_id)}</strong><small><span class="admin-status-badge">Processed</span></small></td>
         <td><strong>${escapeHtml(record.source_label || record.source_platform)}</strong><small>${escapeHtml(record.source_account === 'default' ? '' : record.source_account)}</small></td>
-        <td>${escapeHtml(record.processed_by_name || record.processed_by || '-')}</td>
-        <td><strong>${escapeHtml(presentation.scanLabel(record))}</strong>${record.scan_error_count ? `<small class="is-error">${escapeHtml(record.scan_error_count)} scan issue${record.scan_error_count === 1 ? '' : 's'}</small>` : ''}</td>
+        <td><span class="admin-order-record-operator">${escapeHtml(record.processed_by_name || record.processed_by || '-')}</span></td>
+        <td><span class="admin-order-record-scan${record.scan_error_count ? ' is-error' : ''}">${escapeHtml(presentation.scanLabel(record))}</span>${record.scan_error_count ? `<small class="is-error">${escapeHtml(record.scan_error_count)} scan issue${record.scan_error_count === 1 ? '' : 's'}</small>` : ''}</td>
         <td>${escapeHtml(formatTime(record.fulfilled_at))}</td>
-        <td>${escapeHtml(record.duration_label || '-')}</td>
+        <td><span class="admin-order-record-duration${record.duration_seconds == null ? ' is-missing' : ''}">${escapeHtml(record.duration_label || '—')}</span></td>
       </tr>
     `).join('');
   };
@@ -186,13 +195,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const load = async () => {
     setError('');
     if (refs.status) refs.status.textContent = 'Loading records.';
-    const payload = await request();
-    if (refs.dateFrom instanceof HTMLInputElement && !refs.dateFrom.value) refs.dateFrom.value = payload.filters?.date_from || '';
-    if (refs.dateTo instanceof HTMLInputElement && !refs.dateTo.value) refs.dateTo.value = payload.filters?.date_to || '';
-    state.records = Array.isArray(payload.records) ? payload.records : [];
-    renderSummary(payload.summary || {});
-    renderOperators(Array.isArray(payload.operators) ? payload.operators : []);
-    renderRecords();
+    if (refs.submit instanceof HTMLButtonElement) { refs.submit.disabled = true; refs.submit.textContent = 'Loading…'; }
+    try {
+      const payload = await request();
+      if (refs.dateFrom instanceof HTMLInputElement && !refs.dateFrom.value) refs.dateFrom.value = payload.filters?.date_from || '';
+      if (refs.dateTo instanceof HTMLInputElement && !refs.dateTo.value) refs.dateTo.value = payload.filters?.date_to || '';
+      state.records = Array.isArray(payload.records) ? payload.records : [];
+      renderSummary(payload.summary || {});
+      renderOperators(Array.isArray(payload.operators) ? payload.operators : []);
+      renderRecords();
+    } finally {
+      if (refs.submit instanceof HTMLButtonElement) { refs.submit.disabled = false; refs.submit.textContent = 'Apply filters'; }
+    }
   };
 
   const openDrawer = async (row) => {

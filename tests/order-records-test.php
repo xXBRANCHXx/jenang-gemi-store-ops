@@ -25,6 +25,8 @@ order_records_expect('2026-07-28', $defaults['date_to'], 'The default range must
 order_records_expect('Whatsapp', jg_store_ops_order_records_source_label('whatsapp', 'jenang-gemi'), 'WhatsApp must override generic account labels.');
 order_records_expect('JG Shopee', jg_store_ops_order_records_source_label('shopee', 'jenang-gemi-shopee'), 'Known marketplace accounts must keep their friendly labels.');
 order_records_expect('1h 2m', jg_store_ops_order_records_duration_label(3725), 'Fulfillment duration must use a compact readable label.');
+order_records_expect(95, jg_store_ops_order_records_elapsed_seconds('2026-07-28 01:00:00', '2026-07-28 01:01:35'), 'Processing duration must be calculated from recovered start and completion timestamps.');
+order_records_expect(null, jg_store_ops_order_records_elapsed_seconds('', '2026-07-28 01:01:35'), 'Missing legacy start times must remain excluded from the average.');
 $snapshot = jg_store_ops_fulfillment_items_snapshot([
     ['sku' => '010155002701', 'productName' => 'ZERO Syrup Pistachio 550 ml', 'quantity' => 1, 'skipScan' => true],
 ]);
@@ -35,6 +37,13 @@ order_records_expect([
 $processedJoin = jg_store_ops_order_records_processed_join_sql();
 order_records_expect(true, str_contains($processedJoin, 'event_type = "fulfill"'), 'Order Records must require the real fulfill event.');
 order_records_expect(false, str_contains($processedJoin, 'remove_from_listed'), 'Removed queue rows must never qualify as processed orders.');
+$durationStart = jg_store_ops_order_records_duration_start_sql();
+order_records_expect(true, str_contains($durationStart, 'f.claimed_at'), 'Average processing time must prefer the canonical claim timestamp.');
+order_records_expect(true, str_contains($durationStart, 'event_type IN ("claim", "reclaim")'), 'Historical records must recover their start time from claim events.');
+order_records_expect(true, str_contains($durationStart, 'event_type IN ("scan", "scan_complete", "label_print")'), 'Legacy records without claim events must use their first real processing event.');
+$sourceParts = jg_store_ops_order_records_query_parts(['source' => 'shopee']);
+order_records_expect('%shopee%', $sourceParts['params'][':source_platform'] ?? null, 'Source filtering must bind a native-safe platform placeholder.');
+order_records_expect('%shopee%', $sourceParts['params'][':source_account'] ?? null, 'Source filtering must bind a separate native-safe account placeholder.');
 
 $summary = jg_store_ops_order_records_summary([
     ['processed_by' => 'employee-1', 'duration_seconds' => 60, 'fulfilled_at' => '2026-07-28 01:00:00'],
@@ -43,6 +52,7 @@ $summary = jg_store_ops_order_records_summary([
 order_records_expect(2, $summary['processed'], 'Processed summary must count the filtered records.');
 order_records_expect(2, $summary['processed_today'], 'UTC completion times must be compared using the Jakarta business day.');
 order_records_expect(2, $summary['operators'], 'Processed summary must count distinct operators.');
+order_records_expect(2, $summary['timed_orders'], 'Processed summary must disclose how many records contributed to average time.');
 order_records_expect('1m 30s', $summary['average_label'], 'Processed summary must average claim-to-completion time.');
 
 echo "order-records-test: ok\n";

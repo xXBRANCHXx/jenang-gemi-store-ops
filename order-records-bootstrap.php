@@ -57,6 +57,22 @@ function jg_store_ops_order_records_duration_label(?int $seconds): string
     return $hours . 'h' . ($minutes % 60 > 0 ? ' ' . ($minutes % 60) . 'm' : '');
 }
 
+function jg_store_ops_order_records_elapsed_seconds(mixed $startedAt, mixed $fulfilledAt): ?int
+{
+    $startedAt = trim((string) $startedAt);
+    $fulfilledAt = trim((string) $fulfilledAt);
+    if ($startedAt === '' || $fulfilledAt === '') return null;
+    try {
+        $utc = new DateTimeZone('UTC');
+        $started = new DateTimeImmutable($startedAt, $utc);
+        $fulfilled = new DateTimeImmutable($fulfilledAt, $utc);
+        $seconds = $fulfilled->getTimestamp() - $started->getTimestamp();
+        return $seconds >= 0 ? $seconds : null;
+    } catch (Throwable) {
+        return null;
+    }
+}
+
 function jg_store_ops_order_records_source_label(string $platform, string $account = ''): string
 {
     $platform = jg_store_ops_fulfillment_normalize_key_part($platform, 32);
@@ -99,10 +115,33 @@ function jg_store_ops_order_records_processed_join_sql(): string
             )';
 }
 
-/**
- * @return array<int, array<string, mixed>>
- */
-function jg_store_ops_order_records(PDO $pdo, array $filters): array
+function jg_store_ops_order_records_duration_start_sql(): string
+{
+    return 'COALESCE(
+        f.claimed_at,
+        (
+            SELECT MAX(start_event.created_at)
+            FROM store_ops_order_events_v2 start_event
+            WHERE start_event.source_platform = f.source_platform
+              AND start_event.source_account = f.source_account
+              AND start_event.order_id = f.order_id
+              AND start_event.event_type IN ("claim", "reclaim")
+              AND start_event.created_at <= f.fulfilled_at
+        ),
+        (
+            SELECT MIN(work_event.created_at)
+            FROM store_ops_order_events_v2 work_event
+            WHERE work_event.source_platform = f.source_platform
+              AND work_event.source_account = f.source_account
+              AND work_event.order_id = f.order_id
+              AND work_event.event_type IN ("scan", "scan_complete", "label_print")
+              AND work_event.created_at <= f.fulfilled_at
+        )
+    )';
+}
+
+/** @return array{where:list<string>,params:array<string,string>} */
+function jg_store_ops_order_records_query_parts(array $filters): array
 {
     $bounds = jg_store_ops_order_records_bounds($filters);
     $where = [
@@ -111,11 +150,7 @@ function jg_store_ops_order_records(PDO $pdo, array $filters): array
         'f.fulfilled_at >= :start_at',
         'f.fulfilled_at < :end_at',
     ];
-    $params = [
-        ':start_at' => $bounds['start_utc'],
-        ':end_at' => $bounds['end_utc'],
-    ];
-
+    $params = [':start_at' => $bounds['start_utc'], ':end_at' => $bounds['end_utc']];
     $query = substr(trim((string) ($filters['q'] ?? '')), 0, 96);
     if ($query !== '') {
         $where[] = 'f.order_id LIKE :query';
@@ -123,15 +158,28 @@ function jg_store_ops_order_records(PDO $pdo, array $filters): array
     }
     $source = substr(trim((string) ($filters['source'] ?? '')), 0, 96);
     if ($source !== '') {
-        $where[] = '(f.source_platform LIKE :source OR f.source_account LIKE :source)';
-        $params[':source'] = '%' . $source . '%';
+        $where[] = '(f.source_platform LIKE :source_platform OR f.source_account LIKE :source_account)';
+        $params[':source_platform'] = '%' . $source . '%';
+        $params[':source_account'] = '%' . $source . '%';
     }
     $operator = substr(trim((string) ($filters['operator'] ?? '')), 0, 64);
     if ($operator !== '') {
         $where[] = 'COALESCE(NULLIF(done.employee_id, ""), f.claimed_by, "") = :operator';
         $params[':operator'] = $operator;
     }
+    return ['where' => $where, 'params' => $params];
+}
 
+/**
+ * @return array<int, array<string, mixed>>
+ */
+function jg_store_ops_order_records(PDO $pdo, array $filters): array
+{
+    $parts = jg_store_ops_order_records_query_parts($filters);
+    $where = $parts['where'];
+    $params = $parts['params'];
+
+    $durationStartSql = jg_store_ops_order_records_duration_start_sql();
     $stmt = $pdo->prepare(
         'SELECT
             f.source_platform,
@@ -143,9 +191,9 @@ function jg_store_ops_order_records(PDO $pdo, array $filters): array
             f.fulfilled_at,
             f.scan_required,
             f.scan_completed,
+            ' . $durationStartSql . ' AS processing_started_at,
             COALESCE(NULLIF(done.employee_id, ""), f.claimed_by, "") AS processed_by,
             COALESCE(NULLIF(done.employee_name, ""), employee.display_name, f.claimed_by, "") AS processed_by_name,
-            TIMESTAMPDIFF(SECOND, f.claimed_at, f.fulfilled_at) AS duration_seconds,
             (
                 SELECT COUNT(*)
                 FROM store_ops_order_events_v2 error_event
@@ -167,7 +215,7 @@ function jg_store_ops_order_records(PDO $pdo, array $filters): array
     $records = [];
     foreach ($stmt->fetchAll() as $row) {
         if (!is_array($row)) continue;
-        $duration = $row['duration_seconds'] !== null ? max(0, (int) $row['duration_seconds']) : null;
+        $duration = jg_store_ops_order_records_elapsed_seconds($row['processing_started_at'] ?? null, $row['fulfilled_at'] ?? null);
         $records[] = [
             'source_platform' => (string) ($row['source_platform'] ?? ''),
             'source_account' => (string) ($row['source_account'] ?? ''),
@@ -176,6 +224,7 @@ function jg_store_ops_order_records(PDO $pdo, array $filters): array
             'processed_by' => (string) ($row['processed_by'] ?? ''),
             'processed_by_name' => (string) ($row['processed_by_name'] ?? ''),
             'claimed_at' => $row['claimed_at'] ?? null,
+            'processing_started_at' => $row['processing_started_at'] ?? null,
             'scan_completed_at' => $row['scan_completed_at'] ?? null,
             'label_printed_at' => $row['label_printed_at'] ?? null,
             'fulfilled_at' => $row['fulfilled_at'] ?? null,
@@ -189,9 +238,47 @@ function jg_store_ops_order_records(PDO $pdo, array $filters): array
     return $records;
 }
 
+/** @return array{processed:int,processed_today:int,operators:int,timed_orders:int,average_seconds:int,average_label:string} */
+function jg_store_ops_order_records_summary_from_db(PDO $pdo, array $filters, ?DateTimeImmutable $now = null): array
+{
+    $parts = jg_store_ops_order_records_query_parts($filters);
+    $jakarta = new DateTimeZone('Asia/Jakarta');
+    $today = ($now ?? new DateTimeImmutable('now', $jakarta))->setTimezone($jakarta)->format('Y-m-d');
+    $todayBounds = jg_store_ops_order_records_bounds(['date_from' => $today, 'date_to' => $today], $now);
+    $params = $parts['params'] + [':today_start' => $todayBounds['start_utc'], ':today_end' => $todayBounds['end_utc']];
+    $durationStartSql = jg_store_ops_order_records_duration_start_sql();
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*) AS processed,
+                COALESCE(SUM(CASE WHEN fulfilled_at >= :today_start AND fulfilled_at < :today_end THEN 1 ELSE 0 END), 0) AS processed_today,
+                COUNT(DISTINCT NULLIF(processed_by, "")) AS operators,
+                COUNT(CASE WHEN processing_started_at IS NOT NULL AND processing_started_at <= fulfilled_at THEN 1 END) AS timed_orders,
+                COALESCE(ROUND(AVG(CASE WHEN processing_started_at IS NOT NULL AND processing_started_at <= fulfilled_at THEN TIMESTAMPDIFF(SECOND, processing_started_at, fulfilled_at) END)), 0) AS average_seconds
+         FROM (
+             SELECT f.fulfilled_at,
+                    COALESCE(NULLIF(done.employee_id, ""), f.claimed_by, "") AS processed_by,
+                    ' . $durationStartSql . ' AS processing_started_at
+             FROM store_ops_order_fulfillment_v2 f
+             ' . jg_store_ops_order_records_processed_join_sql() . '
+             WHERE ' . implode(' AND ', $parts['where']) . '
+         ) summary_rows'
+    );
+    $stmt->execute($params);
+    $row = $stmt->fetch() ?: [];
+    $timed = max(0, (int) ($row['timed_orders'] ?? 0));
+    $average = max(0, (int) ($row['average_seconds'] ?? 0));
+    return [
+        'processed' => max(0, (int) ($row['processed'] ?? 0)),
+        'processed_today' => max(0, (int) ($row['processed_today'] ?? 0)),
+        'operators' => max(0, (int) ($row['operators'] ?? 0)),
+        'timed_orders' => $timed,
+        'average_seconds' => $average,
+        'average_label' => $timed > 0 ? jg_store_ops_order_records_duration_label($average) : '-',
+    ];
+}
+
 /**
  * @param array<int, array<string, mixed>> $records
- * @return array{processed:int,processed_today:int,operators:int,average_seconds:int,average_label:string}
+ * @return array{processed:int,processed_today:int,operators:int,timed_orders:int,average_seconds:int,average_label:string}
  */
 function jg_store_ops_order_records_summary(array $records, ?DateTimeImmutable $now = null): array
 {
@@ -224,6 +311,7 @@ function jg_store_ops_order_records_summary(array $records, ?DateTimeImmutable $
         'processed' => count($records),
         'processed_today' => $processedToday,
         'operators' => count($operators),
+        'timed_orders' => $durationCount,
         'average_seconds' => $average,
         'average_label' => $durationCount > 0 ? jg_store_ops_order_records_duration_label($average) : '-',
     ];

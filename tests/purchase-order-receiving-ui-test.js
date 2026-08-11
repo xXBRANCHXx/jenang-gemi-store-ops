@@ -15,6 +15,8 @@ assert.match(page, /data-po-filter="open" aria-pressed="true"/);
 assert.doesNotMatch(page, /data-invoice-upload-form|Upload supplier invoices/);
 assert.doesNotMatch(page, /admin-po-receiving-hero|admin-po-metrics|admin-metric-card/);
 assert.match(styles, /\/\* Flat receiving ledger \*\/[\s\S]*\.admin-po-receive-card,[\s\S]*border-radius: 0;[\s\S]*box-shadow: none;/);
+assert.match(styles, /\.admin-po-line-check input:checked \+ i::after\s*\{[\s\S]*color:\s*var\(--admin-on-accent\)/, 'Selected receiving checkboxes must retain a contrasting checkmark.');
+assert.match(styles, /\.admin-po-receive-card footer button\s*\{[\s\S]*color:\s*var\(--admin-on-accent\)/, 'Receiving actions must retain contrasting text in light mode.');
 
 assert.match(script, /data-po-item-check/);
 assert.match(script, /data-po-item-quantity/);
