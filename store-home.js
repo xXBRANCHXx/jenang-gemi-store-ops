@@ -43,6 +43,19 @@
     return ['PROCESSED', 'AWAITING_COLLECTION', 'IN_TRANSIT', 'SHIPPED', 'DELIVERED', 'COMPLETED']
       .includes(normalizedMarketplaceStatus(order));
   };
+  const isDelayedMarketplaceOrder = (order) => {
+    const platform = String(order?.platform || '').trim().toLowerCase();
+    const arrangementState = String(order?.shopeeArrangementState || order?.shopee_arrangement_state || '')
+      .trim()
+      .toLowerCase();
+    const arrangementError = String(order?.shopeeArrangementError || order?.shopee_arrangement_error || '')
+      .trim()
+      .toLowerCase();
+    return platform === 'shopee'
+      && !isMarketplaceShipmentArranged(order)
+      && arrangementState === 'failed'
+      && arrangementError.includes('shipping parameters can only be obtained when package is ready to be shipped');
+  };
   const normalizeDeadline = (order, now = Date.now()) => {
     const deadlineAt = Number(order?.deadlineAt || order?.deadline_at || 0);
     const deadlineType = String(order?.deadlineType || order?.deadline_type || 'deadline');
@@ -55,24 +68,28 @@
     const deadlineSatisfied = ['shopee', 'tiktok'].includes(platform)
       && isMarketplaceShipmentArranged(order)
       && preArrangementDeadline;
+    const deadlineDelayed = isDelayedMarketplaceOrder(order);
     return {
       deadlineAt: Number.isFinite(deadlineAt) && deadlineAt > 0 ? deadlineAt : now + 86400000,
       deadlineType,
-      deadlineLabel: deadlineSatisfied ? '' : deadlineLabel,
-      deadlineSatisfied
+      deadlineLabel: deadlineSatisfied || deadlineDelayed ? '' : deadlineLabel,
+      deadlineSatisfied,
+      deadlineDelayed
     };
   };
 
   const minutesRemaining = (order, now = Date.now()) => Math.ceil((Number(order?.deadlineAt || 0) - now) / 60000);
   const isCriticalOrder = (order, now = Date.now()) => !order?.deadlineSatisfied
+    && !order?.deadlineDelayed
     && Number(order?.deadlineAt || 0) - now < 60 * 60000;
   const shouldSoundSiren = (order, now = Date.now()) => {
-    if (order?.deadlineSatisfied) return false;
+    if (order?.deadlineSatisfied || order?.deadlineDelayed) return false;
     const thresholdMs = order?.instant ? 2 * 60 * 60000 : 60 * 60000;
     const remainingMs = Number(order?.deadlineAt || 0) - now;
     return remainingMs > 0 && remainingMs < thresholdMs;
   };
   const formatDeadline = (order, now = Date.now()) => {
+    if (order?.deadlineDelayed || isDelayedMarketplaceOrder(order)) return 'Delayed';
     if (order?.deadlineSatisfied) {
       const hours = Math.max(0, Math.ceil((Number(order?.deadlineAt || 0) - now) / 3600000));
       return `${hours}h`;
@@ -148,6 +165,7 @@
     .slice()
     .sort((a, b) => Number(Boolean(b?.instant)) - Number(Boolean(a?.instant))
       || Number(Boolean(b?.weekendDependent)) - Number(Boolean(a?.weekendDependent))
+      || Number(Boolean(a?.deadlineDelayed)) - Number(Boolean(b?.deadlineDelayed))
       || Number(a?.deadlineAt || Number.MAX_SAFE_INTEGER) - Number(b?.deadlineAt || Number.MAX_SAFE_INTEGER));
   const canCurrentEmployeeUnclaim = (order, currentEmployeeId) => {
     const claimant = String(order?.claimedBy || order?.claimed_by || '').trim();
@@ -207,6 +225,7 @@
   global.JGStoreOrderPresentation = Object.freeze({
     normalizeDeadline,
     isMarketplaceShipmentArranged,
+    isDelayedMarketplaceOrder,
     minutesRemaining,
     isCriticalOrder,
     shouldSoundSiren,
@@ -1404,6 +1423,7 @@ document.addEventListener('DOMContentLoaded', () => {
       deadlineType: deadline.deadlineType,
       deadlineLabel: deadline.deadlineLabel,
       deadlineSatisfied: deadline.deadlineSatisfied,
+      deadlineDelayed: deadline.deadlineDelayed,
       fulfillmentStatus: String(order.fulfillmentStatus || 'UNCLAIMED'),
       claimedBy: order.claimedBy || null,
       claimedByName: String(order.claimedByName || ''),

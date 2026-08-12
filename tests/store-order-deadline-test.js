@@ -56,6 +56,23 @@ assert(collection.deadlineType === 'collection_due', 'Store Ops must preserve th
 assert(collection.deadlineLabel === 'Collection due', 'Store Ops must render the post-arrangement deadline label.');
 assert(presentation.formatDeadline(collection, now) === '1h 30m', 'Store Ops must format the collection countdown from the supplied deadline.');
 
+const delayedShopee = presentation.normalizeDeadline({
+  platform: 'Shopee',
+  shipmentArranged: false,
+  shopeeManualRequired: true,
+  shopeeArrangementState: 'failed',
+  shopeeArrangementError: 'Shipping parameters can only be obtained when package is ready to be shipped',
+  deadlineAt: now - 24 * 60 * 60000,
+  deadlineType: 'estimated',
+  deadlineLabel: 'Estimated deadline',
+  deadlineSource: 'created_plus_24h'
+}, now);
+assert(delayedShopee.deadlineDelayed === true, 'Shopee package-readiness holds must be recognized as delayed orders.');
+assert(delayedShopee.deadlineLabel === '', 'A delayed order must not retain the false estimated-deadline label.');
+assert(presentation.formatDeadline(delayedShopee, now) === 'Delayed', 'A delayed order must display Delayed instead of a countdown.');
+assert(presentation.isCriticalOrder(delayedShopee, now) === false, 'A delayed order without a real deadline must not become urgent.');
+assert(presentation.shouldSoundSiren(delayedShopee, now) === false, 'A delayed order without a real deadline must not sound the siren.');
+
 const fallback = presentation.normalizeDeadline({}, now);
 assert(fallback.deadlineAt === now + 86400000, 'A missing deadline must receive the existing safe 24-hour fallback.');
 assert(fallback.deadlineLabel === 'Deadline', 'A non-marketplace fallback must retain the generic label.');
@@ -98,9 +115,10 @@ const ranked = presentation.sortOrdersByUrgency([
   { id: 'REGULAR-EARLY', deadlineAt: now + 30 * 60000 },
   { id: 'WEEKEND', weekendDependent: true, deadlineAt: now + 10 * 60000 },
   { id: 'INSTANT', instant: true, deadlineSatisfied: true, deadlineAt: now + 3 * 60 * 60000 },
-  { id: 'REGULAR-LATE', deadlineAt: now + 5 * 60 * 60000 }
+  { id: 'REGULAR-LATE', deadlineAt: now + 5 * 60 * 60000 },
+  { id: 'DELAYED', deadlineDelayed: true, deadlineAt: now - 5 * 60 * 60000 }
 ]);
-assert(ranked.map((order) => order.id).join(',') === 'INSTANT,WEEKEND,REGULAR-EARLY,REGULAR-LATE', 'Instant orders must rank first, followed by the existing urgency classes and deadline order.');
+assert(ranked.map((order) => order.id).join(',') === 'INSTANT,WEEKEND,REGULAR-EARLY,REGULAR-LATE,DELAYED', 'Orders with real deadlines must rank ahead of delayed orders with no deadline.');
 
 assert(presentation.canCurrentEmployeeRemove('branch-vincent') === true, 'The branch-vincent profile must receive the protected Remove action.');
 assert(presentation.canCurrentEmployeeRemove('employee-1') === false, 'Other employee profiles must not receive the Remove action.');
