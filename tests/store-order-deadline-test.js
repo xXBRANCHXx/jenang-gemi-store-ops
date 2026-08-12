@@ -73,6 +73,21 @@ assert(presentation.formatDeadline(delayedShopee, now) === 'Delayed', 'A delayed
 assert(presentation.isCriticalOrder(delayedShopee, now) === false, 'A delayed order without a real deadline must not become urgent.');
 assert(presentation.shouldSoundSiren(delayedShopee, now) === false, 'A delayed order without a real deadline must not sound the siren.');
 
+const processableShopee = presentation.normalizeDeadline({
+  platform: 'Shopee',
+  shipmentArranged: false,
+  shopeeManualRequired: true,
+  shopeeArrangementState: 'failed',
+  shopeeArrangementError: 'Shipping parameters can only be obtained when package is ready to be shipped',
+  deadlineAt: now + 24 * 60 * 60000,
+  deadlineType: 'ship_by',
+  deadlineLabel: 'Ship by',
+  deadlineSource: 'ship_by_date'
+}, now);
+assert(processableShopee.deadlineDelayed === false, 'A real Shopee ship-by date must end the delayed presentation even if the stored retry error is stale.');
+assert(processableShopee.deadlineLabel === 'Ship by', 'A processable Shopee order must restore its real deadline label.');
+assert(presentation.formatDeadline(processableShopee, now) === '24h', 'A processable Shopee order must restore its real countdown.');
+
 const fallback = presentation.normalizeDeadline({}, now);
 assert(fallback.deadlineAt === now + 86400000, 'A missing deadline must receive the existing safe 24-hour fallback.');
 assert(fallback.deadlineLabel === 'Deadline', 'A non-marketplace fallback must retain the generic label.');

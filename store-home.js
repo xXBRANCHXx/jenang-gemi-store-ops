@@ -45,6 +45,8 @@
   };
   const isDelayedMarketplaceOrder = (order) => {
     const platform = String(order?.platform || '').trim().toLowerCase();
+    const deadlineType = String(order?.deadlineType || order?.deadline_type || '').trim().toLowerCase();
+    const deadlineSource = String(order?.deadlineSource || order?.deadline_source || '').trim().toLowerCase();
     const arrangementState = String(order?.shopeeArrangementState || order?.shopee_arrangement_state || '')
       .trim()
       .toLowerCase();
@@ -53,6 +55,7 @@
       .toLowerCase();
     return platform === 'shopee'
       && !isMarketplaceShipmentArranged(order)
+      && (deadlineType === 'estimated' || deadlineSource === 'created_plus_24h')
       && arrangementState === 'failed'
       && arrangementError.includes('shipping parameters can only be obtained when package is ready to be shipped');
   };
@@ -2396,8 +2399,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const marketplaceName = String(order.platform || 'marketplace').trim() || 'marketplace';
         actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-cancellation" title="Cancellation requested — do not process. Resolve it in ${escapeHtml(marketplaceName)}." disabled><span>Handle in ${escapeHtml(marketplaceName)}</span></button>`;
       } else if (shopeeManualRequired) {
+        const shopeeDelayed = Boolean(order.deadlineDelayed);
         const shopeeDisabled = !bigSetEnabled
           || isLocked
+          || shopeeDelayed
           || automaticShopeePending
           || ['processing', 'requested', 'label_pending'].includes(shopeeState);
         const shopeeLabel = !bigSetEnabled
@@ -2415,7 +2420,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 : 'Manual arrange')))));
         const shopeeTitle = automaticShopeePending
           ? 'Automatic Shopee arrangement is healthy and still owns this order.'
-          : (order.shopeeArrangementError || 'Arrange this Shopee order from Store Ops.');
+          : (shopeeDelayed
+            ? 'Shopee has delayed this order and has not released shipping options yet.'
+            : (order.shopeeArrangementError || 'Arrange this Shopee order from Store Ops.'));
         actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-shopee-action ${manualArrangementNeeded ? 'is-manual-needed' : ''}" data-arrange-shopee="${escapeHtml(order.id)}" title="${escapeHtml(shopeeTitle)}" ${shopeeDisabled ? 'disabled' : ''}><span>${escapeHtml(shopeeLabel)}</span></button>`;
       } else if (arrangementRetryRequired) {
         const retrying = String(order.arrangementRetryState || '').toLowerCase() === 'retrying';

@@ -196,6 +196,9 @@ assert(
     && storeHome.includes('shopeeManualRequired')
     && storeHome.includes('manualArrangementNeeded')
     && storeHome.includes("shopeeState === 'automatic' && !automaticArrangementPaused")
+    && storeHome.includes('const shopeeDelayed = Boolean(order.deadlineDelayed)')
+    && storeHome.includes('|| shopeeDelayed')
+    && storeHome.includes('Shopee has delayed this order and has not released shipping options yet.')
     && storeHome.includes('Auto-arranging…')
     && storeHome.includes('Manual arrange')
     && storeHome.includes('Retry label')
@@ -203,7 +206,7 @@ assert(
     && storeHome.includes("const arrangementIssue = order.instant && instantState === 'failed'")
     && storeHome.includes("order.weekendDependentCutoff || '12:00'")
     && storeHome.includes("isWeekendDependent ? 'is-weekend-dependent' : ''"),
-  'Instant orders must sort first, while server-authorized Shopee fallbacks are clearly labeled as manual arrangement.'
+  'Instant orders must sort first, while delayed Shopee fallbacks stay disabled until a real deadline makes them actionable.'
 );
 assert(
   !storeHome.includes('admin-instant-action-error')
