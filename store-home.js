@@ -2366,8 +2366,9 @@ document.addEventListener('DOMContentLoaded', () => {
         && !cancellationRequested;
       const instantState = String(order.instantArrangementState || '').trim().toLowerCase();
       const shopeeState = String(order.shopeeArrangementState || '').trim().toLowerCase();
+      const shopeeDelayed = Boolean(order.deadlineDelayed);
       const automaticShopeePending = shopeeState === 'automatic' && !automaticArrangementPaused;
-      const manualArrangementNeeded = shopeeManualRequired && (
+      const manualArrangementNeeded = shopeeManualRequired && !shopeeDelayed && (
         !shopeeState
         || ['required', 'failed', 'label_failed'].includes(shopeeState)
         || (shopeeState === 'automatic' && automaticArrangementPaused)
@@ -2399,7 +2400,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const marketplaceName = String(order.platform || 'marketplace').trim() || 'marketplace';
         actionButton = `<button type="button" class="admin-start-order-btn admin-manual-order-btn is-cancellation" title="Cancellation requested — do not process. Resolve it in ${escapeHtml(marketplaceName)}." disabled><span>Handle in ${escapeHtml(marketplaceName)}</span></button>`;
       } else if (shopeeManualRequired) {
-        const shopeeDelayed = Boolean(order.deadlineDelayed);
         const shopeeDisabled = !bigSetEnabled
           || isLocked
           || shopeeDelayed
@@ -2444,7 +2444,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       return `
         <article
-          class="admin-order-card ${isCritical && !isLocked && !order.instant ? 'is-deadline-urgent' : ''} ${order.instant ? 'is-instant' : ''} ${isWeekendDependent ? 'is-weekend-dependent' : ''} ${manualArrangementVisual ? 'is-manual-arrangement' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${arrangementRetryRequired ? 'is-arrangement-failed' : ''} ${pausedUnarranged || shopeeManualRequired ? 'is-awaiting-arrangement' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
+          class="admin-order-card ${isCritical && !isLocked && !order.instant ? 'is-deadline-urgent' : ''} ${order.instant ? 'is-instant' : ''} ${isWeekendDependent ? 'is-weekend-dependent' : ''} ${manualArrangementVisual ? 'is-manual-arrangement' : ''} ${cancellationRequested ? 'is-cancellation-requested' : ''} ${arrangementRetryRequired ? 'is-arrangement-failed' : ''} ${pausedUnarranged || (shopeeManualRequired && !shopeeDelayed) ? 'is-awaiting-arrangement' : ''} ${shopeeDelayed ? 'is-delayed' : ''} ${order.started ? 'is-started' : ''} ${isLocked ? 'is-locked' : ''} ${isDropOff ? 'is-drop-off' : ''}"
           data-order-id="${escapeHtml(order.id)}"
           data-source-key="${escapeHtml(sourceKey)}"
           ${claimedBySelf ? 'data-claim-owner="self" title="Right-click for claim actions"' : ''}

@@ -197,7 +197,9 @@ assert(
     && storeHome.includes('manualArrangementNeeded')
     && storeHome.includes("shopeeState === 'automatic' && !automaticArrangementPaused")
     && storeHome.includes('const shopeeDelayed = Boolean(order.deadlineDelayed)')
+    && storeHome.includes('shopeeManualRequired && !shopeeDelayed')
     && storeHome.includes('|| shopeeDelayed')
+    && storeHome.includes("shopeeDelayed ? 'is-delayed' : ''")
     && storeHome.includes('Shopee has delayed this order and has not released shipping options yet.')
     && storeHome.includes('Auto-arranging…')
     && storeHome.includes('Manual arrange')
@@ -245,6 +247,8 @@ assert(
 assert(
   adminCss.includes('.admin-order-card.is-weekend-dependent')
     && adminCss.includes('.admin-order-card.is-manual-arrangement')
+    && adminCss.includes('.admin-order-card.is-delayed')
+    && adminCss.includes('animation: none')
     && adminCss.includes('@keyframes admin-manual-arrangement-pulse')
     && adminCss.includes('.admin-manual-order-btn.is-shopee-action.is-manual-needed:not(:disabled)')
     && storeHome.includes("manualArrangementVisual ? 'is-manual-arrangement' : ''"),
