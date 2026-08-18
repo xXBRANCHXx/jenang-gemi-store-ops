@@ -8,6 +8,7 @@ require_once dirname(__DIR__, 2) . '/partner-orders-bootstrap.php';
 require_once dirname(__DIR__, 2) . '/store-ops-fulfillment-runtime.php';
 require_once dirname(__DIR__, 2) . '/website-orders-bootstrap.php';
 require_once dirname(__DIR__, 2) . '/marketplace-queue-policy.php';
+require_once dirname(__DIR__, 2) . '/inventory-commitments.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -1052,7 +1053,14 @@ function jg_store_ops_orders_apply_default_fulfillment(array $orders): array
     return $orders;
 }
 
-jg_admin_require_auth_json();
+$inventoryCommitmentsRequest = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'GET'
+    && (string) ($_GET['inventory_commitments'] ?? '') === '1';
+if ($inventoryCommitmentsRequest && array_diff(array_keys($_GET), ['inventory_commitments']) !== []) {
+    jg_store_ops_orders_fail('Inventory commitments does not accept other actions.', 400);
+}
+if (!$inventoryCommitmentsRequest || !jg_store_ops_website_token_matches()) {
+    jg_admin_require_auth_json();
+}
 
 $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 if ($method === 'POST') {
@@ -1548,6 +1556,15 @@ try {
 } catch (Throwable) {
     $decoded['orders'] = jg_store_ops_orders_apply_default_fulfillment($decoded['orders']);
     $decoded['meta']['fulfillment'] = 'unavailable';
+}
+
+if ($inventoryCommitmentsRequest) {
+    header('Cache-Control: no-store');
+    echo json_encode(
+        jg_store_ops_inventory_commitments($decoded['orders'], $decoded['meta']),
+        JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+    );
+    exit;
 }
 
 echo json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
