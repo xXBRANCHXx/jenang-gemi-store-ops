@@ -35,13 +35,16 @@ foreach (['api/orders/index.php', 'api/orders-v2/index.php'] as $endpoint) {
     order_removal_expect(
         str_contains($source, "'remove_order'")
         && str_contains($source, 'jg_admin_verify_employee_passcode')
+        && str_contains($source, "!in_array(\$stockAction, ['deduct', 'keep'], true)")
+        && str_contains($source, "if (\$stockAction === 'deduct')")
+        && str_contains($source, 'jg_store_ops_website_deduct_stock')
+        && str_contains($source, 'jg_store_ops_order_stock_deduct')
         && str_contains($source, "if (\$key['source_platform'] === 'whatsapp')")
-        && str_contains($source, "jg_store_ops_website_stock_state(\$pdo, 'whatsapp', \$key['order_id'])")
         && str_contains($source, 'jg_store_ops_whatsapp_cancel_unclaimed')
         && str_contains($source, "jg_store_ops_website_callback(\$pdo, 'whatsapp', \$key['order_id'], 'FULFILLED')")
         && str_contains($source, "jg_store_ops_orders_marketplace_status_callback(\$key, 'IS_PROCESSED')")
         && str_contains($source, 'jg_store_ops_fulfillment_remove_from_listed'),
-        $endpoint . ' must verify Branch Login, audit WhatsApp stock, and remove orders without repeating a deduction.'
+        $endpoint . ' must require an explicit stock choice and deduct idempotently only when selected.'
     );
 }
 
@@ -58,8 +61,10 @@ order_removal_expect(
     str_contains($dashboard, 'data-unclaim-order')
     && strpos($dashboard, 'data-unclaim-order') < strpos($dashboard, 'data-remove-order')
     && str_contains($dashboard, 'name="passcode" type="password"')
-    && str_contains($dashboard, 'data-remove-order-stock-audit'),
-    'The right-click menu must keep Unclaim first and show Remove with a password confirmation and stock audit.'
+    && str_contains($dashboard, 'data-remove-order-stock-audit')
+    && str_contains($dashboard, 'name="stock_action" value="deduct" required')
+    && str_contains($dashboard, 'name="stock_action" value="keep" required'),
+    'The Remove dialog must require stock handling plus Branch Login confirmation.'
 );
 
 $storeHome = (string) file_get_contents(dirname(__DIR__) . '/store-home.js');
@@ -67,8 +72,30 @@ order_removal_expect(
     str_contains($storeHome, "completion_audit: '1'")
     && str_contains($storeHome, 'Stock already deducted')
     && str_contains($storeHome, 'including a shortage of')
-    && str_contains($storeHome, 'Removing this card will not deduct it again.'),
-    'The Remove dialog must display the authoritative stock audit before confirmation.'
+    && str_contains($storeHome, 'Removing this card will not deduct it again.')
+    && str_contains($storeHome, "stock_action: stockAction")
+    && str_contains($storeHome, 'product_name: String(item.productName')
+    && str_contains($storeHome, "['deduct', 'keep'].includes(stockAction)"),
+    'The Remove dialog must audit stock and send the explicit choice with normalized order items.'
+);
+
+foreach (['store-ops-fulfillment.php', 'store-ops-fulfillment-runtime.php'] as $fulfillmentFile) {
+    $source = (string) file_get_contents(dirname(__DIR__) . '/' . $fulfillmentFile);
+    order_removal_expect(
+        str_contains($source, "'stock_action' => \$stockAction")
+        && str_contains($source, "'stock_deducted_now' => \$stockDeductedNow")
+        && str_contains($source, 'Shared inventory was left unchanged.'),
+        $fulfillmentFile . ' must persist the selected stock behavior in the removal audit event.'
+    );
+}
+
+$websiteOrders = (string) file_get_contents(dirname(__DIR__) . '/website-orders-bootstrap.php');
+order_removal_expect(
+    str_contains($websiteOrders, 'array $auditPayload = []')
+    && str_contains($websiteOrders, "string \$employeeId = 'executive-dashboard'")
+    && str_contains($websiteOrders, 'string $employeeName =')
+    && str_contains($websiteOrders, "array_merge(['message' => 'Cancelled before the order was claimed.'], \$auditPayload)"),
+    'WhatsApp cancellation must retain the selected unchanged-stock decision and acting employee in its audit event.'
 );
 
 echo "order-removal-test: ok\n";

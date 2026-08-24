@@ -1912,7 +1912,65 @@ input[type='radio'] {
 .admin-remove-order-card {
   display: grid;
   gap: 16px;
-  width: min(440px, 100%);
+  width: min(520px, 100%);
+}
+
+.admin-remove-stock-choice {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.admin-remove-stock-choice legend {
+  margin-bottom: 8px;
+  color: var(--admin-text);
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-remove-stock-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  background: var(--admin-surface-soft);
+  cursor: pointer;
+}
+
+.admin-remove-stock-option:has(input:checked) {
+  border-color: var(--admin-accent-primary);
+  box-shadow: 0 0 0 1px var(--admin-accent-primary);
+}
+
+.admin-remove-stock-option input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--admin-accent-primary);
+  flex: 0 0 auto;
+}
+
+.admin-remove-stock-option span {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-remove-stock-option strong {
+  color: var(--admin-text);
+  font-size: 0.9rem;
+}
+
+.admin-remove-stock-option small {
+  color: var(--admin-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 .admin-remove-order-submit {

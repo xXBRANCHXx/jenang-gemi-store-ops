@@ -880,7 +880,13 @@ function jg_store_ops_whatsapp_has_removal_event(PDO $pdo, string $orderId): boo
 }
 
 /** @return array{order_id:string,status:string} */
-function jg_store_ops_whatsapp_cancel_unclaimed(PDO $pdo, string $orderId): array
+function jg_store_ops_whatsapp_cancel_unclaimed(
+    PDO $pdo,
+    string $orderId,
+    array $auditPayload = [],
+    string $employeeId = 'executive-dashboard',
+    string $employeeName = 'Executive Dashboard'
+): array
 {
     $orderId = trim($orderId);
     if ($orderId === '') {
@@ -944,9 +950,9 @@ function jg_store_ops_whatsapp_cancel_unclaimed(PDO $pdo, string $orderId): arra
             $pdo,
             $key,
             'cancel',
-            'executive-dashboard',
-            'Executive Dashboard',
-            ['message' => 'Cancelled before the order was claimed.']
+            $employeeId,
+            $employeeName,
+            array_merge(['message' => 'Cancelled before the order was claimed.'], $auditPayload)
         );
         $pdo->commit();
         return ['order_id' => $orderId, 'status' => 'CANCELLED'];

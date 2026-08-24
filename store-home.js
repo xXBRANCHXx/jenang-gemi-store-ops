@@ -2912,7 +2912,7 @@ document.addEventListener('DOMContentLoaded', () => {
           : `Stock already deducted${deductedAt ? ` at ${deductedAt} UTC` : ''}. Removing this card will not deduct it again.`;
         removeOrderStockAudit.dataset.state = 'deducted';
       } else {
-        removeOrderStockAudit.textContent = 'Stock has not been deducted. Removing this card will cancel it without changing inventory.';
+        removeOrderStockAudit.textContent = 'Stock has not been deducted. Choose below whether this order should reduce inventory.';
         removeOrderStockAudit.dataset.state = 'not-deducted';
       }
     } catch (error) {
@@ -2933,10 +2933,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     removeOrderModal.hidden = false;
     loadRemoveOrderStockAudit(order).catch(() => {});
+    const firstStockAction = removeOrderForm?.querySelector('input[name="stock_action"]');
     const passcodeField = removeOrderForm?.elements.namedItem('passcode');
     if (passcodeField instanceof HTMLInputElement) {
       passcodeField.value = '';
-      window.setTimeout(() => passcodeField.focus(), 30);
+      window.setTimeout(() => {
+        if (firstStockAction instanceof HTMLInputElement) firstStockAction.focus();
+      }, 30);
     }
   };
 
@@ -2945,14 +2948,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const order = state.orders.find((item) => item.id === orderId);
     const passcodeField = removeOrderForm?.elements.namedItem('passcode');
     const passcode = passcodeField instanceof HTMLInputElement ? passcodeField.value : '';
-    if (!order || !passcode || !orderPresentation.canCurrentEmployeeRemove(currentEmployee.id)) return;
+    const stockActionField = removeOrderForm?.querySelector('input[name="stock_action"]:checked');
+    const stockAction = stockActionField instanceof HTMLInputElement ? stockActionField.value : '';
+    if (!order || !passcode || !['deduct', 'keep'].includes(stockAction) || !orderPresentation.canCurrentEmployeeRemove(currentEmployee.id)) return;
+    const items = (Array.isArray(order.items) ? order.items : []).map((item) => ({
+      sku: String(item.sku || item.tag || item.sourceSkus?.[0] || ''),
+      product_name: String(item.productName || item.scanProductName || item.product_name || ''),
+      quantity: Math.max(0, Number(item.quantity || item.qty || 0))
+    })).filter((item) => item.quantity > 0 && (item.sku || item.product_name));
     if (removeOrderSubmit instanceof HTMLButtonElement) removeOrderSubmit.disabled = true;
     if (removeOrderError) {
       removeOrderError.hidden = true;
       removeOrderError.textContent = '';
     }
     try {
-      const payload = await postOrderAction('remove_order', order, { passcode });
+      const payload = await postOrderAction('remove_order', order, {
+        passcode,
+        stock_action: stockAction,
+        items
+      });
       if (passcodeField instanceof HTMLInputElement) passcodeField.value = '';
       applyFulfillmentState(order, payload.fulfillment || payload.order);
       if (state.activeOrderId === order.id || state.previewOrderId === order.id) closeFulfillment(false);

@@ -818,7 +818,14 @@ function jg_store_ops_fulfillment_mark_fulfilled(PDO $pdo, array $key, string $e
     }
 }
 
-function jg_store_ops_fulfillment_remove_from_listed(PDO $pdo, array $key, string $employeeId, string $employeeName): array
+function jg_store_ops_fulfillment_remove_from_listed(
+    PDO $pdo,
+    array $key,
+    string $employeeId,
+    string $employeeName,
+    string $stockAction = 'keep',
+    bool $stockDeductedNow = false
+): array
 {
     $pdo->beginTransaction();
     try {
@@ -849,13 +856,22 @@ function jg_store_ops_fulfillment_remove_from_listed(PDO $pdo, array $key, strin
             ':updated_at' => $now,
             ':id' => (int) $row['id'],
         ]);
+        $stockMessage = $stockAction === 'deduct'
+            ? ($stockDeductedNow
+                ? ' Shared inventory was deducted for the manually completed order.'
+                : ' Shared inventory was already deducted, so no second deduction was made.')
+            : ' Shared inventory was left unchanged.';
         jg_store_ops_fulfillment_log_event(
             $pdo,
             $key,
             'remove_from_listed',
             $employeeId,
             $employeeName,
-            ['message' => 'Removed from listed orders after Branch Login confirmation.']
+            [
+                'message' => 'Removed from listed orders after Branch Login confirmation.' . $stockMessage,
+                'stock_action' => $stockAction,
+                'stock_deducted_now' => $stockDeductedNow,
+            ]
         );
         $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
         $pdo->commit();

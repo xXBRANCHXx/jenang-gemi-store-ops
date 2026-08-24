@@ -1101,16 +1101,46 @@ if ($method === 'POST') {
             if (!jg_admin_verify_employee_passcode($employeeId, (string) ($payload['passcode'] ?? ''))) {
                 jg_store_ops_orders_fail('Branch Login passcode is incorrect.', 403);
             }
+            $stockAction = strtolower(trim((string) ($payload['stock_action'] ?? '')));
+            if (!in_array($stockAction, ['deduct', 'keep'], true)) {
+                jg_store_ops_orders_fail('Choose whether to deduct this order from stock or keep stock unchanged.', 422);
+            }
+            $items = is_array($payload['items'] ?? null) ? $payload['items'] : [];
+            $existing = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
+            $alreadyFulfilled = is_array($existing)
+                && strtoupper((string) ($existing['status'] ?? '')) === 'FULFILLED';
+            if (!$alreadyFulfilled) {
+                jg_store_ops_fulfillment_assert_can_work($existing, $employeeId);
+            }
+            $stockDeductedNow = false;
+            if ($stockAction === 'deduct') {
+                if (in_array($key['source_platform'], JG_STORE_OPS_WEBSITE_PLATFORMS, true)) {
+                    $stockDeductedNow = jg_store_ops_website_deduct_stock($pdo, $key['source_platform'], $key['order_id']);
+                } else {
+                    $deduction = jg_store_ops_order_stock_deduct($pdo, $key, $items);
+                    $stockDeductedNow = !empty($deduction['deducted']);
+                }
+            }
 
             if ($key['source_platform'] === 'whatsapp') {
-                $stockState = jg_store_ops_website_stock_state($pdo, 'whatsapp', $key['order_id']);
-                if (empty($stockState['deducted'])) {
-                    jg_store_ops_whatsapp_cancel_unclaimed($pdo, $key['order_id']);
+                if ($stockAction === 'keep') {
+                    jg_store_ops_whatsapp_cancel_unclaimed($pdo, $key['order_id'], [
+                        'message' => 'Removed from listed orders after Branch Login confirmation. Shared inventory was left unchanged.',
+                        'stock_action' => 'keep',
+                        'stock_deducted_now' => false,
+                    ], $employeeId, $employeeName);
                     $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
                     jg_store_ops_orders_fulfillment_response($pdo, is_array($row) ? $row : []);
                 }
 
-                $row = jg_store_ops_fulfillment_remove_from_listed($pdo, $key, $employeeId, $employeeName);
+                $row = jg_store_ops_fulfillment_remove_from_listed(
+                    $pdo,
+                    $key,
+                    $employeeId,
+                    $employeeName,
+                    $stockAction,
+                    $stockDeductedNow
+                );
                 try {
                     jg_store_ops_website_callback($pdo, 'whatsapp', $key['order_id'], 'FULFILLED');
                 } catch (Throwable $callbackError) {
@@ -1130,7 +1160,14 @@ if ($method === 'POST') {
                 jg_store_ops_orders_marketplace_status_callback($key, 'IS_PROCESSED');
             }
 
-            $row = jg_store_ops_fulfillment_remove_from_listed($pdo, $key, $employeeId, $employeeName);
+            $row = jg_store_ops_fulfillment_remove_from_listed(
+                $pdo,
+                $key,
+                $employeeId,
+                $employeeName,
+                $stockAction,
+                $stockDeductedNow
+            );
             jg_store_ops_orders_fulfillment_response($pdo, $row);
         }
 

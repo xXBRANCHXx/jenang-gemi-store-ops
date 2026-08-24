@@ -35,7 +35,7 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
     <link rel="stylesheet" href="../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
 <body class="admin-body is-dashboard is-store-home">
-    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.46</div>
+    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.47</div>
     <div
         class="admin-app admin-store-home"
         data-store-home
@@ -207,6 +207,23 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
                     </div>
                     <p class="admin-reprint-intro">Remove <strong data-remove-order-id></strong> from listed orders.</p>
                     <p class="admin-reprint-intro" data-remove-order-stock-audit data-state="checking">Checking the shared stock ledger…</p>
+                    <fieldset class="admin-remove-stock-choice">
+                        <legend>What should happen to stock?</legend>
+                        <label class="admin-remove-stock-option">
+                            <input type="radio" name="stock_action" value="deduct" required>
+                            <span>
+                                <strong>Deduct this order’s stock</strong>
+                                <small>The order was completed manually. Reduce the shared inventory now.</small>
+                            </span>
+                        </label>
+                        <label class="admin-remove-stock-option">
+                            <input type="radio" name="stock_action" value="keep" required>
+                            <span>
+                                <strong>Keep stock unchanged</strong>
+                                <small>The order was cancelled, duplicated, or did not leave the store.</small>
+                            </span>
+                        </label>
+                    </fieldset>
                     <label class="admin-reprint-field">
                         <span>Branch Login passcode</span>
                         <input class="admin-settings-input" name="passcode" type="password" autocomplete="current-password" maxlength="128" required>
@@ -214,7 +231,7 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
                     <p class="admin-form-error" data-remove-order-error hidden></p>
                     <div class="admin-modal-actions">
                         <button type="button" class="admin-ghost-btn" data-close-remove-order>Cancel</button>
-                        <button type="submit" class="admin-primary-btn admin-remove-order-submit" data-remove-order-submit>Remove</button>
+                        <button type="submit" class="admin-primary-btn admin-remove-order-submit" data-remove-order-submit>Remove order</button>
                     </div>
                 </form>
             </div>
