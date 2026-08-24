@@ -32,6 +32,11 @@ order_removal_expect(
 
 foreach (['api/orders/index.php', 'api/orders-v2/index.php'] as $endpoint) {
     $source = (string) file_get_contents(dirname(__DIR__) . '/' . $endpoint);
+    $removeStart = strpos($source, "if (\$action === 'remove_order')");
+    $removeEnd = $removeStart !== false ? strpos($source, 'if (!jg_store_ops_marketplace_action_enabled(', $removeStart) : false;
+    $removeSource = $removeStart !== false
+        ? substr($source, $removeStart, $removeEnd !== false ? $removeEnd - $removeStart : null)
+        : '';
     order_removal_expect(
         str_contains($source, "'remove_order'")
         && str_contains($source, 'jg_admin_verify_employee_passcode')
@@ -45,6 +50,10 @@ foreach (['api/orders/index.php', 'api/orders-v2/index.php'] as $endpoint) {
         && str_contains($source, "jg_store_ops_orders_marketplace_status_callback(\$key, 'IS_PROCESSED')")
         && str_contains($source, 'jg_store_ops_fulfillment_remove_from_listed'),
         $endpoint . ' must require an explicit stock choice and deduct idempotently only when selected.'
+    );
+    order_removal_expect(
+        !str_contains($removeSource, 'jg_store_ops_fulfillment_assert_can_work'),
+        $endpoint . ' protected removal must not require the order to be claimed first.'
     );
 }
 

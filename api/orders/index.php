@@ -1106,12 +1106,6 @@ if ($method === 'POST') {
                 jg_store_ops_orders_fail('Choose whether to deduct this order from stock or keep stock unchanged.', 422);
             }
             $items = is_array($payload['items'] ?? null) ? $payload['items'] : [];
-            $existing = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
-            $alreadyFulfilled = is_array($existing)
-                && strtoupper((string) ($existing['status'] ?? '')) === 'FULFILLED';
-            if (!$alreadyFulfilled) {
-                jg_store_ops_fulfillment_assert_can_work($existing, $employeeId);
-            }
             $stockDeductedNow = false;
             if ($stockAction === 'deduct') {
                 if (in_array($key['source_platform'], JG_STORE_OPS_WEBSITE_PLATFORMS, true)) {

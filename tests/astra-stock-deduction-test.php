@@ -162,8 +162,10 @@ foreach ([$legacyApi, $currentApi] as $apiSource) {
             && str_contains($apiSource, 'jg_store_ops_order_stock_deduct'),
         'Every fulfillment API must route website/WhatsApp and marketplace/Partner stock deduction.'
     );
-    $ownershipCheckPosition = strpos($apiSource, 'jg_store_ops_fulfillment_assert_can_work($existing, $employeeId)');
-    $stockDeductionPosition = strpos($apiSource, 'jg_store_ops_website_deduct_stock($pdo');
+    $fulfillActionPosition = strpos($apiSource, "if (\$action === 'fulfill_order')");
+    $fulfillActionSource = $fulfillActionPosition !== false ? substr($apiSource, $fulfillActionPosition) : '';
+    $ownershipCheckPosition = strpos($fulfillActionSource, 'jg_store_ops_fulfillment_assert_can_work($existing, $employeeId)');
+    $stockDeductionPosition = strpos($fulfillActionSource, 'jg_store_ops_website_deduct_stock($pdo');
     astra_deduction_expect(
         true,
         $ownershipCheckPosition !== false
