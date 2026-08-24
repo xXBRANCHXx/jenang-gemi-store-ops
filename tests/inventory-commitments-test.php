@@ -28,8 +28,13 @@ $payload = jg_store_ops_inventory_commitments([
 
 inventory_commitments_expect(true, $payload['ok'], 'The commitments feed must succeed.');
 inventory_commitments_expect([
-    ['sku' => 'SKU-A', 'quantity' => 6, 'order_count' => 2],
-    ['sku' => 'SKU-B', 'quantity' => 1, 'order_count' => 1],
+    ['sku' => 'SKU-A', 'quantity' => 6, 'order_count' => 2, 'orders' => [
+        ['order_id' => 'OPEN-1', 'quantity' => 3],
+        ['order_id' => 'OPEN-2', 'quantity' => 3],
+    ]],
+    ['sku' => 'SKU-B', 'quantity' => 1, 'order_count' => 1, 'orders' => [
+        ['order_id' => 'OPEN-1', 'quantity' => 1],
+    ]],
 ], $payload['commitments'], 'Only quantities from listed, unfulfilled, matched Store Ops lines may be committed.');
 inventory_commitments_expect(2, $payload['summary']['listed_order_count'], 'The feed must count orders that reserve stock.');
 inventory_commitments_expect(7, $payload['summary']['committed_qty'], 'The feed must total committed units.');

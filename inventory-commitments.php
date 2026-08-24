@@ -29,6 +29,7 @@ function jg_store_ops_inventory_commitments(array $orders, array $meta = []): ar
             continue;
         }
 
+        $orderId = trim((string) ($order['order_id'] ?? $order['id'] ?? ''));
         $orderHasCommitment = false;
         $orderSkus = [];
         foreach ((array) ($order['items'] ?? []) as $item) {
@@ -41,9 +42,15 @@ function jg_store_ops_inventory_commitments(array $orders, array $meta = []): ar
                 continue;
             }
             if (!isset($bySku[$sku])) {
-                $bySku[$sku] = ['sku' => $sku, 'quantity' => 0.0, 'order_count' => 0];
+                $bySku[$sku] = ['sku' => $sku, 'quantity' => 0.0, 'order_count' => 0, 'orders' => []];
             }
             $bySku[$sku]['quantity'] += $quantity;
+            if ($orderId !== '') {
+                if (!isset($bySku[$sku]['orders'][$orderId])) {
+                    $bySku[$sku]['orders'][$orderId] = 0.0;
+                }
+                $bySku[$sku]['orders'][$orderId] += $quantity;
+            }
             if (!isset($orderSkus[$sku])) {
                 $bySku[$sku]['order_count']++;
                 $orderSkus[$sku] = true;
@@ -56,10 +63,21 @@ function jg_store_ops_inventory_commitments(array $orders, array $meta = []): ar
     ksort($bySku, SORT_STRING);
     $commitments = array_values(array_map(static function (array $row): array {
         $quantity = round((float) $row['quantity'], 2);
+        $orders = [];
+        foreach ((array) ($row['orders'] ?? []) as $orderId => $orderQuantity) {
+            $normalizedOrderQuantity = round((float) $orderQuantity, 2);
+            $orders[] = [
+                'order_id' => (string) $orderId,
+                'quantity' => abs($normalizedOrderQuantity - round($normalizedOrderQuantity)) < 0.001
+                    ? (int) round($normalizedOrderQuantity)
+                    : $normalizedOrderQuantity,
+            ];
+        }
         return [
             'sku' => (string) $row['sku'],
             'quantity' => abs($quantity - round($quantity)) < 0.001 ? (int) round($quantity) : $quantity,
             'order_count' => (int) $row['order_count'],
+            'orders' => $orders,
         ];
     }, $bySku));
 
