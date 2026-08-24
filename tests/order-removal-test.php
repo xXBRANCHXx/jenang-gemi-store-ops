@@ -42,6 +42,8 @@ foreach (['api/orders/index.php', 'api/orders-v2/index.php'] as $endpoint) {
         && str_contains($source, 'jg_admin_verify_employee_passcode')
         && str_contains($source, "!in_array(\$stockAction, ['deduct', 'keep'], true)")
         && str_contains($source, "if (\$stockAction === 'deduct')")
+        && str_contains($source, 'jg_store_ops_order_stock_normalize_sku_overrides')
+        && str_contains($source, 'jg_store_ops_order_stock_apply_sku_overrides')
         && str_contains($source, 'jg_store_ops_website_deduct_stock')
         && str_contains($source, 'jg_store_ops_order_stock_deduct')
         && str_contains($source, "if (\$key['source_platform'] === 'whatsapp')")
@@ -71,6 +73,8 @@ order_removal_expect(
     && strpos($dashboard, 'data-unclaim-order') < strpos($dashboard, 'data-remove-order')
     && str_contains($dashboard, 'name="passcode" type="password"')
     && str_contains($dashboard, 'data-remove-order-stock-audit')
+    && str_contains($dashboard, 'data-remove-sku-mapping')
+    && str_contains($dashboard, 'data-remove-sku-mapping-list')
     && str_contains($dashboard, 'name="stock_action" value="deduct" required')
     && str_contains($dashboard, 'name="stock_action" value="keep" required'),
     'The Remove dialog must require stock handling plus Branch Login confirmation.'
@@ -83,6 +87,9 @@ order_removal_expect(
     && str_contains($storeHome, 'including a shortage of')
     && str_contains($storeHome, 'Removing this card will not deduct it again.')
     && str_contains($storeHome, "stock_action: stockAction")
+    && str_contains($storeHome, 'sku_mappings: skuMappings')
+    && str_contains($storeHome, 'Select an exact SKU from the live catalog.')
+    && str_contains($storeHome, 'data-remove-sku-input')
     && str_contains($storeHome, 'product_name: String(item.productName')
     && str_contains($storeHome, "['deduct', 'keep'].includes(stockAction)"),
     'The Remove dialog must audit stock and send the explicit choice with normalized order items.'
@@ -93,6 +100,7 @@ foreach (['store-ops-fulfillment.php', 'store-ops-fulfillment-runtime.php'] as $
     order_removal_expect(
         str_contains($source, "'stock_action' => \$stockAction")
         && str_contains($source, "'stock_deducted_now' => \$stockDeductedNow")
+        && str_contains($source, "'sku_mappings' => \$skuMappings")
         && str_contains($source, 'Shared inventory was left unchanged.'),
         $fulfillmentFile . ' must persist the selected stock behavior in the removal audit event.'
     );

@@ -293,6 +293,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const removeOrderForm = document.querySelector('[data-remove-order-form]');
   const removeOrderId = document.querySelector('[data-remove-order-id]');
   const removeOrderStockAudit = document.querySelector('[data-remove-order-stock-audit]');
+  const removeOrderSkuMapping = document.querySelector('[data-remove-sku-mapping]');
+  const removeOrderSkuMappingSummary = document.querySelector('[data-remove-sku-mapping-summary]');
+  const removeOrderSkuMappingList = document.querySelector('[data-remove-sku-mapping-list]');
+  const removeOrderSkuOptions = document.querySelector('[data-remove-sku-options]');
   const removeOrderError = document.querySelector('[data-remove-order-error]');
   const removeOrderSubmit = document.querySelector('[data-remove-order-submit]');
   const shopeeArrangementModal = document.querySelector('[data-shopee-arrangement-modal]');
@@ -2869,6 +2873,86 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  const removeOrderItemSourceTag = (item, index) => String(
+    item?.sourceTags?.[0]
+      || item?.sourceSkus?.[0]
+      || item?.tag
+      || item?.source_tag
+      || item?.sku
+      || item?.productName
+      || item?.product_name
+      || `Order item ${index + 1}`
+  ).trim();
+
+  const removeOrderCatalogBySku = () => new Map(skuCatalog.map((item) => [
+    String(item.sku || '').trim().toUpperCase(),
+    item
+  ]).filter(([sku]) => sku));
+
+  const syncRemoveOrderStockChoice = () => {
+    const selected = removeOrderForm?.querySelector('input[name="stock_action"]:checked');
+    const deductStock = selected instanceof HTMLInputElement && selected.value === 'deduct';
+    if (removeOrderSkuMapping) removeOrderSkuMapping.hidden = !deductStock;
+    removeOrderForm?.querySelectorAll('[data-remove-sku-input]').forEach((field) => {
+      if (!(field instanceof HTMLInputElement)) return;
+      field.disabled = !deductStock;
+      field.required = deductStock;
+      if (!deductStock) field.setCustomValidity('');
+    });
+  };
+
+  const renderRemoveOrderSkuMappings = (order) => {
+    const items = Array.isArray(order?.items) ? order.items : [];
+    const catalogBySku = removeOrderCatalogBySku();
+    const catalogRows = Array.from(catalogBySku.values()).sort((left, right) => (
+      String(left.productName || left.sku).localeCompare(String(right.productName || right.sku))
+    ));
+    if (removeOrderSkuOptions) {
+      removeOrderSkuOptions.innerHTML = catalogRows.map((item) => (
+        `<option value="${escapeHtml(String(item.sku || '').toUpperCase())}" label="${escapeHtml(`${item.productName || item.sku} · Stock ${Number(item.currentStock || 0)}`)}"></option>`
+      )).join('');
+    }
+
+    let unresolved = 0;
+    if (removeOrderSkuMappingList) {
+      removeOrderSkuMappingList.innerHTML = items.map((item, index) => {
+        const sourceTag = removeOrderItemSourceTag(item, index);
+        const currentSku = String(item.sku || '').trim().toUpperCase();
+        const selectedSku = catalogBySku.has(currentSku) ? currentSku : '';
+        if (!selectedSku) unresolved += 1;
+        const quantity = Math.max(0, Number(item.quantity || item.qty || 0));
+        const productName = String(item.productName || item.scanProductName || item.product_name || 'Order item');
+        return `
+          <div class="admin-remove-sku-line">
+            <span>
+              <strong>${escapeHtml(sourceTag)}</strong>
+              <small>${escapeHtml(`${quantity} × ${productName}`)}</small>
+            </span>
+            <label class="admin-remove-sku-field">
+              <span>Subtract from SKU</span>
+              <input
+                class="admin-remove-sku-input"
+                type="text"
+                list="remove-order-live-skus"
+                value="${escapeHtml(selectedSku)}"
+                placeholder="Type or select a live SKU"
+                autocomplete="off"
+                data-remove-sku-input
+                data-item-index="${index}"
+                data-source-tag="${escapeHtml(sourceTag)}"
+              >
+            </label>
+          </div>`;
+      }).join('');
+    }
+    if (removeOrderSkuMappingSummary) {
+      removeOrderSkuMappingSummary.textContent = unresolved > 0
+        ? `${unresolved} order tag${unresolved === 1 ? '' : 's'} could not be matched. Assign the correct live SKU before deducting.`
+        : 'Review the resolved SKUs below. You can replace any incorrect tag mapping.';
+    }
+    syncRemoveOrderStockChoice();
+  };
+
   const closeRemoveOrderModal = () => {
     if (!removeOrderModal) return;
     removeOrderModal.hidden = true;
@@ -2882,6 +2966,9 @@ document.addEventListener('DOMContentLoaded', () => {
       removeOrderStockAudit.textContent = '';
       removeOrderStockAudit.removeAttribute('data-state');
     }
+    if (removeOrderSkuMapping) removeOrderSkuMapping.hidden = true;
+    if (removeOrderSkuMappingList) removeOrderSkuMappingList.innerHTML = '';
+    if (removeOrderSkuOptions) removeOrderSkuOptions.innerHTML = '';
     if (removeOrderSubmit instanceof HTMLButtonElement) removeOrderSubmit.disabled = false;
   };
 
@@ -2931,6 +3018,7 @@ document.addEventListener('DOMContentLoaded', () => {
       removeOrderError.hidden = true;
       removeOrderError.textContent = '';
     }
+    renderRemoveOrderSkuMappings(order);
     removeOrderModal.hidden = false;
     loadRemoveOrderStockAudit(order).catch(() => {});
     const firstStockAction = removeOrderForm?.querySelector('input[name="stock_action"]');
@@ -2951,11 +3039,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const stockActionField = removeOrderForm?.querySelector('input[name="stock_action"]:checked');
     const stockAction = stockActionField instanceof HTMLInputElement ? stockActionField.value : '';
     if (!order || !passcode || !['deduct', 'keep'].includes(stockAction) || !orderPresentation.canCurrentEmployeeRemove(currentEmployee.id)) return;
-    const items = (Array.isArray(order.items) ? order.items : []).map((item) => ({
-      sku: String(item.sku || item.tag || item.sourceSkus?.[0] || ''),
+    const catalogBySku = removeOrderCatalogBySku();
+    const mappingsByIndex = new Map();
+    if (stockAction === 'deduct') {
+      const mappingFields = Array.from(removeOrderForm?.querySelectorAll('[data-remove-sku-input]') || []);
+      for (const field of mappingFields) {
+        if (!(field instanceof HTMLInputElement)) continue;
+        const selectedSku = String(field.value || '').trim().toUpperCase();
+        if (!catalogBySku.has(selectedSku)) {
+          field.setCustomValidity('Select an exact SKU from the live catalog.');
+          field.reportValidity();
+          field.focus();
+          return;
+        }
+        field.setCustomValidity('');
+        mappingsByIndex.set(Number(field.dataset.itemIndex || -1), {
+          sourceTag: String(field.dataset.sourceTag || ''),
+          sku: selectedSku
+        });
+      }
+    }
+    const items = (Array.isArray(order.items) ? order.items : []).map((item, index) => ({
+      source_tag: mappingsByIndex.get(index)?.sourceTag || removeOrderItemSourceTag(item, index),
+      sku: mappingsByIndex.get(index)?.sku || String(item.sku || item.tag || item.sourceSkus?.[0] || ''),
       product_name: String(item.productName || item.scanProductName || item.product_name || ''),
       quantity: Math.max(0, Number(item.quantity || item.qty || 0))
     })).filter((item) => item.quantity > 0 && (item.sku || item.product_name));
+    const skuMappings = Array.from(mappingsByIndex.values()).map((mapping) => ({
+      source_tag: mapping.sourceTag,
+      sku: mapping.sku
+    }));
     if (removeOrderSubmit instanceof HTMLButtonElement) removeOrderSubmit.disabled = true;
     if (removeOrderError) {
       removeOrderError.hidden = true;
@@ -2965,7 +3078,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const payload = await postOrderAction('remove_order', order, {
         passcode,
         stock_action: stockAction,
-        items
+        items,
+        sku_mappings: skuMappings
       });
       if (passcodeField instanceof HTMLInputElement) passcodeField.value = '';
       applyFulfillmentState(order, payload.fulfillment || payload.order);
@@ -3098,6 +3212,15 @@ document.addEventListener('DOMContentLoaded', () => {
   removeOrderForm?.addEventListener('submit', (event) => {
     event.preventDefault();
     removeOrderFromListed();
+  });
+  removeOrderForm?.addEventListener('change', (event) => {
+    const target = event.target;
+    if (target instanceof HTMLInputElement && target.name === 'stock_action') {
+      syncRemoveOrderStockChoice();
+    }
+    if (target instanceof HTMLInputElement && target.matches('[data-remove-sku-input]')) {
+      target.setCustomValidity('');
+    }
   });
   document.querySelectorAll('[data-close-remove-order]').forEach((button) => {
     button.addEventListener('click', closeRemoveOrderModal);

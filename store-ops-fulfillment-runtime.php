@@ -824,7 +824,8 @@ function jg_store_ops_fulfillment_remove_from_listed(
     string $employeeId,
     string $employeeName,
     string $stockAction = 'keep',
-    bool $stockDeductedNow = false
+    bool $stockDeductedNow = false,
+    array $skuMappings = []
 ): array
 {
     $pdo->beginTransaction();
@@ -871,6 +872,7 @@ function jg_store_ops_fulfillment_remove_from_listed(
                 'message' => 'Removed from listed orders after Branch Login confirmation.' . $stockMessage,
                 'stock_action' => $stockAction,
                 'stock_deducted_now' => $stockDeductedNow,
+                'sku_mappings' => $skuMappings,
             ]
         );
         $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);

@@ -52,6 +52,26 @@ $tagPlan = jg_store_ops_astra_deduction_plan($rows, [['sku' => 'Bubur 30', 'quan
 astra_deduction_expect('BUBUR30', $tagPlan[0]['selling_sku'] ?? '', 'Marketplace tags must resolve to the exact live selling SKU.');
 astra_deduction_expect(2, $tagPlan[0]['base_quantity'] ?? 0, 'A mapped Bubur 30 marketplace tag must consume two base units.');
 
+$manuallyMappedItems = jg_store_ops_order_stock_apply_sku_overrides(
+    [['source_tag' => 'INCORRECT_TAG', 'sku' => 'INCORRECT_TAG', 'quantity' => 2]],
+    [['source_tag' => 'INCORRECT_TAG', 'sku' => 'BUBUR30']]
+);
+astra_deduction_expect('BUBUR30', $manuallyMappedItems[0]['sku'] ?? '', 'A protected manual mapping must replace an incorrect order tag.');
+astra_deduction_expect(2, $manuallyMappedItems[0]['quantity'] ?? 0, 'A manual SKU mapping must preserve the original order quantity.');
+$manualMappingPlan = jg_store_ops_astra_deduction_plan($rows, $manuallyMappedItems);
+astra_deduction_expect(4, $manualMappingPlan[0]['base_quantity'] ?? 0, 'A mapped order line must deduct through the selected SKU ASTRA ratio.');
+
+$unrelatedMappingRejected = false;
+try {
+    jg_store_ops_order_stock_apply_sku_overrides(
+        [['source_tag' => 'ORDER_TAG', 'sku' => 'ORDER_TAG', 'quantity' => 1]],
+        [['source_tag' => 'NOT_IN_ORDER', 'sku' => 'BUBUR15']]
+    );
+} catch (InvalidArgumentException) {
+    $unrelatedMappingRejected = true;
+}
+astra_deduction_expect(true, $unrelatedMappingRejected, 'A manual mapping must not target a tag absent from the order.');
+
 $pdo->beginTransaction();
 jg_store_ops_astra_apply_deduction($pdo, [
     ['sku' => 'BUBUR30', 'quantity' => 2],
@@ -159,8 +179,9 @@ foreach ([$legacyApi, $currentApi] as $apiSource) {
         true,
         str_contains($apiSource, 'JG_STORE_OPS_WEBSITE_PLATFORMS')
             && str_contains($apiSource, 'jg_store_ops_website_deduct_stock')
-            && str_contains($apiSource, 'jg_store_ops_order_stock_deduct'),
-        'Every fulfillment API must route website/WhatsApp and marketplace/Partner stock deduction.'
+            && str_contains($apiSource, 'jg_store_ops_order_stock_deduct')
+            && str_contains($apiSource, 'jg_store_ops_order_stock_apply_sku_overrides'),
+        'Every fulfillment API must route website/WhatsApp and marketplace/Partner stock deduction with validated overrides.'
     );
     $fulfillActionPosition = strpos($apiSource, "if (\$action === 'fulfill_order')");
     $fulfillActionSource = $fulfillActionPosition !== false ? substr($apiSource, $fulfillActionPosition) : '';

@@ -60,6 +60,87 @@ function jg_store_ops_astra_code_key(mixed $value): string
     return preg_replace('/[^A-Z0-9]+/', '', $normalized) ?? '';
 }
 
+/**
+ * @param array<int,array<string,mixed>> $overrides
+ * @return array<int,array{source_tag:string,sku:string}>
+ */
+function jg_store_ops_order_stock_normalize_sku_overrides(array $overrides): array
+{
+    $normalized = [];
+    $targetsBySource = [];
+    foreach (array_slice($overrides, 0, 500) as $override) {
+        if (!is_array($override)) {
+            throw new InvalidArgumentException('A manual SKU mapping is invalid.');
+        }
+        $sourceTag = substr(trim((string) ($override['source_tag'] ?? $override['source_sku'] ?? '')), 0, 160);
+        $sku = substr(strtoupper(trim((string) ($override['sku'] ?? ''))), 0, 80);
+        $sourceKey = jg_store_ops_astra_code_key($sourceTag);
+        if ($sourceKey === '' || $sku === '') {
+            throw new InvalidArgumentException('Every manual SKU mapping requires an order tag and a live SKU.');
+        }
+        if (isset($targetsBySource[$sourceKey]) && $targetsBySource[$sourceKey] !== $sku) {
+            throw new InvalidArgumentException(sprintf('%s has conflicting manual SKU mappings.', $sourceTag));
+        }
+        if (isset($targetsBySource[$sourceKey])) {
+            continue;
+        }
+        $targetsBySource[$sourceKey] = $sku;
+        $normalized[] = ['source_tag' => $sourceTag, 'sku' => $sku];
+    }
+    return $normalized;
+}
+
+/**
+ * Apply operator-selected SKUs while preserving every order-line quantity.
+ * The deduction planner still validates the selected SKU against the live
+ * catalog before inventory changes.
+ *
+ * @param array<int,array<string,mixed>> $items
+ * @param array<int,array<string,mixed>> $overrides
+ * @return array<int,array<string,mixed>>
+ */
+function jg_store_ops_order_stock_apply_sku_overrides(array $items, array $overrides): array
+{
+    $normalized = jg_store_ops_order_stock_normalize_sku_overrides($overrides);
+    if ($normalized === []) {
+        return $items;
+    }
+
+    $targetsBySource = [];
+    foreach ($normalized as $override) {
+        $targetsBySource[jg_store_ops_astra_code_key($override['source_tag'])] = $override['sku'];
+    }
+
+    $matchedSources = [];
+    foreach ($items as &$item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $sourceTag = trim((string) (
+            $item['source_tag'] ?? $item['sku'] ?? $item['sku_code'] ?? $item['tag'] ?? ''
+        ));
+        $sourceKey = jg_store_ops_astra_code_key($sourceTag);
+        if ($sourceKey === '' || !isset($targetsBySource[$sourceKey])) {
+            continue;
+        }
+        $item['source_tag'] = $sourceTag;
+        $item['sku'] = $targetsBySource[$sourceKey];
+        $matchedSources[$sourceKey] = true;
+    }
+    unset($item);
+
+    foreach ($normalized as $override) {
+        $sourceKey = jg_store_ops_astra_code_key($override['source_tag']);
+        if (empty($matchedSources[$sourceKey])) {
+            throw new InvalidArgumentException(sprintf(
+                '%s is not present in this order and cannot be mapped.',
+                $override['source_tag']
+            ));
+        }
+    }
+    return $items;
+}
+
 /** @return array<int,array<string,mixed>> */
 function jg_store_ops_astra_rows(PDO $pdo): array
 {

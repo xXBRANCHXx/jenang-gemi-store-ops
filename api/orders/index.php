@@ -1106,12 +1106,23 @@ if ($method === 'POST') {
                 jg_store_ops_orders_fail('Choose whether to deduct this order from stock or keep stock unchanged.', 422);
             }
             $items = is_array($payload['items'] ?? null) ? $payload['items'] : [];
+            $skuMappings = $stockAction === 'deduct'
+                ? jg_store_ops_order_stock_normalize_sku_overrides(
+                    is_array($payload['sku_mappings'] ?? null) ? $payload['sku_mappings'] : []
+                )
+                : [];
             $stockDeductedNow = false;
             if ($stockAction === 'deduct') {
                 if (in_array($key['source_platform'], JG_STORE_OPS_WEBSITE_PLATFORMS, true)) {
-                    $stockDeductedNow = jg_store_ops_website_deduct_stock($pdo, $key['source_platform'], $key['order_id']);
+                    $stockDeductedNow = jg_store_ops_website_deduct_stock(
+                        $pdo,
+                        $key['source_platform'],
+                        $key['order_id'],
+                        $skuMappings
+                    );
                 } else {
-                    $deduction = jg_store_ops_order_stock_deduct($pdo, $key, $items);
+                    $stockItems = jg_store_ops_order_stock_apply_sku_overrides($items, $skuMappings);
+                    $deduction = jg_store_ops_order_stock_deduct($pdo, $key, $stockItems);
                     $stockDeductedNow = !empty($deduction['deducted']);
                 }
             }
@@ -1133,7 +1144,8 @@ if ($method === 'POST') {
                     $employeeId,
                     $employeeName,
                     $stockAction,
-                    $stockDeductedNow
+                    $stockDeductedNow,
+                    $skuMappings
                 );
                 try {
                     jg_store_ops_website_callback($pdo, 'whatsapp', $key['order_id'], 'FULFILLED');
@@ -1160,7 +1172,8 @@ if ($method === 'POST') {
                 $employeeId,
                 $employeeName,
                 $stockAction,
-                $stockDeductedNow
+                $stockDeductedNow,
+                $skuMappings
             );
             jg_store_ops_orders_fulfillment_response($pdo, $row);
         }

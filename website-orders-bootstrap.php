@@ -719,7 +719,7 @@ function jg_store_ops_website_stock_lines(array $payload): array
     return $lines;
 }
 
-function jg_store_ops_website_deduct_stock(PDO $pdo, string $platform, string $orderId): bool
+function jg_store_ops_website_deduct_stock(PDO $pdo, string $platform, string $orderId, array $skuOverrides = []): bool
 {
     $platform = strtolower(trim($platform));
     $orderId = trim($orderId);
@@ -744,8 +744,9 @@ function jg_store_ops_website_deduct_stock(PDO $pdo, string $platform, string $o
     if (!is_array($payload)) throw new RuntimeException('Order payload is invalid.');
     $items = [];
     foreach (jg_store_ops_website_stock_lines($payload) as $sku => $quantity) {
-        $items[] = ['sku' => $sku, 'quantity' => $quantity];
+        $items[] = ['source_tag' => $sku, 'sku' => $sku, 'quantity' => $quantity];
     }
+    $items = jg_store_ops_order_stock_apply_sku_overrides($items, $skuOverrides);
     $result = jg_store_ops_order_stock_deduct($pdo, [
         'source_platform' => $platform,
         'source_account' => $platform,

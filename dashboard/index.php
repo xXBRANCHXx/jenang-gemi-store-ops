@@ -35,7 +35,7 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
     <link rel="stylesheet" href="../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
 <body class="admin-body is-dashboard is-store-home">
-    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.47</div>
+    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.48</div>
     <div
         class="admin-app admin-store-home"
         data-store-home
@@ -224,6 +224,14 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
                             </span>
                         </label>
                     </fieldset>
+                    <section class="admin-remove-sku-mapping" data-remove-sku-mapping hidden>
+                        <div class="admin-remove-sku-mapping-head">
+                            <strong>Confirm stock SKUs</strong>
+                            <small data-remove-sku-mapping-summary>Match each order tag to a live SKU.</small>
+                        </div>
+                        <div class="admin-remove-sku-mapping-list" data-remove-sku-mapping-list></div>
+                        <datalist id="remove-order-live-skus" data-remove-sku-options></datalist>
+                    </section>
                     <label class="admin-reprint-field">
                         <span>Branch Login passcode</span>
                         <input class="admin-settings-input" name="passcode" type="password" autocomplete="current-password" maxlength="128" required>

@@ -1913,6 +1913,8 @@ input[type='radio'] {
   display: grid;
   gap: 16px;
   width: min(520px, 100%);
+  max-height: min(92svh, 860px);
+  overflow-y: auto;
 }
 
 .admin-remove-stock-choice {
@@ -1971,6 +1973,86 @@ input[type='radio'] {
   font-size: 0.76rem;
   font-weight: 700;
   line-height: 1.4;
+}
+
+.admin-remove-sku-mapping {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--admin-accent-primary) 45%, var(--admin-border));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--admin-accent-primary) 6%, var(--admin-surface-soft));
+}
+
+.admin-remove-sku-mapping[hidden] {
+  display: none;
+}
+
+.admin-remove-sku-mapping-head,
+.admin-remove-sku-line,
+.admin-remove-sku-line > span,
+.admin-remove-sku-field {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-remove-sku-mapping-head strong,
+.admin-remove-sku-line > span strong {
+  color: var(--admin-text);
+  font-size: 0.84rem;
+}
+
+.admin-remove-sku-mapping-head small,
+.admin-remove-sku-line > span small {
+  color: var(--admin-muted);
+  font-size: 0.73rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.admin-remove-sku-mapping-list {
+  display: grid;
+  gap: 9px;
+}
+
+.admin-remove-sku-line {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.35fr);
+  align-items: end;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--admin-border);
+}
+
+.admin-remove-sku-field span {
+  color: var(--admin-muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.admin-remove-sku-input {
+  min-width: 0;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.admin-remove-sku-input:focus {
+  border-color: var(--admin-accent-primary);
+  outline: 2px solid color-mix(in srgb, var(--admin-accent-primary) 25%, transparent);
+}
+
+@media (max-width: 560px) {
+  .admin-remove-sku-line {
+    grid-template-columns: 1fr;
+  }
 }
 
 .admin-remove-order-submit {
