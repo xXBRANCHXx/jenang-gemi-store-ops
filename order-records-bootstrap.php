@@ -236,11 +236,13 @@ function jg_store_ops_order_records_processed_join_sql(): string
 }
 
 /**
- * Resolve one completed stock ledger entry without changing inventory.
+ * Resolve one exact account-scoped order key without changing any state.
+ * Prefer immutable stock proof, then an existing terminal Store Ops row, and
+ * finally an authoritative source hint whose completion proof is checked later.
  *
  * @return array{source_platform:string,source_account:string,order_id:string}
  */
-function jg_store_ops_order_records_history_repair_key(PDO $pdo, string $orderId): array
+function jg_store_ops_order_records_history_repair_key(PDO $pdo, string $orderId, array $sourceHint = []): array
 {
     $orderId = substr(trim($orderId), 0, 160);
     if ($orderId === '') {
@@ -257,22 +259,52 @@ function jg_store_ops_order_records_history_repair_key(PDO $pdo, string $orderId
     );
     $stmt->execute([':order_id' => $orderId]);
     $rows = array_values(array_filter($stmt->fetchAll(), 'is_array'));
-    if ($rows === []) {
-        throw new OutOfBoundsException('No completed stock deduction exists for this order. Nothing was repaired.');
-    }
     if (count($rows) > 1) {
         throw new InvalidArgumentException('This Order ID exists in more than one source. Repair it with an exact source key.');
     }
+    if ($rows !== []) {
+        return [
+            'source_platform' => jg_store_ops_fulfillment_normalize_key_part((string) ($rows[0]['source_platform'] ?? ''), 32),
+            'source_account' => jg_store_ops_fulfillment_normalize_key_part((string) ($rows[0]['source_account'] ?? ''), 96),
+            'order_id' => trim((string) ($rows[0]['order_id'] ?? '')),
+        ];
+    }
 
-    return [
-        'source_platform' => jg_store_ops_fulfillment_normalize_key_part((string) ($rows[0]['source_platform'] ?? ''), 32),
-        'source_account' => jg_store_ops_fulfillment_normalize_key_part((string) ($rows[0]['source_account'] ?? ''), 96),
-        'order_id' => trim((string) ($rows[0]['order_id'] ?? '')),
+    $local = $pdo->prepare(
+        'SELECT source_platform, source_account, order_id
+         FROM store_ops_order_fulfillment_v2
+         WHERE order_id = :order_id AND status = "FULFILLED" AND fulfilled_at IS NOT NULL
+         ORDER BY fulfilled_at DESC
+         LIMIT 2'
+    );
+    $local->execute([':order_id' => $orderId]);
+    $localRows = array_values(array_filter($local->fetchAll(), 'is_array'));
+    if (count($localRows) > 1) {
+        throw new InvalidArgumentException('This Order ID exists in more than one source. Repair it with an exact source key.');
+    }
+    if ($localRows !== []) {
+        return [
+            'source_platform' => jg_store_ops_fulfillment_normalize_key_part((string) ($localRows[0]['source_platform'] ?? ''), 32),
+            'source_account' => jg_store_ops_fulfillment_normalize_key_part((string) ($localRows[0]['source_account'] ?? ''), 96),
+            'order_id' => trim((string) ($localRows[0]['order_id'] ?? '')),
+        ];
+    }
+
+    $hint = [
+        'source_platform' => jg_store_ops_fulfillment_normalize_key_part((string) ($sourceHint['source_platform'] ?? ''), 32),
+        'source_account' => jg_store_ops_fulfillment_normalize_key_part((string) ($sourceHint['source_account'] ?? ''), 96),
+        'order_id' => $orderId,
     ];
+    if ($hint['source_platform'] !== '' && $hint['source_account'] !== '') {
+        jg_store_ops_fulfillment_validate_key($hint);
+        return $hint;
+    }
+
+    throw new OutOfBoundsException('No completed Store Ops or API Ingest record exists for this order. Nothing was repaired.');
 }
 
 /**
- * Restore a missing completed-history event from the immutable stock ledger.
+ * Restore a missing completed-history event from verified existing completion state.
  * This function never calls a marketplace, changes stock, or reopens Listed.
  *
  * @param array{source_platform:string,source_account:string,order_id:string} $key
@@ -285,7 +317,8 @@ function jg_store_ops_order_records_repair_history(
     string $repairEmployeeId,
     string $repairEmployeeName,
     array $items = [],
-    string $customerName = ''
+    string $customerName = '',
+    array $completionProof = []
 ): array {
     $key = [
         'source_platform' => jg_store_ops_fulfillment_normalize_key_part((string) ($key['source_platform'] ?? ''), 32),
@@ -296,9 +329,6 @@ function jg_store_ops_order_records_repair_history(
     jg_store_ops_fulfillment_validate_key($key);
 
     $stockState = jg_store_ops_order_stock_state($pdo, $key);
-    if (empty($stockState['deducted'])) {
-        throw new DomainException('History repair requires a completed stock-deduction ledger entry. Inventory was not changed.');
-    }
 
     $snapshot = jg_store_ops_fulfillment_items_snapshot($items);
     if ($snapshot === []) {
@@ -333,6 +363,20 @@ function jg_store_ops_order_records_repair_history(
             ':order_id' => $key['order_id'],
         ]);
         $row = $select->fetch();
+
+        $localTerminal = is_array($row)
+            && strtoupper(trim((string) ($row['status'] ?? ''))) === 'FULFILLED'
+            && trim((string) ($row['fulfilled_at'] ?? '')) !== '';
+        $upstreamProcessed = (string) ($completionProof['proof_source'] ?? '') === 'api_ingest_processed'
+            && jg_store_ops_fulfillment_normalize_key_part((string) ($completionProof['source_platform'] ?? ''), 32) === $key['source_platform']
+            && jg_store_ops_fulfillment_normalize_key_part((string) ($completionProof['source_account'] ?? ''), 96) === $key['source_account']
+            && trim((string) ($completionProof['order_id'] ?? '')) === $key['order_id'];
+        $proofSource = !empty($stockState['deducted'])
+            ? 'stock_ledger'
+            : ($localTerminal ? 'local_fulfilled_state' : ($upstreamProcessed ? 'api_ingest_processed' : ''));
+        if ($proofSource === '') {
+            throw new DomainException('History repair requires verified completed state in Store Ops or API Ingest. Inventory was not changed.');
+        }
 
         if (!is_array($row)) {
             $insertSql = $driver === 'sqlite'
@@ -411,6 +455,7 @@ function jg_store_ops_order_records_repair_history(
         $fulfilledAt = trim((string) ($row['fulfilled_at'] ?? ''))
             ?: trim((string) ($originalEvent['created_at'] ?? ''))
             ?: trim((string) ($stockState['deducted_at'] ?? ''))
+            ?: trim((string) ($completionProof['processed_at'] ?? ''))
             ?: jg_store_ops_fulfillment_now();
         $processedBy = trim((string) ($originalEvent['employee_id'] ?? ''))
             ?: trim((string) ($row['claimed_by'] ?? ''))
@@ -449,6 +494,7 @@ function jg_store_ops_order_records_repair_history(
 
         $payload = json_encode([
             'history_only_repair' => true,
+            'proof_source' => $proofSource,
             'stock_changed' => false,
             'stock_deducted_at' => $stockState['deducted_at'] ?? null,
             'repaired_by' => ['id' => $repairEmployeeId, 'name' => $repairEmployeeName],
@@ -467,7 +513,7 @@ function jg_store_ops_order_records_repair_history(
         $event->execute($eventParams + [
             ':employee_id' => $processedBy !== '' ? $processedBy : null,
             ':employee_name' => $processedByName,
-            ':message' => 'History restored from verified stock deduction; inventory and source status were unchanged.',
+            ':message' => 'History restored from verified completed state; inventory and source status were unchanged.',
             ':payload_json' => $payload,
             ':created_at' => $fulfilledAt,
         ]);

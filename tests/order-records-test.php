@@ -132,4 +132,59 @@ order_records_expect(1, (int) $repairPdo->query('SELECT COUNT(*) FROM store_ops_
 $resolvedRepairKey = jg_store_ops_order_records_history_repair_key($repairPdo, $repairKey['order_id']);
 order_records_expect($repairKey, $resolvedRepairKey, 'History repair must resolve the exact account-scoped stock ledger key.');
 
+$legacyKey = ['source_platform' => 'shopee', 'source_account' => 'zero-shopee', 'order_id' => 'LEGACY-FULFILLED-1'];
+$repairPdo->prepare(
+    'INSERT INTO store_ops_order_fulfillment_v2
+        (source_platform, source_account, order_id, status, fulfilled_at, created_at, updated_at)
+     VALUES (:platform, :account, :order_id, "FULFILLED", :fulfilled_at, :created_at, :updated_at)'
+)->execute([
+    ':platform' => $legacyKey['source_platform'],
+    ':account' => $legacyKey['source_account'],
+    ':order_id' => $legacyKey['order_id'],
+    ':fulfilled_at' => '2026-08-31 03:00:00',
+    ':created_at' => '2026-08-31 02:55:00',
+    ':updated_at' => '2026-08-31 03:00:00',
+]);
+$resolvedLegacyKey = jg_store_ops_order_records_history_repair_key($repairPdo, $legacyKey['order_id']);
+order_records_expect($legacyKey, $resolvedLegacyKey, 'A terminal legacy Store Ops row must identify an order whose newer stock ledger is missing.');
+$legacyRepair = jg_store_ops_order_records_repair_history(
+    $repairPdo,
+    $legacyKey,
+    'branch-vincent',
+    'Branch Vincent'
+);
+order_records_expect(true, $legacyRepair['created'], 'A terminal legacy Store Ops row must safely restore its missing completed event.');
+
+$ingestKey = ['source_platform' => 'shopee', 'source_account' => 'zero-shopee', 'order_id' => 'INGEST-PROCESSED-1'];
+$resolvedIngestKey = jg_store_ops_order_records_history_repair_key($repairPdo, $ingestKey['order_id'], $ingestKey);
+order_records_expect($ingestKey, $resolvedIngestKey, 'An authoritative source hint must resolve the exact key before API Ingest proof is checked.');
+$ledgerCountBeforeIngestRepair = (int) $repairPdo->query('SELECT COUNT(*) FROM store_ops_inventory_order_deductions')->fetchColumn();
+$ingestRepair = jg_store_ops_order_records_repair_history(
+    $repairPdo,
+    $ingestKey,
+    'branch-vincent',
+    'Branch Vincent',
+    [['sku' => 'ZDROPS_VANILLA_30ML', 'product_name' => 'ZERO Drops Vanilla 30 ml', 'quantity' => 1]],
+    'buyer-1',
+    $ingestKey + [
+        'proof_source' => 'api_ingest_processed',
+        'processed_at' => '2026-09-01 01:44:09',
+    ]
+);
+order_records_expect(true, $ingestRepair['created'], 'Exact API Ingest processed proof must restore missing history when the newer stock ledger is absent.');
+order_records_expect($ledgerCountBeforeIngestRepair, (int) $repairPdo->query('SELECT COUNT(*) FROM store_ops_inventory_order_deductions')->fetchColumn(), 'API Ingest-backed repair must not add or change a stock-ledger row.');
+$ingestPayload = json_decode((string) $repairPdo->query(
+    'SELECT payload_json FROM store_ops_order_events_v2 WHERE order_id = "INGEST-PROCESSED-1" AND event_type = "fulfill"'
+)->fetchColumn(), true);
+order_records_expect('api_ingest_processed', $ingestPayload['proof_source'] ?? null, 'The repaired event must preserve its completion proof source for audit.');
+
+$rejectedKey = ['source_platform' => 'shopee', 'source_account' => 'zero-shopee', 'order_id' => 'NO-COMPLETION-PROOF'];
+$rejected = false;
+try {
+    jg_store_ops_order_records_repair_history($repairPdo, $rejectedKey, 'branch-vincent', 'Branch Vincent');
+} catch (DomainException) {
+    $rejected = true;
+}
+order_records_expect(true, $rejected, 'History repair must reject an order with no stock, terminal Store Ops, or exact API Ingest proof.');
+
 echo "order-records-test: ok\n";

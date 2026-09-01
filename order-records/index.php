@@ -71,7 +71,7 @@ $orderRecordsJsVersion = (string) @filemtime(dirname(__DIR__) . '/order-records.
                         <div>
                             <span>Branch-only recovery</span>
                             <h2 id="order-records-repair-title">Repair missing completed history</h2>
-                            <p>Available only when the immutable ledger proves stock was already deducted. This does not change stock, marketplace status, or the Listed queue.</p>
+                            <p>Available only when Store Ops or API Ingest proves the order was already completed. This does not change stock, marketplace status, or the Listed queue.</p>
                         </div>
                         <form data-order-records-repair-form>
                             <label>

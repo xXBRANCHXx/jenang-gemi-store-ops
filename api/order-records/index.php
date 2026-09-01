@@ -35,9 +35,9 @@ try {
         }
 
         $orderId = trim((string) ($payload['order_id'] ?? $payload['order'] ?? ''));
-        $key = jg_store_ops_order_records_history_repair_key($pdo, $orderId);
         $items = [];
         $customerName = '';
+        $resolved = null;
         try {
             $resolved = jg_store_ops_resolve_order_by_id($orderId);
             if (is_array($resolved)) {
@@ -48,13 +48,30 @@ try {
             error_log('History repair order lookup failed; using the stock ledger snapshot: ' . $resolverError->getMessage());
         }
 
+        $resolvedSource = is_array($resolved['source'] ?? null) ? $resolved['source'] : [];
+        $key = jg_store_ops_order_records_history_repair_key($pdo, $orderId, [
+            'source_platform' => (string) ($resolvedSource['platform'] ?? $resolvedSource['key'] ?? ''),
+            'source_account' => (string) ($resolvedSource['account'] ?? ''),
+        ]);
+        $completionProof = null;
+        try {
+            $completionProof = jg_store_ops_order_resolver_marketplace_fulfillment_proof(
+                $key['source_platform'],
+                $key['source_account'],
+                $key['order_id']
+            );
+        } catch (Throwable $proofError) {
+            error_log('History repair API Ingest proof lookup failed: ' . $proofError->getMessage());
+        }
+
         $repair = jg_store_ops_order_records_repair_history(
             $pdo,
             $key,
             $employeeId,
             $employeeName,
             $items,
-            $customerName
+            $customerName,
+            is_array($completionProof) ? $completionProof : []
         );
         echo json_encode([
             'ok' => true,

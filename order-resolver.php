@@ -688,6 +688,50 @@ function jg_store_ops_order_resolver_find_marketplace_history(string $orderId): 
     return jg_store_ops_order_resolver_order_from_marketplace_rows((array) ($payload['orders'] ?? []));
 }
 
+/**
+ * Return an exact, read-only API Ingest completion proof for a marketplace order.
+ *
+ * @return array{source_platform:string,source_account:string,order_id:string,proof_source:string,processed_at:string}|null
+ */
+function jg_store_ops_order_resolver_marketplace_fulfillment_proof(
+    string $platform,
+    string $account,
+    string $orderId
+): ?array {
+    $platform = jg_store_ops_order_resolver_platform_key($platform);
+    $account = strtolower(trim($account));
+    $orderId = trim($orderId);
+    if (!in_array($platform, ['shopee', 'tiktok'], true) || $account === '' || $orderId === '') {
+        return null;
+    }
+
+    $payload = jg_store_ops_order_resolver_marketplace_request('/fulfillment/orders', [
+        'platform' => $platform,
+        'limit' => 500,
+    ]);
+    if (!is_array($payload) || empty($payload['ok'])) {
+        return null;
+    }
+
+    foreach ((array) ($payload['orders'] ?? []) as $row) {
+        if (!is_array($row)) continue;
+        if (jg_store_ops_order_resolver_platform_key((string) ($row['platform'] ?? '')) !== $platform) continue;
+        if (strtolower(trim((string) ($row['account_key'] ?? ''))) !== $account) continue;
+        if (trim((string) ($row['order_id'] ?? '')) !== $orderId) continue;
+        if (empty($row['is_processed'])) return null;
+        if (strtoupper(trim((string) ($row['workflow_status'] ?? ''))) !== 'IS_PROCESSED') return null;
+
+        return [
+            'source_platform' => $platform,
+            'source_account' => $account,
+            'order_id' => $orderId,
+            'proof_source' => 'api_ingest_processed',
+            'processed_at' => trim((string) ($row['processed_at'] ?? $row['updated_at'] ?? '')),
+        ];
+    }
+    return null;
+}
+
 function jg_store_ops_order_resolver_configured_marketplace_sources(): array
 {
     $sourcesValue = jg_store_ops_order_resolver_config('JG_MARKETPLACE_SOURCES', 'marketplace_sources');

@@ -369,7 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (refs.repairSubmit instanceof HTMLButtonElement) {
       refs.repairSubmit.disabled = true;
-      refs.repairSubmit.textContent = 'Verifying ledger…';
+      refs.repairSubmit.textContent = 'Verifying completion…';
     }
     repairHistory().then((payload) => {
       if (!payload) return;
