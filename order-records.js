@@ -59,7 +59,12 @@ document.addEventListener('DOMContentLoaded', () => {
     items: document.querySelector('[data-order-records-items]'),
     itemsBody: document.querySelector('[data-order-records-items-body]'),
     averageContext: document.querySelector('[data-order-records-average-context]'),
-    submit: document.querySelector('[data-order-records-filters] button[type="submit"]')
+    submit: document.querySelector('[data-order-records-filters] button[type="submit"]'),
+    repairForm: document.querySelector('[data-order-records-repair-form]'),
+    repairOrder: document.querySelector('[data-order-records-repair-order]'),
+    repairPasscode: document.querySelector('[data-order-records-repair-passcode]'),
+    repairSubmit: document.querySelector('[data-order-records-repair-submit]'),
+    repairResult: document.querySelector('[data-order-records-repair-result]')
   };
   const state = { records: [], operatorsReady: false };
 
@@ -337,6 +342,59 @@ document.addEventListener('DOMContentLoaded', () => {
   const closeDrawer = () => {
     if (refs.drawer) refs.drawer.hidden = true;
   };
+
+  const repairHistory = async () => {
+    const orderId = refs.repairOrder instanceof HTMLInputElement ? refs.repairOrder.value.trim() : '';
+    const passcode = refs.repairPasscode instanceof HTMLInputElement ? refs.repairPasscode.value : '';
+    if (!orderId || !passcode) throw new Error('Enter the exact Order ID and Branch Login passcode.');
+    if (!window.confirm(`Restore ${orderId} to completed Order Records only? Stock, marketplace status, and Listed will not change.`)) return null;
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ action: 'repair_history', order_id: orderId, passcode })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) throw new Error(payload.error || `HTTP ${response.status}`);
+    return payload;
+  };
+
+  refs.repairForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (refs.repairResult) {
+      refs.repairResult.hidden = true;
+      refs.repairResult.classList.remove('is-error');
+    }
+    if (refs.repairSubmit instanceof HTMLButtonElement) {
+      refs.repairSubmit.disabled = true;
+      refs.repairSubmit.textContent = 'Verifying ledger…';
+    }
+    repairHistory().then((payload) => {
+      if (!payload) return;
+      if (refs.repairPasscode instanceof HTMLInputElement) refs.repairPasscode.value = '';
+      if (refs.query instanceof HTMLInputElement && refs.repairOrder instanceof HTMLInputElement) {
+        refs.query.value = refs.repairOrder.value.trim();
+      }
+      if (refs.repairResult) {
+        refs.repairResult.textContent = payload.message || 'Completed history restored without changing stock.';
+        refs.repairResult.hidden = false;
+      }
+      return load();
+    }).catch((error) => {
+      if (refs.repairResult) {
+        refs.repairResult.textContent = error instanceof Error ? error.message : 'Unable to repair completed history.';
+        refs.repairResult.classList.add('is-error');
+        refs.repairResult.hidden = false;
+      }
+    }).finally(() => {
+      if (refs.repairSubmit instanceof HTMLButtonElement) {
+        refs.repairSubmit.disabled = false;
+        refs.repairSubmit.textContent = 'Restore history only';
+      }
+    });
+  });
 
   refs.form?.addEventListener('submit', (event) => {
     event.preventDefault();

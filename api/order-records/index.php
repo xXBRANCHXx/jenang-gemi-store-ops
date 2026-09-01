@@ -15,12 +15,60 @@ function jg_store_ops_order_records_fail(string $message, int $status = 422): ne
     exit;
 }
 
-if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'GET') {
-    jg_store_ops_order_records_fail('Order Records is read-only.', 405);
-}
-
 try {
     $pdo = jg_store_ops_fulfillment_db();
+    $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+    if ($method === 'POST') {
+        $payload = json_decode((string) file_get_contents('php://input'), true);
+        $payload = is_array($payload) ? $payload : [];
+        if (strtolower(trim((string) ($payload['action'] ?? ''))) !== 'repair_history') {
+            jg_store_ops_order_records_fail('Only the protected history-only repair is available.', 405);
+        }
+
+        $employeeId = jg_admin_current_employee_id();
+        $employeeName = jg_admin_current_employee_name();
+        if (!jg_admin_employee_can_remove_orders($employeeId)) {
+            jg_store_ops_order_records_fail('Only branch-vincent can repair completed order history.', 403);
+        }
+        if (!jg_admin_verify_employee_passcode($employeeId, (string) ($payload['passcode'] ?? ''))) {
+            jg_store_ops_order_records_fail('Branch Login passcode is incorrect.', 403);
+        }
+
+        $orderId = trim((string) ($payload['order_id'] ?? $payload['order'] ?? ''));
+        $key = jg_store_ops_order_records_history_repair_key($pdo, $orderId);
+        $items = [];
+        $customerName = '';
+        try {
+            $resolved = jg_store_ops_resolve_order_by_id($orderId);
+            if (is_array($resolved)) {
+                $items = is_array($resolved['items'] ?? null) ? $resolved['items'] : [];
+                $customerName = jg_store_ops_order_records_customer_name_from_payload($resolved);
+            }
+        } catch (Throwable $resolverError) {
+            error_log('History repair order lookup failed; using the stock ledger snapshot: ' . $resolverError->getMessage());
+        }
+
+        $repair = jg_store_ops_order_records_repair_history(
+            $pdo,
+            $key,
+            $employeeId,
+            $employeeName,
+            $items,
+            $customerName
+        );
+        echo json_encode([
+            'ok' => true,
+            'repair' => $repair,
+            'message' => $repair['created']
+                ? 'Completed history restored. Inventory, marketplace status, and Listed were not changed.'
+                : 'This order already has a completed history record. Nothing was changed.',
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+    if ($method !== 'GET') {
+        jg_store_ops_order_records_fail('Method not allowed.', 405);
+    }
+
     if (trim((string) ($_GET['detail_order_id'] ?? '')) !== '') {
         $detail = jg_store_ops_order_records_detail(
             $pdo,
@@ -81,6 +129,8 @@ try {
     jg_store_ops_order_records_fail($exception->getMessage(), 422);
 } catch (OutOfBoundsException $exception) {
     jg_store_ops_order_records_fail($exception->getMessage(), 404);
+} catch (DomainException $exception) {
+    jg_store_ops_order_records_fail($exception->getMessage(), 409);
 } catch (Throwable $throwable) {
     error_log('Store Ops Order Records API failed: ' . $throwable->getMessage());
     jg_store_ops_order_records_fail('Unable to load processed order records.', 500);

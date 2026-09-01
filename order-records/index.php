@@ -66,6 +66,28 @@ $orderRecordsJsVersion = (string) @filemtime(dirname(__DIR__) . '/order-records.
                     </article>
                 </section>
 
+                <?php if (jg_admin_employee_can_remove_orders(jg_admin_current_employee_id())): ?>
+                    <section class="admin-order-records-repair-panel" aria-labelledby="order-records-repair-title">
+                        <div>
+                            <span>Branch-only recovery</span>
+                            <h2 id="order-records-repair-title">Repair missing completed history</h2>
+                            <p>Available only when the immutable ledger proves stock was already deducted. This does not change stock, marketplace status, or the Listed queue.</p>
+                        </div>
+                        <form data-order-records-repair-form>
+                            <label>
+                                <span>Order ID</span>
+                                <input type="text" name="order_id" maxlength="160" placeholder="Exact Order ID" autocomplete="off" required data-order-records-repair-order>
+                            </label>
+                            <label>
+                                <span>Branch Login passcode</span>
+                                <input type="password" name="passcode" placeholder="Passcode" autocomplete="current-password" required data-order-records-repair-passcode>
+                            </label>
+                            <button type="submit" class="admin-primary-btn" data-order-records-repair-submit>Restore history only</button>
+                        </form>
+                        <p class="admin-order-records-repair-result" data-order-records-repair-result hidden></p>
+                    </section>
+                <?php endif; ?>
+
                 <section class="admin-order-records-panel">
                     <header class="admin-order-records-section-head admin-order-records-history-head">
                         <div>

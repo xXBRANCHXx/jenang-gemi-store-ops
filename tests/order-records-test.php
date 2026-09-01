@@ -62,4 +62,74 @@ order_records_expect(2, $summary['operators'], 'Processed summary must count dis
 order_records_expect(2, $summary['timed_orders'], 'Processed summary must disclose how many records contributed to average time.');
 order_records_expect('1m 30s', $summary['average_label'], 'Processed summary must average claim-to-completion time.');
 
+$repairPdo = new PDO('sqlite::memory:');
+$repairPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$repairPdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+$repairPdo->exec('CREATE TABLE store_ops_employees_v2 (
+    id TEXT PRIMARY KEY, display_name TEXT NOT NULL, pin_hash TEXT NOT NULL DEFAULT "", active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT, updated_at TEXT
+)');
+$repairPdo->exec('CREATE TABLE store_ops_order_fulfillment_v2 (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_platform TEXT NOT NULL, source_account TEXT NOT NULL DEFAULT "", order_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT "UNCLAIMED", claimed_by TEXT, claimed_at TEXT, last_activity_at TEXT,
+    scan_completed_at TEXT, label_printed_at TEXT, fulfilled_at TEXT,
+    scan_required INTEGER NOT NULL DEFAULT 0, scan_completed INTEGER NOT NULL DEFAULT 0,
+    items_json TEXT, customer_name TEXT NOT NULL DEFAULT "", created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+    UNIQUE (source_platform, source_account, order_id)
+)');
+$repairPdo->exec('CREATE TABLE store_ops_order_events_v2 (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_platform TEXT NOT NULL, source_account TEXT NOT NULL DEFAULT "", order_id TEXT NOT NULL,
+    event_type TEXT NOT NULL, employee_id TEXT, employee_name TEXT NOT NULL DEFAULT "", sku TEXT NOT NULL DEFAULT "",
+    quantity REAL NOT NULL DEFAULT 0, progress_scanned INTEGER NOT NULL DEFAULT 0, progress_required INTEGER NOT NULL DEFAULT 0,
+    message TEXT NOT NULL DEFAULT "", payload_json TEXT, created_at TEXT NOT NULL
+)');
+jg_store_ops_order_stock_ensure_schema($repairPdo);
+$repairKey = ['source_platform' => 'shopee', 'source_account' => 'zero-shopee', 'order_id' => '260829M74URA9P'];
+$repairPdo->prepare(
+    'INSERT INTO store_ops_inventory_order_deductions
+        (source_platform, source_account, order_id, status, deductions_json, deducted_at, created_at, updated_at)
+     VALUES (:platform, :account, :order_id, "deducted", :deductions, :deducted_at, :created_at, :updated_at)'
+)->execute([
+    ':platform' => $repairKey['source_platform'],
+    ':account' => $repairKey['source_account'],
+    ':order_id' => $repairKey['order_id'],
+    ':deductions' => json_encode([['selling_sku' => 'ZDROPS_CARAMEL_30ML', 'selling_quantity' => 2]], JSON_THROW_ON_ERROR),
+    ':deducted_at' => '2026-09-01 01:44:09',
+    ':created_at' => '2026-09-01 01:44:09',
+    ':updated_at' => '2026-09-01 01:44:09',
+]);
+$repairPdo->prepare(
+    'INSERT INTO store_ops_order_fulfillment_v2
+        (source_platform, source_account, order_id, status, fulfilled_at, created_at, updated_at)
+     VALUES (:platform, :account, :order_id, "FULFILLED", :fulfilled_at, :created_at, :updated_at)'
+)->execute([
+    ':platform' => $repairKey['source_platform'],
+    ':account' => $repairKey['source_account'],
+    ':order_id' => $repairKey['order_id'],
+    ':fulfilled_at' => '2026-09-01 01:44:09',
+    ':created_at' => '2026-08-30 00:05:05',
+    ':updated_at' => '2026-09-01 01:44:09',
+]);
+$ledgerBefore = $repairPdo->query('SELECT * FROM store_ops_inventory_order_deductions')->fetchAll();
+$repair = jg_store_ops_order_records_repair_history(
+    $repairPdo,
+    $repairKey,
+    'branch-vincent',
+    'Branch Vincent',
+    [['sku' => 'ZDROPS_CARAMEL_30ML', 'product_name' => 'ZERO Drops Caramel 30 ml', 'quantity' => 2]],
+    'bfzc5bf88i'
+);
+order_records_expect(true, $repair['created'], 'History-only repair must create the missing fulfill event.');
+order_records_expect(false, $repair['stock_changed'], 'History-only repair must explicitly report that stock was untouched.');
+order_records_expect(1, (int) $repairPdo->query('SELECT COUNT(*) FROM store_ops_order_events_v2 WHERE event_type = "fulfill"')->fetchColumn(), 'History-only repair must create one real completed-history event.');
+order_records_expect('FULFILLED', (string) $repairPdo->query('SELECT status FROM store_ops_order_fulfillment_v2')->fetchColumn(), 'History-only repair must keep the order terminal instead of reopening Listed.');
+order_records_expect($ledgerBefore, $repairPdo->query('SELECT * FROM store_ops_inventory_order_deductions')->fetchAll(), 'History-only repair must not rewrite the stock ledger.');
+$repairRetry = jg_store_ops_order_records_repair_history($repairPdo, $repairKey, 'branch-vincent', 'Branch Vincent');
+order_records_expect(false, $repairRetry['created'], 'History-only repair must be idempotent after the completed event exists.');
+order_records_expect(1, (int) $repairPdo->query('SELECT COUNT(*) FROM store_ops_order_events_v2 WHERE event_type = "fulfill"')->fetchColumn(), 'A repair retry must not duplicate completed history.');
+$resolvedRepairKey = jg_store_ops_order_records_history_repair_key($repairPdo, $repairKey['order_id']);
+order_records_expect($repairKey, $resolvedRepairKey, 'History repair must resolve the exact account-scoped stock ledger key.');
+
 echo "order-records-test: ok\n";

@@ -235,6 +235,259 @@ function jg_store_ops_order_records_processed_join_sql(): string
             )';
 }
 
+/**
+ * Resolve one completed stock ledger entry without changing inventory.
+ *
+ * @return array{source_platform:string,source_account:string,order_id:string}
+ */
+function jg_store_ops_order_records_history_repair_key(PDO $pdo, string $orderId): array
+{
+    $orderId = substr(trim($orderId), 0, 160);
+    if ($orderId === '') {
+        throw new InvalidArgumentException('Order ID is required for history repair.');
+    }
+
+    jg_store_ops_order_stock_ensure_schema($pdo);
+    $stmt = $pdo->prepare(
+        'SELECT source_platform, source_account, order_id
+         FROM store_ops_inventory_order_deductions
+         WHERE order_id = :order_id AND status = "deducted"
+         ORDER BY deducted_at DESC
+         LIMIT 2'
+    );
+    $stmt->execute([':order_id' => $orderId]);
+    $rows = array_values(array_filter($stmt->fetchAll(), 'is_array'));
+    if ($rows === []) {
+        throw new OutOfBoundsException('No completed stock deduction exists for this order. Nothing was repaired.');
+    }
+    if (count($rows) > 1) {
+        throw new InvalidArgumentException('This Order ID exists in more than one source. Repair it with an exact source key.');
+    }
+
+    return [
+        'source_platform' => jg_store_ops_fulfillment_normalize_key_part((string) ($rows[0]['source_platform'] ?? ''), 32),
+        'source_account' => jg_store_ops_fulfillment_normalize_key_part((string) ($rows[0]['source_account'] ?? ''), 96),
+        'order_id' => trim((string) ($rows[0]['order_id'] ?? '')),
+    ];
+}
+
+/**
+ * Restore a missing completed-history event from the immutable stock ledger.
+ * This function never calls a marketplace, changes stock, or reopens Listed.
+ *
+ * @param array{source_platform:string,source_account:string,order_id:string} $key
+ * @param array<int,array<string,mixed>> $items
+ * @return array{created:bool,order_id:string,source_platform:string,source_account:string,fulfilled_at:string,processed_by:string,stock_changed:false}
+ */
+function jg_store_ops_order_records_repair_history(
+    PDO $pdo,
+    array $key,
+    string $repairEmployeeId,
+    string $repairEmployeeName,
+    array $items = [],
+    string $customerName = ''
+): array {
+    $key = [
+        'source_platform' => jg_store_ops_fulfillment_normalize_key_part((string) ($key['source_platform'] ?? ''), 32),
+        'source_account' => jg_store_ops_fulfillment_normalize_key_part((string) ($key['source_account'] ?? ''), 96),
+        'order_id' => substr(trim((string) ($key['order_id'] ?? '')), 0, 160),
+    ];
+    if ($key['source_account'] === '') $key['source_account'] = 'default';
+    jg_store_ops_fulfillment_validate_key($key);
+
+    $stockState = jg_store_ops_order_stock_state($pdo, $key);
+    if (empty($stockState['deducted'])) {
+        throw new DomainException('History repair requires a completed stock-deduction ledger entry. Inventory was not changed.');
+    }
+
+    $snapshot = jg_store_ops_fulfillment_items_snapshot($items);
+    if ($snapshot === []) {
+        $deductionItems = [];
+        foreach ((array) ($stockState['deductions'] ?? []) as $deduction) {
+            if (!is_array($deduction)) continue;
+            $deductionItems[] = [
+                'sku' => (string) ($deduction['selling_sku'] ?? $deduction['sku'] ?? $deduction['stock_sku'] ?? ''),
+                'product_name' => (string) ($deduction['product_name'] ?? $deduction['selling_sku'] ?? $deduction['sku'] ?? ''),
+                'quantity' => $deduction['selling_quantity'] ?? $deduction['quantity'] ?? 0,
+            ];
+        }
+        $snapshot = jg_store_ops_fulfillment_items_snapshot($deductionItems);
+    }
+    $customerName = jg_store_ops_order_records_customer_name($customerName);
+    $repairEmployeeId = substr(trim($repairEmployeeId), 0, 64);
+    $repairEmployeeName = substr(trim($repairEmployeeName), 0, 120);
+    $driver = strtolower((string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME));
+
+    $pdo->beginTransaction();
+    try {
+        $selectSql = 'SELECT * FROM store_ops_order_fulfillment_v2
+                      WHERE source_platform = :source_platform
+                        AND source_account = :source_account
+                        AND order_id = :order_id
+                      LIMIT 1';
+        if ($driver !== 'sqlite') $selectSql .= ' FOR UPDATE';
+        $select = $pdo->prepare($selectSql);
+        $select->execute([
+            ':source_platform' => $key['source_platform'],
+            ':source_account' => $key['source_account'],
+            ':order_id' => $key['order_id'],
+        ]);
+        $row = $select->fetch();
+
+        if (!is_array($row)) {
+            $insertSql = $driver === 'sqlite'
+                ? 'INSERT OR IGNORE INTO store_ops_order_fulfillment_v2
+                    (source_platform, source_account, order_id, status, created_at, updated_at)
+                   VALUES (:source_platform, :source_account, :order_id, "UNCLAIMED", :created_at, :updated_at)'
+                : 'INSERT INTO store_ops_order_fulfillment_v2
+                    (source_platform, source_account, order_id, status, created_at, updated_at)
+                   VALUES (:source_platform, :source_account, :order_id, "UNCLAIMED", :created_at, :updated_at)
+                   ON DUPLICATE KEY UPDATE updated_at = updated_at';
+            $insert = $pdo->prepare($insertSql);
+            $insert->execute([
+                ':source_platform' => $key['source_platform'],
+                ':source_account' => $key['source_account'],
+                ':order_id' => $key['order_id'],
+                ':created_at' => jg_store_ops_fulfillment_now(),
+                ':updated_at' => jg_store_ops_fulfillment_now(),
+            ]);
+            $select->execute([
+                ':source_platform' => $key['source_platform'],
+                ':source_account' => $key['source_account'],
+                ':order_id' => $key['order_id'],
+            ]);
+            $row = $select->fetch();
+        }
+        if (!is_array($row)) {
+            throw new RuntimeException('Unable to create the local history row.');
+        }
+        if (strtoupper(trim((string) ($row['status'] ?? ''))) === 'CANCELLED') {
+            throw new DomainException('A cancelled order cannot be restored as completed history.');
+        }
+
+        $eventParams = [
+            ':source_platform' => $key['source_platform'],
+            ':source_account' => $key['source_account'],
+            ':order_id' => $key['order_id'],
+        ];
+        $existing = $pdo->prepare(
+            'SELECT employee_id, employee_name, created_at
+             FROM store_ops_order_events_v2
+             WHERE source_platform = :source_platform
+               AND source_account = :source_account
+               AND order_id = :order_id
+               AND event_type = "fulfill"
+             ORDER BY id DESC LIMIT 1'
+        );
+        $existing->execute($eventParams);
+        $existingEvent = $existing->fetch();
+        if (is_array($existingEvent)) {
+            $pdo->commit();
+            return [
+                'created' => false,
+                'order_id' => $key['order_id'],
+                'source_platform' => $key['source_platform'],
+                'source_account' => $key['source_account'],
+                'fulfilled_at' => (string) ($existingEvent['created_at'] ?? $row['fulfilled_at'] ?? ''),
+                'processed_by' => (string) ($existingEvent['employee_name'] ?? $existingEvent['employee_id'] ?? ''),
+                'stock_changed' => false,
+            ];
+        }
+
+        $original = $pdo->prepare(
+            'SELECT event_type, employee_id, employee_name, created_at
+             FROM store_ops_order_events_v2
+             WHERE source_platform = :source_platform
+               AND source_account = :source_account
+               AND order_id = :order_id
+               AND event_type IN ("remove_from_listed", "label_print", "scan_complete", "claim", "reclaim")
+             ORDER BY CASE WHEN event_type = "remove_from_listed" THEN 0 ELSE 1 END, id DESC
+             LIMIT 1'
+        );
+        $original->execute($eventParams);
+        $originalEvent = $original->fetch();
+        $originalEvent = is_array($originalEvent) ? $originalEvent : [];
+
+        $fulfilledAt = trim((string) ($row['fulfilled_at'] ?? ''))
+            ?: trim((string) ($originalEvent['created_at'] ?? ''))
+            ?: trim((string) ($stockState['deducted_at'] ?? ''))
+            ?: jg_store_ops_fulfillment_now();
+        $processedBy = trim((string) ($originalEvent['employee_id'] ?? ''))
+            ?: trim((string) ($row['claimed_by'] ?? ''))
+            ?: $repairEmployeeId;
+        $processedByName = trim((string) ($originalEvent['employee_name'] ?? ''));
+        if ($processedByName === '' && $processedBy !== '') {
+            $employee = $pdo->prepare('SELECT display_name FROM store_ops_employees_v2 WHERE id = :id LIMIT 1');
+            $employee->execute([':id' => $processedBy]);
+            $processedByName = trim((string) ($employee->fetchColumn() ?: ''));
+        }
+        if ($processedByName === '') $processedByName = $repairEmployeeName !== '' ? $repairEmployeeName : $processedBy;
+
+        $itemsJson = $snapshot !== []
+            ? json_encode($snapshot, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+            : null;
+        $update = $pdo->prepare(
+            'UPDATE store_ops_order_fulfillment_v2
+             SET status = "FULFILLED",
+                 fulfilled_at = COALESCE(fulfilled_at, :fulfilled_at),
+                 last_activity_at = COALESCE(last_activity_at, :last_activity_at),
+                 items_json = CASE WHEN :items_present = 1 AND (items_json IS NULL OR items_json = "") THEN :items_json ELSE items_json END,
+                 customer_name = CASE WHEN :customer_present = 1 AND customer_name = "" THEN :customer_name ELSE customer_name END,
+                 updated_at = :updated_at
+             WHERE id = :id'
+        );
+        $update->execute([
+            ':fulfilled_at' => $fulfilledAt,
+            ':last_activity_at' => $fulfilledAt,
+            ':items_present' => is_string($itemsJson) ? 1 : 0,
+            ':items_json' => $itemsJson,
+            ':customer_present' => $customerName !== '' ? 1 : 0,
+            ':customer_name' => $customerName,
+            ':updated_at' => jg_store_ops_fulfillment_now(),
+            ':id' => (int) $row['id'],
+        ]);
+
+        $payload = json_encode([
+            'history_only_repair' => true,
+            'stock_changed' => false,
+            'stock_deducted_at' => $stockState['deducted_at'] ?? null,
+            'repaired_by' => ['id' => $repairEmployeeId, 'name' => $repairEmployeeName],
+            'original_event_type' => (string) ($originalEvent['event_type'] ?? ''),
+            'items' => $snapshot,
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $event = $pdo->prepare(
+            'INSERT INTO store_ops_order_events_v2 (
+                source_platform, source_account, order_id, event_type, employee_id, employee_name,
+                sku, quantity, progress_scanned, progress_required, message, payload_json, created_at
+             ) VALUES (
+                :source_platform, :source_account, :order_id, "fulfill", :employee_id, :employee_name,
+                "", 0, 0, 0, :message, :payload_json, :created_at
+             )'
+        );
+        $event->execute($eventParams + [
+            ':employee_id' => $processedBy !== '' ? $processedBy : null,
+            ':employee_name' => $processedByName,
+            ':message' => 'History restored from verified stock deduction; inventory and source status were unchanged.',
+            ':payload_json' => $payload,
+            ':created_at' => $fulfilledAt,
+        ]);
+        $pdo->commit();
+
+        return [
+            'created' => true,
+            'order_id' => $key['order_id'],
+            'source_platform' => $key['source_platform'],
+            'source_account' => $key['source_account'],
+            'fulfilled_at' => $fulfilledAt,
+            'processed_by' => $processedByName,
+            'stock_changed' => false,
+        ];
+    } catch (Throwable $error) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $error;
+    }
+}
+
 function jg_store_ops_order_records_duration_start_sql(): string
 {
     return 'COALESCE(

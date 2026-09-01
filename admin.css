@@ -10059,6 +10059,79 @@ button.admin-store-sidebar-profile:hover {
   text-align: right;
 }
 
+.admin-order-records-repair-panel {
+  display: grid;
+  grid-template-columns: minmax(250px, 1fr) minmax(520px, 1.5fr);
+  align-items: end;
+  gap: 12px 18px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--admin-accent-primary) 34%, var(--admin-border));
+  border-radius: 15px;
+  background: var(--admin-surface);
+}
+
+.admin-order-records-repair-panel > div {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-order-records-repair-panel > div > span,
+.admin-order-records-repair-panel label > span {
+  color: var(--admin-muted);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.admin-order-records-repair-panel h2 {
+  margin: 0;
+  color: var(--admin-text);
+  font: 850 1rem/1.2 'Space Grotesk', sans-serif;
+}
+
+.admin-order-records-repair-panel p {
+  margin: 0;
+  color: var(--admin-muted);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.admin-order-records-repair-panel form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(150px, .75fr) auto;
+  align-items: end;
+  gap: 9px;
+}
+
+.admin-order-records-repair-panel label {
+  display: grid;
+  gap: 5px;
+}
+
+.admin-order-records-repair-panel input,
+.admin-order-records-repair-panel button {
+  min-height: 36px;
+  border-radius: 9px;
+  font-size: 11px;
+}
+
+.admin-order-records-repair-result {
+  grid-column: 1 / -1;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, #16a34a 40%, var(--admin-border));
+  border-radius: 9px;
+  color: #16a34a !important;
+  background: color-mix(in srgb, #16a34a 8%, var(--admin-surface));
+}
+
+.admin-order-records-repair-result.is-error {
+  border-color: color-mix(in srgb, var(--admin-danger) 42%, var(--admin-border));
+  color: var(--admin-danger) !important;
+  background: color-mix(in srgb, var(--admin-danger) 8%, var(--admin-surface));
+}
+
 .admin-order-records-panel {
   min-width: 0;
   overflow: hidden;
@@ -10576,6 +10649,10 @@ button.admin-store-sidebar-profile:hover {
 
   .admin-order-records-filter-actions {
     grid-column: auto;
+  }
+
+  .admin-order-records-repair-panel {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -12733,6 +12810,10 @@ button.admin-store-sidebar-profile:hover {
 
   .admin-order-records-date-range {
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+
+  .admin-order-records-repair-panel form {
+    grid-template-columns: 1fr;
   }
 
   .admin-order-record-event > div > header {

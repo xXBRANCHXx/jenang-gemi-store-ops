@@ -39,7 +39,11 @@ assert.match(orderRecordsScript(), /Order claimed[\s\S]*Label printed[\s\S]*Pick
 assert.match(orderRecordsScript(), /pickup_complete[\s\S]*scheduled_pickup_start_at[\s\S]*picked_up_at/, 'Pickup must show its schedule until an actual marketplace timestamp replaces it.');
 assert.match(orderRecordsScript(), /delivered[\s\S]*delivered_at/, 'Delivery must remain pending until the marketplace supplies its actual timestamp.');
 assert.match(page, /data-order-records-average-context/, 'Average time must disclose its timed-order coverage.');
-assert.match(api, /REQUEST_METHOD[\s\S]*?Order Records is read-only/, 'Order Records API must reject writes.');
+assert.match(page, /Repair missing completed history[\s\S]*?data-order-records-repair-order[\s\S]*?data-order-records-repair-passcode[\s\S]*?Restore history only/, 'Branch operators must have an explicit history-only repair form.');
+assert.match(api, /repair_history[\s\S]*?jg_admin_employee_can_remove_orders[\s\S]*?jg_admin_verify_employee_passcode/, 'History repair must require the Branch identity and a fresh passcode.');
+assert.match(api, /jg_store_ops_order_records_history_repair_key[\s\S]*?jg_store_ops_order_records_repair_history/, 'History repair must resolve and use the completed stock ledger key.');
+assert.match(orderRecordsScript(), /Stock, marketplace status, and Listed will not change/, 'The repair UI must describe the operation as history-only before confirmation.');
+assert.match(orderRecordsScript(), /method:\s*'POST'[\s\S]*?action:\s*'repair_history'/, 'The repair UI must submit only the protected history-repair action.');
 assert.match(api, /jg_store_ops_order_records_summary_from_db/, 'Summary metrics must cover the full filtered result instead of only the visible rows.');
 assert.match(api, /jg_store_ops_order_resolver_shipment_lifecycle[\s\S]*'lifecycle'/, 'Order detail must include the authoritative marketplace shipment lifecycle.');
 assert.match(api, /jg_store_ops_resolve_order_by_id[\s\S]*?items_source.*?order_source/, 'Existing processed records must resolve products from the authoritative order source.');
@@ -49,7 +53,8 @@ assert.match(bootstrap, /f\.status = \"FULFILLED\"[\s\S]*?event_type = \"fulfill
 assert.match(bootstrap, /processing_started_at[\s\S]*TIMESTAMPDIFF/, 'Average time must use a recovered processing start timestamp.');
 assert.match(bootstrap, /f\.customer_name[\s\S]*jg_store_ops_order_records_historical_customer_names/, 'Processed records must use saved customer identifiers and recover historical direct-order names.');
 assert.match(orderRecordsScript(), /record\.source_account === 'default'[\s\S]*admin-order-record-customer[\s\S]*presentation\.customerLabel\(record\)/, 'The Source column must retain the account while the Customer column shows the customer identifier.');
-assert.doesNotMatch(bootstrap, /event_type = \"remove_from_listed\"/, 'Removed queue rows must not be included as processed records.');
+assert.match(bootstrap, /function jg_store_ops_order_records_repair_history[\s\S]*?jg_store_ops_order_stock_state[\s\S]*?stock_changed'\s*=>\s*false/, 'History repair must require prior stock proof and report that inventory was untouched.');
+assert.match(bootstrap, /function jg_store_ops_order_records_processed_join_sql\(\)[\s\S]*?event_type = \"fulfill\"[\s\S]*?function jg_store_ops_order_records_history_repair_key/, 'Removed queue events must remain excluded until a guarded repair creates a real fulfill event.');
 assert.doesNotMatch(page + orderRecordsScript(), /gradient/i, 'The Order Records experience must not introduce gradients.');
 assert.match(css, /\.admin-order-records-events::before,[\s\S]*?\.admin-order-records-events::after\s*\{[\s\S]*?display:\s*none;[\s\S]*?background:\s*none;/, 'Order Records must disable inherited timeline fade gradients.');
 assert.match(fulfillment, /items_json LONGTEXT[\s\S]*?jg_store_ops_fulfillment_items_snapshot[\s\S]*?items_json = CASE/, 'Future processed orders must persist their complete product snapshot.');
