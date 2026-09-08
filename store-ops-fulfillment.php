@@ -585,6 +585,13 @@ function jg_store_ops_fulfillment_release(PDO $pdo, array $key, string $employee
             ':updated_at' => $now,
             ':id' => (int) $row['id'],
         ]);
+        if ($key['source_platform'] === 'whatsapp') {
+            $pdo->prepare(
+                'UPDATE store_ops_website_orders SET status = "IS_LISTED", updated_at = :updated_at
+                 WHERE source_platform = "whatsapp" AND order_id = :order_id
+                   AND status = "IS_BEING_FULFILLED"'
+            )->execute([':updated_at' => $now, ':order_id' => $key['order_id']]);
+        }
         jg_store_ops_fulfillment_log_event($pdo, $key, 'release', $employeeId, $employeeName);
         $row = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
         $pdo->commit();

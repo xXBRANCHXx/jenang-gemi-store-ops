@@ -229,3 +229,17 @@ try {
 website_ops_expect(true, $invalidStockLineRejected, 'WhatsApp stock deduction must reject invalid quantities.');
 
 echo "website-orders-test: ok\n";
+
+foreach (['IS_LISTED', 'IS_BEING_FULFILLED'] as $sourceStatus) {
+    $state = jg_store_ops_whatsapp_cancellation_state_from_order('released-direct', $sourceStatus, ['status' => 'UNCLAIMED', 'claimed_by' => null]);
+    website_ops_expect(true, $state['can_cancel'], 'An unclaimed direct order can be cancelled even after its source entered processing.');
+    website_ops_expect('IS_LISTED', $state['display_status'], 'A released order must no longer display as processing.');
+    foreach ([['status' => 'CLAIMED', 'claimed_by' => 'employee'], ['status' => 'UNCLAIMED', 'claimed_by' => 'employee'], ['status' => 'FULFILLED'], ['status' => 'CANCELLED']] as $fulfillment) {
+        $state = jg_store_ops_whatsapp_cancellation_state_from_order('protected-direct', $sourceStatus, $fulfillment);
+        website_ops_expect(false, $state['can_cancel'], 'Claimed and terminal orders must remain protected from cancellation.');
+    }
+}
+foreach (['FULFILLED', 'REMOVED', 'CANCELLED'] as $sourceStatus) {
+    $state = jg_store_ops_whatsapp_cancellation_state_from_order('terminal-direct', $sourceStatus, ['status' => 'UNCLAIMED']);
+    website_ops_expect(false, $state['can_cancel'], 'Terminal source orders must not become cancellable.');
+}

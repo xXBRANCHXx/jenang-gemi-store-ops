@@ -925,10 +925,10 @@ function jg_store_ops_whatsapp_cancel_unclaimed(
         if (!$alreadyCancelled && !$legacyRemoval && ($claimedBy !== '' || $fulfillmentStatus !== 'UNCLAIMED')) {
             throw new RuntimeException('This WhatsApp order has already been claimed or processed in Store Ops and cannot be cancelled.');
         }
-        if (!$alreadyCancelled && !$legacyRemoval && $sourceStatus !== 'IS_LISTED') {
+        if (!$alreadyCancelled && !$legacyRemoval && !in_array($sourceStatus, ['IS_LISTED', 'IS_BEING_FULFILLED'], true)) {
             throw new RuntimeException($sourceStatus === ''
                 ? 'WhatsApp order is missing from Store Ops.'
-                : 'Only an unclaimed listed WhatsApp order can be cancelled.');
+                : 'Only an active, unclaimed WhatsApp order can be cancelled.');
         }
 
         $now = jg_store_ops_website_now();
@@ -986,19 +986,25 @@ function jg_store_ops_whatsapp_cancellation_state(PDO $pdo, string $orderId): ar
 
     $key = ['source_platform' => 'whatsapp', 'source_account' => 'whatsapp', 'order_id' => $orderId];
     $fulfillment = jg_store_ops_fulfillment_fetch_order($pdo, $key, false);
+    return jg_store_ops_whatsapp_cancellation_state_from_order($orderId, $sourceStatus, $fulfillment,
+        $sourceStatus === 'REMOVED' && jg_store_ops_whatsapp_has_removal_event($pdo, $orderId));
+}
+
+function jg_store_ops_whatsapp_cancellation_state_from_order(string $orderId, string $sourceStatus, ?array $fulfillment, bool $hasRemovalEvent = false): array
+{
     $fulfillmentStatus = strtoupper(trim((string) ($fulfillment['status'] ?? 'UNCLAIMED'))) ?: 'UNCLAIMED';
     $claimedBy = trim((string) ($fulfillment['claimed_by'] ?? ''));
     $legacyRemoval = $sourceStatus === 'REMOVED'
         && $fulfillmentStatus === 'FULFILLED'
         && $claimedBy === ''
-        && jg_store_ops_whatsapp_has_removal_event($pdo, $orderId);
+        && $hasRemovalEvent;
     $cancelled = $legacyRemoval || $sourceStatus === 'CANCELLED' || $fulfillmentStatus === 'CANCELLED';
     $processed = !$legacyRemoval && $fulfillmentStatus === 'FULFILLED';
     $claimed = !$cancelled && !$processed && ($claimedBy !== '' || $fulfillmentStatus !== 'UNCLAIMED');
-    $canCancel = !$cancelled && !$claimed && !$processed && $sourceStatus === 'IS_LISTED';
+    $canCancel = !$cancelled && !$claimed && !$processed && in_array($sourceStatus, ['IS_LISTED', 'IS_BEING_FULFILLED'], true);
     $displayStatus = $cancelled
         ? 'CANCELLED'
-        : ($processed ? 'FULFILLED' : ($claimed ? 'IS_BEING_FULFILLED' : $sourceStatus));
+        : ($processed ? 'FULFILLED' : ($claimed ? 'IS_BEING_FULFILLED' : ($canCancel ? 'IS_LISTED' : $sourceStatus)));
     return [
         'order_id' => $orderId,
         'source_status' => $sourceStatus,
