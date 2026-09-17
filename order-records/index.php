@@ -74,6 +74,7 @@ $orderRecordsJsVersion = (string) @filemtime(dirname(__DIR__) . '/order-records.
                             <p>Available only when Store Ops or API Ingest proves the order was already completed. This does not change stock, marketplace status, or the Listed queue.</p>
                         </div>
                         <form data-order-records-repair-form>
+                            <input type="text" name="username" autocomplete="username" value="branch-vincent" hidden>
                             <label>
                                 <span>Order ID</span>
                                 <input type="text" name="order_id" maxlength="160" placeholder="Exact Order ID" autocomplete="off" required data-order-records-repair-order>

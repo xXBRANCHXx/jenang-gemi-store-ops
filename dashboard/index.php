@@ -35,7 +35,7 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
     <link rel="stylesheet" href="../admin.css?v=<?php echo urlencode($adminCssVersion ?: '1'); ?>">
 </head>
 <body class="admin-body is-dashboard is-store-home">
-    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.48</div>
+    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.49</div>
     <div
         class="admin-app admin-store-home"
         data-store-home
@@ -198,6 +198,7 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
             <div class="admin-modal-shell admin-remove-order-modal" data-remove-order-modal hidden>
                 <div class="admin-modal-backdrop" data-close-remove-order></div>
                 <form class="admin-modal-card admin-remove-order-card" data-remove-order-form role="dialog" aria-modal="true" aria-labelledby="remove-order-title">
+                    <input type="text" name="username" autocomplete="username" value="branch-vincent" hidden>
                     <div class="admin-modal-head">
                         <div>
                             <span class="admin-panel-kicker">Branch authorization</span>
@@ -474,7 +475,7 @@ $currentEmployeeInitial = strtoupper(substr(trim($currentEmployeeName), 0, 1)) ?
                     <form class="admin-employee-profile-form" data-employee-profile-form>
                         <label class="admin-reprint-field">
                             <span>Employee ID</span>
-                            <input class="admin-settings-input" name="id" autocomplete="off" placeholder="vincent" maxlength="64" required>
+                            <input class="admin-settings-input" name="id" autocomplete="username" placeholder="vincent" maxlength="64" required>
                         </label>
                         <label class="admin-reprint-field">
                             <span>Display Name</span>

@@ -109,7 +109,7 @@ function jg_store_ops_shell_open(array $options = []): void
         'data-scan-serial-endpoint' => $rootPrefix . 'api/scan-serial/',
     ], $appAttributes);
     ?>
-    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.45</div>
+    <div class="admin-build-badge" aria-label="Store build version">Build 1.04.49</div>
     <div<?php echo jg_store_ops_shell_attr($attributes); ?>>
         <div class="admin-backdrop admin-backdrop-a"></div>
         <div class="admin-backdrop admin-backdrop-b"></div>
@@ -319,7 +319,7 @@ function jg_store_ops_shell_close(): void
                 <form class="admin-employee-profile-form" data-employee-profile-form>
                     <label>
                         <span>Employee ID</span>
-                        <input class="admin-settings-input" name="id" type="text" autocomplete="off" placeholder="branch-vincent" required>
+                        <input class="admin-settings-input" name="id" type="text" autocomplete="username" placeholder="branch-vincent" required>
                     </label>
                     <label>
                         <span>Display name</span>

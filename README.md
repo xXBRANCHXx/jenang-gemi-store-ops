@@ -75,3 +75,5 @@ Operational backend for `store.jenanggemi.com`.
 - Platform color coding is stored against the authenticated Store Ops employee profile, so a profile uses the same queue colors across stations and browsers.
 - If the local serial fallback reports a permission error, add the web-server user to the Linux `dialout` group or set a udev rule for the IWARE scanner.
 - To install the IWARE udev rule on the POS, run `sudo scripts/install-iware-scanner-permissions.sh`, reconnect the scanner, then use Store Settings > Scanner > Recheck / Test Scan.
+
+- Login exposes the stable employee ID as the password-manager username. Profile tiles and autofill select the same server-validated employee; unique legacy display-name logins remain accepted. Switching tiles clears the previous account's password. Password approval dialogs also identify the Branch account.
