@@ -84,8 +84,16 @@ function jg_store_ops_marketplace_status(array $order): string
     return '';
 }
 
+function jg_store_ops_marketplace_cancelled(array $order): bool
+{
+    return in_array(jg_store_ops_marketplace_status($order), ['CANCELLED', 'CANCELED', 'CANCEL'], true);
+}
+
 function jg_store_ops_marketplace_pre_activation_visible(array $order, string $sourcePlatform): bool
 {
+    if (jg_store_ops_marketplace_cancelled($order)) {
+        return false;
+    }
     if (jg_store_ops_marketplace_label_backed($order)) {
         return false;
     }
@@ -112,6 +120,11 @@ function jg_store_ops_marketplace_order_visible(
     bool $preActivationOnly = false
 ): bool
 {
+    // Delayed/manual flags and stored labels can outlive marketplace
+    // cancellation. A final cancellation always leaves the active queue.
+    if (jg_store_ops_marketplace_cancelled($order)) {
+        return false;
+    }
     if ($preActivationOnly) {
         return jg_store_ops_marketplace_pre_activation_visible($order, $sourcePlatform);
     }

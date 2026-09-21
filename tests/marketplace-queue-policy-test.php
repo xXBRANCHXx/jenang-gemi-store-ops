@@ -22,6 +22,34 @@ $failedTikTokArrangement = ['platform' => 'TikTok', 'marketplaceStatus' => 'AWAI
 marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible($failedTikTokArrangement, 'tiktok', true), 'An exhausted TikTok/Tokopedia arrangement must remain visible without a label.');
 $regularShopeeManual = ['platform' => 'Shopee', 'marketplaceStatus' => 'READY_TO_SHIP', 'shopeeManualRequired' => true, 'labelBacked' => false];
 marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible($regularShopeeManual, 'shopee', true), 'Every unlabelled regular Shopee order must remain visible for fail-safe handling.');
+$delayedShopee = $regularShopeeManual + [
+    'deadlineType' => 'estimated',
+    'deadlineSource' => 'created_plus_24h',
+    'shopeeArrangementState' => 'failed',
+    'shopeeArrangementError' => 'Shipping parameters can only be obtained when package is ready to be shipped',
+];
+marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible($delayedShopee, 'shopee', true), 'A delayed order must remain Listed while the marketplace still expects shipment.');
+foreach (['CANCELLED', 'CANCELED', 'CANCEL'] as $cancelledStatus) {
+    foreach ([false, true] as $requireLabelBacked) {
+        foreach ([false, true] as $preActivationOnly) {
+            $cancelledOrder = array_replace($delayedShopee, [
+                'marketplaceStatus' => ' ' . strtolower($cancelledStatus) . ' ',
+                'cancellationRequested' => true,
+            ]);
+            marketplace_queue_expect(false, jg_store_ops_marketplace_order_visible($cancelledOrder, 'shopee', $requireLabelBacked, $preActivationOnly), 'Confirmed cancellation must override delayed/manual and stale cancellation-request flags in every queue mode.');
+            marketplace_queue_expect(false, jg_store_ops_marketplace_order_visible(array_replace($cancelledOrder, ['labelBacked' => true]), 'shopee', $requireLabelBacked, $preActivationOnly), 'A stored label must not keep a confirmed cancellation Listed.');
+        }
+    }
+}
+foreach (['marketplace_status', 'orderStatus', 'order_status', 'status'] as $statusKey) {
+    $cancelledOrder = $delayedShopee;
+    unset($cancelledOrder['marketplaceStatus']);
+    $cancelledOrder[$statusKey] = 'CANCELLED';
+    marketplace_queue_expect(false, jg_store_ops_marketplace_order_visible($cancelledOrder, 'shopee', true), 'Supported marketplace status aliases must also remove canceled delayed orders.');
+}
+foreach (['IN_CANCEL', 'CANCEL_REQUESTED', 'CANCELLATION_REQUESTED', 'CANCEL_PENDING', 'CANCELLATION_PENDING'] as $pendingStatus) {
+    marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible(array_replace($delayedShopee, ['marketplaceStatus' => $pendingStatus]), 'shopee', true), 'A pending cancellation must remain visible until the marketplace confirms the outcome.');
+}
 marketplace_queue_expect(false, jg_store_ops_marketplace_failed_arrangement($failedTikTokArrangement + ['instant' => true]), 'The regular-order recovery contract must never classify an Instant order as a failed arrangement alert.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible(['platform' => 'Shopee', 'marketplaceStatus' => 'PROCESSED', 'labelBacked' => true], 'shopee', true), 'Marketplace PROCESSED means arranged and must remain Listed until Store Ops processes it.');
 marketplace_queue_expect(true, jg_store_ops_marketplace_order_visible(['platform' => 'Shopee', 'marketplaceStatus' => 'Shipped', 'labelBacked' => true], 'shopee', true), 'Marketplace shipping progress must not erase an order Store Ops has not processed.');
